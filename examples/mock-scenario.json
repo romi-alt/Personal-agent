@@ -1,0 +1,11 @@
+{
+  "tasks": {
+    "Scaffold project": ["success"],
+    "Build attendance module": [
+      { "type": "partial", "writes": [{ "file": "attendance/README.md", "content": "half done\n" }] },
+      { "type": "quota", "resetsInMs": 30000 },
+      "success"
+    ],
+    "Write reports": ["success"]
+  }
+}

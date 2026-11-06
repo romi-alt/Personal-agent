@@ -1,0 +1,44 @@
+{
+  "name": "elevariq-personal-agent",
+  "version": "0.1.0",
+  "private": true,
+  "description": "ELEVARIQ Personal Agent - Phase 1: persistent supervisor, durable queue, recovery, provider adapters",
+  "type": "module",
+  "engines": {
+    "node": ">=22.12"
+  },
+  "scripts": {
+    "agent": "tsx src/cli/index.ts",
+    "agent:dist": "node dist/cli/index.js",
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check src tests",
+    "test": "vitest run",
+    "test:unit": "vitest run tests/unit",
+    "test:integration": "vitest run tests/integration",
+    "test:e2e": "vitest run tests/e2e",
+    "check": "npm run typecheck && npm run lint && npm run test",
+    "smoke:live": "tsx scripts/live-smoke.ts"
+  },
+  "dependencies": {
+    "@anthropic-ai/claude-agent-sdk": "^0.3.319",
+    "better-sqlite3": "^13.0.3",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/better-sqlite3": "^9.6.0",
+    "@types/node": "^26.6.6",
+    "eslint": "^10.14.0",
+    "prettier": "^3.9.10",
+    "tsx": "^4.23.15",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.72.1",
+    "vitest": "^5.1.0"
+  },
+  "bin": {
+    "elevariq-agent": "dist/cli/index.js"
+  }
+}

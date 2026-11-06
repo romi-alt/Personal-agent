@@ -1,0 +1,49 @@
+# ELEVARIQ Personal Agent supervisor - systemd unit (Ubuntu/Debian/any systemd distro)
+# Install: sudo scripts/linux/install.sh   (see docs/OPERATIONS.md)
+[Unit]
+Description=ELEVARIQ Personal Agent supervisor
+Documentation=file:///opt/elevariq-personal-agent/docs/OPERATIONS.md
+After=network-online.target
+Wants=network-online.target
+StartLimitIntervalSec=600
+StartLimitBurst=20
+
+[Service]
+Type=simple
+User=elevariq-agent
+Group=elevariq-agent
+WorkingDirectory=/opt/elevariq-personal-agent
+# Non-secret settings live here; secrets (ANTHROPIC_API_KEY) go in the root-owned 0640 env file below.
+Environment=NODE_ENV=production
+Environment=AGENT_HOME=/var/lib/elevariq-agent
+Environment=AGENT_ENV_FILE=/etc/elevariq-agent/agent.env
+Environment=HOME=/var/lib/elevariq-agent
+EnvironmentFile=-/etc/elevariq-agent/agent.env
+# Adjust the node path to match `command -v node` on the host.
+ExecStart=/usr/bin/node dist/cli/index.js start
+
+# Restart only on crashes. Exit 0 = graceful stop (CLI `stop` / SIGTERM); exit 3 = another supervisor is live.
+Restart=on-failure
+RestartSec=10
+RestartPreventExitStatus=3
+
+# SIGTERM triggers graceful shutdown (checkpoint + lease release); allow time for it.
+KillSignal=SIGTERM
+TimeoutStopSec=60
+
+# State outside ephemeral directories
+StateDirectory=elevariq-agent
+StateDirectoryMode=0750
+
+# Hardening (non-root, minimal privileges)
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+ReadWritePaths=/var/lib/elevariq-agent
+
+[Install]
+WantedBy=multi-user.target

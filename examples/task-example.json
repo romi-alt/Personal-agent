@@ -1,0 +1,6 @@
+{
+  "title": "Add student enrollment API",
+  "instructions": "Create a REST endpoint POST /students with validation and unit tests.",
+  "acceptanceCriteria": "Tests pass; invalid payloads return 400; README documents the endpoint.",
+  "priority": 1
+}
