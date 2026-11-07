@@ -1,4 +1,5 @@
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync } from 'node:fs';
+import { removeTempDir } from './fs.js';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { type AppConfig, loadConfig } from '../../src/config/index.js';
@@ -35,7 +36,7 @@ export interface TestEnv {
   workflows: WorkflowEngine;
   lines: string[];
   log: Logger;
-  cleanup(): void;
+  cleanup(): Promise<void>;
 }
 
 export async function makeEnv(
@@ -98,13 +99,19 @@ export async function makeEnv(
     workflows,
     lines,
     log,
-    cleanup: () => {
+    cleanup: async () => {
+      // A worker still in flight (slow git/process spawns on Windows) would otherwise write to a closed database.
+      try {
+        await waitFor(() => supervisor.activeWorkers === 0, 30_000);
+      } catch {
+        /* report via the test itself; still release resources */
+      }
       try {
         db.close();
       } catch {
         /* already closed */
       }
-      rmSync(dir, { recursive: true, force: true });
+      removeTempDir(dir);
     },
   };
 }

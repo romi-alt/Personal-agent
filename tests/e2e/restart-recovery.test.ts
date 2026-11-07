@@ -1,11 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { type ChildProcess, spawn, spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { openDatabase } from '../../src/database/connection.js';
 import { Store } from '../../src/queue/store.js';
 import { waitFor } from '../helpers/env.js';
+import { removeTempDir } from '../helpers/fs.js';
 
 /**
  * End-to-end: REAL supervisor processes (spawned via the CLI), a REAL SQLite file, REAL SIGKILL.
@@ -54,10 +55,12 @@ beforeEach(() => {
     NODE_NO_WARNINGS: '1',
   };
 });
-afterEach(() => {
-  for (const p of procs) if (p.exitCode === null) p.kill('SIGKILL');
+afterEach(async () => {
+  const alive = procs.filter((p) => p.exitCode === null && p.signalCode === null);
+  for (const p of alive) p.kill('SIGKILL');
+  await Promise.all(alive.map(exited));
   procs.length = 0;
-  rmSync(home, { recursive: true, force: true });
+  removeTempDir(home);
 });
 
 describe('E2E: three tasks, capacity exhaustion, supervisor killed and restarted', () => {

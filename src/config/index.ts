@@ -3,6 +3,7 @@ import { parseEnv } from 'node:util';
 import { homedir } from 'node:os';
 import path from 'node:path';
 import { z } from 'zod';
+import { normalizeText } from '../core/text.js';
 
 export class ConfigError extends Error {
   constructor(
@@ -173,7 +174,7 @@ export function defaultAgentHome(env: NodeJS.ProcessEnv): string {
 /** Read a .env file (never mutates process.env). Real environment variables win. */
 export function readEnvFile(file: string): Record<string, string> {
   if (!existsSync(file)) return {};
-  return parseEnv(readFileSync(file, 'utf8')) as Record<string, string>;
+  return parseEnv(normalizeText(readFileSync(file, 'utf8'))) as Record<string, string>;
 }
 
 export function loadConfig(opts: LoadConfigOptions = {}): AppConfig {

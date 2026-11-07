@@ -1,10 +1,11 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, mkdirSync, rmSync } from 'node:fs';
+import { mkdtempSync, mkdirSync } from 'node:fs';
 import { tmpdir, hostname } from 'node:os';
 import path from 'node:path';
 import { openDatabase } from '../../src/database/connection.js';
 import { Store } from '../../src/queue/store.js';
+import { removeTempDir } from '../helpers/fs.js';
 
 /** Every advertised CLI command is executed for real against a throwaway AGENT_HOME. */
 const ROOT = path.resolve(__dirname, '../..');
@@ -34,7 +35,7 @@ beforeAll(() => {
     NODE_NO_WARNINGS: '1',
   };
 });
-afterAll(() => rmSync(home, { recursive: true, force: true }));
+afterAll(() => removeTempDir(home));
 
 describe('CLI commands', () => {
   let taskId = '';

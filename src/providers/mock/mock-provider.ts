@@ -1,5 +1,6 @@
-import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { appendFileSync, existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
+import { readTextFile } from '../../core/text.js';
 import type { AuthReadiness, ExecutionProvider, RunOutcome, RunRequest } from '../types.js';
 
 /**
@@ -108,14 +109,14 @@ export class MockProvider implements ExecutionProvider {
 
   private scenario(): MockScenario {
     if (this.opts.scenarioFile && existsSync(this.opts.scenarioFile)) {
-      return JSON.parse(readFileSync(this.opts.scenarioFile, 'utf8')) as MockScenario;
+      return JSON.parse(readTextFile(this.opts.scenarioFile)) as MockScenario;
     }
     return this.opts.scenario ?? { tasks: {} };
   }
 
   private capacity(): { available: boolean; mode?: string; retryAfterMs?: number; resetsInMs?: number } {
     if (this.opts.capacityFile && existsSync(this.opts.capacityFile)) {
-      return JSON.parse(readFileSync(this.opts.capacityFile, 'utf8')) as { available: boolean };
+      return JSON.parse(readTextFile(this.opts.capacityFile)) as { available: boolean };
     }
     return { available: true };
   }

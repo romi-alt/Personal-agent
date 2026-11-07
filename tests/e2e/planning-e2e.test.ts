@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { type ChildProcess, spawn, spawnSync } from 'node:child_process';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { openDatabase } from '../../src/database/connection.js';
@@ -8,6 +8,7 @@ import { Store } from '../../src/queue/store.js';
 import { WorkflowRepository } from '../../src/workflows/repository.js';
 import { assignmentExample } from '../helpers/assignment.js';
 import { waitFor } from '../helpers/env.js';
+import { removeTempDir } from '../helpers/fs.js';
 import { analysisJson, architectureJson, planJson, reply } from '../helpers/plan-fixtures.js';
 
 /**
@@ -60,10 +61,12 @@ beforeEach(() => {
     NODE_NO_WARNINGS: '1',
   };
 });
-afterEach(() => {
-  for (const p of procs) if (p.exitCode === null) p.kill('SIGKILL');
+afterEach(async () => {
+  const alive = procs.filter((p) => p.exitCode === null && p.signalCode === null);
+  for (const p of alive) p.kill('SIGKILL');
+  await Promise.all(alive.map(exited));
   procs.length = 0;
-  rmSync(home, { recursive: true, force: true });
+  removeTempDir(home);
 });
 
 describe('E2E: assignment -> planned tasks -> executed -> VERIFYING, across a SIGKILL during planning', () => {

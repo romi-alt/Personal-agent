@@ -76,9 +76,16 @@ describe('workspace path safety', () => {
     expect(() => resolveInside(root, '/etc/passwd')).toThrow(WorkspaceViolationError);
     expect(resolveInside(root, 'src/x.ts')).toBe(path.join(root, 'src/x.ts'));
   });
-  it('detects symlink escapes', () => {
+  it('detects symlink escapes', (ctx) => {
     const outside = mkdtempSync(path.join(tmpdir(), 'outside-'));
-    symlinkSync(outside, path.join(root, 'link'));
+    try {
+      // 'junction' is ignored on POSIX; on Windows a junction needs no Developer Mode / admin privilege, unlike a
+      // directory symlink, and is the link type an attacker-controlled repo most realistically contains.
+      symlinkSync(outside, path.join(root, 'link'), 'junction');
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code === 'EPERM') ctx.skip();
+      throw err;
+    }
     expect(isPathInside(path.join(root, 'link', 'secret.txt'), root)).toBe(false);
   });
 });

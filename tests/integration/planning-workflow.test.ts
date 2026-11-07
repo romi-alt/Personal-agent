@@ -4,7 +4,7 @@ import { Store } from '../../src/queue/store.js';
 import { Supervisor } from '../../src/supervisor/supervisor.js';
 import { WorkflowEngine } from '../../src/workflows/engine.js';
 import { assignmentExample } from '../helpers/assignment.js';
-import { makeEnv, settle, type TestEnv } from '../helpers/env.js';
+import { makeEnv, settle, waitFor, type TestEnv } from '../helpers/env.js';
 import { analysisJson, architectureJson, happyPlanning, planJson, reply } from '../helpers/plan-fixtures.js';
 
 let env: TestEnv;
@@ -310,7 +310,7 @@ describe('durability: crashes, waits and replays', () => {
     const run = env.workflows.startPlanning(project.id);
     // run only the first step, then "crash"
     await env.supervisor.tick();
-    await new Promise((r) => setTimeout(r, 150));
+    await waitFor(() => env.supervisor.activeWorkers === 0, 20_000);
     env.workflows.advanceAll();
     expect(env.workflows.repo.latestStep(run.id, 'analyze')!.status).toBe('COMPLETED');
     expect(env.workflows.repo.latestStep(run.id, 'architect')).toBeNull();

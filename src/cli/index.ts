@@ -8,6 +8,7 @@ import { parseArgs } from 'node:util';
 import { promisify } from 'node:util';
 import { ConfigError } from '../config/index.js';
 import { createApp, type App } from '../core/app.js';
+import { readTextFile } from '../core/text.js';
 import { createIntegrations, EVENT_MAPPING } from '../integrations/index.js';
 import { MEMORY_SECTIONS } from '../memory/context.js';
 import { reconcileOrphans } from '../recovery/reconcile.js';
@@ -413,7 +414,7 @@ async function main(): Promise<void> {
           : [];
         let priority = values.priority ? Number(values.priority) : 0;
         if (values.file) {
-          const text = readFileSync(values.file, 'utf8');
+          const text = readTextFile(values.file);
           if (values.file.endsWith('.json')) {
             const j = JSON.parse(text) as {
               title?: string;
@@ -888,7 +889,7 @@ async function main(): Promise<void> {
         if (!values.file) fail('usage: assignment:add --file assignment.json');
         let raw: unknown;
         try {
-          raw = JSON.parse(readFileSync(values.file, 'utf8'));
+          raw = JSON.parse(readTextFile(values.file));
         } catch (e) {
           fail(`cannot read ${values.file}: ${(e as Error).message}`);
         }
