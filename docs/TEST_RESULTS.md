@@ -102,3 +102,24 @@ Not covered: real model output, prompt quality, plan cost, Windows, GitHub CI (a
 
 History: the first Windows run failed at `npm ci` (node-gyp rebuild of `better-sqlite3`; fixed by `.npmrc` `ignore-scripts=true`), the second ran 219/226 (one real CRLF bug in `task:add --file`, plus test-harness issues on file locks, timing and path forms; all fixed with a regression test).
 Still unverified: PowerShell / Task Scheduler scripts, Windows sleep/reboot behaviour, live Claude provider.
+
+---
+
+# Phase 2 stage 5 results - 2026-11-07
+
+Linux sandbox, mock provider only. No real model or API request.
+
+| Command | Result |
+|---|---|
+| `npm run typecheck` / `lint` / `format:check` / `build` | all pass |
+| `npm test` | **19 files, 253 tests, 253 passed, 0 failed** (~37 s) |
+| `npm run test:unit` | 119 passed |
+| `npm run test:integration` | 113 passed |
+| `npm run test:e2e` | 21 passed |
+| `npm audit --omit=dev` | 0 vulnerabilities |
+| Secret scan (outside `tests/`) | none |
+
+New (+27 tests since 226): `integration/progress-dispatch` (25: verified-vs-claimed on the real planning pipeline, failing checks, no-change "success", latest-evidence-wins, milestone/requirement states, change-only and bounded snapshots, strict vs off milestone gating, every inbox kind appearing and clearing) and CLI/real-process e2e additions.
+Mutation checks: counting an unchecked task as verified fails 1 test; leaving the milestone gate always open fails 2.
+Bugs found by the new tests while building: progress change detection keyed on a timestamp could miss same-millisecond changes (now a monotonic token); the inbox's "newer run" check depended on timestamps (now creation order); Phase 1's provider-claim project summary fought the tracker (removed).
+Windows/GitHub CI for this branch: see the PR checks. Not covered: real model output, Windows service scripts.
