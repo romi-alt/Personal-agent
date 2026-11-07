@@ -67,3 +67,25 @@ Phase 1's 24-item coverage map (config, DB, queue ordering, transitions, locking
 * Verification commands run model-written code **unsandboxed**; command screening is a guardrail, not a sandbox.
 * Requirements-satisfied and security verification are **not implemented**; the delivery-readiness derivation can therefore never be fully `ready` without an explicit owner override.
 * GitHub: the default-branch switch and branch protection could not be applied from this session (proxy blocks settings writes); CI has not yet run on GitHub.
+
+---
+
+# Phase 2 (stages 1-4) results - 2026-11-07
+
+Linux sandbox, mock provider only. No real model or API request was involved.
+
+| Command | Result |
+|---|---|
+| `npm run typecheck` / `lint` / `format:check` / `build` | all pass |
+| `npm test` | **18 files, 226 tests, 226 passed, 0 failed** (~30 s) |
+| `npm run test:unit` | 119 passed |
+| `npm run test:integration` | 88 passed |
+| `npm run test:e2e` | 19 passed |
+| `npm audit --omit=dev` | 0 vulnerabilities |
+| Secret scan (outside `tests/`) | none |
+
+New in Phase 2 (+43 tests): `unit/planning` (24: JSON extraction, schemas, every validator rule, property tests on 200 random DAGs and 200 injected cycles, read-only policy),
+`integration/planning-workflow` (17), `e2e/planning-e2e` (1: real processes, SIGKILL during the architecture step, approval via CLI, all 3 planning + 3 coding tasks completed exactly once),
+plus one Claude-adapter read-only test. Mutation check: disabling the coverage validator makes 3 tests fail.
+
+Not covered: real model output, prompt quality, plan cost, Windows, GitHub CI (account-level runner problem, see PR #1).
