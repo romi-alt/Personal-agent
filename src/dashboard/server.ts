@@ -78,7 +78,9 @@ export function startDashboard(app: App, opts: DashboardOptions): Promise<Server
     const nonce = randomBytes(16).toString('base64');
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('X-Frame-Options', 'DENY');
-    res.setHeader('Referrer-Policy', 'no-referrer');
+    // same-origin (not no-referrer): browsers then send the real Origin on same-origin POSTs, which the origin check
+    // requires; with no-referrer they send Origin: null and every login/action would be refused.
+    res.setHeader('Referrer-Policy', 'same-origin');
     res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
     res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
     res.setHeader(

@@ -78,7 +78,17 @@ const done = () => {
       app.qa.rows().some((q) => q.status === 'ESCALATED'))
   );
 };
-while (!done() && Date.now() < deadline) await new Promise((r) => setTimeout(r, 5000));
+while (!done() && Date.now() < deadline) {
+  // Significant ADRs require owner approval even with PLAN_APPROVAL=auto. This smoke runs a disposable sandbox
+  // project, so the harness approves it and records that it did (never do this for real projects).
+  for (const a of app.store
+    .listApprovals('PENDING')
+    .filter((x) => x.projectId === project.id && x.actionType === 'plan_approval')) {
+    app.store.decideApproval(a.id, 'APPROVED', 'live-pipeline-smoke (sandbox project)');
+    console.log(`INFO  plan approval ${a.id} approved by the smoke harness: ${a.description}`);
+  }
+  await new Promise((r) => setTimeout(r, 5000));
+}
 sup.requestStop('live pipeline smoke finished');
 await started;
 

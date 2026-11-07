@@ -76,17 +76,22 @@ Observed facts (do not re-derive):
 
 - Windows restart / sign-in trigger: cannot be automated safely here. Manual check in `docs/WINDOWS_DEPLOYMENT.md`.
 - Real usage-limit wait output of the CLI: inferred from docs, never observed live (deliberately).
-- Command-center UI has not been rendered in a real browser in this environment (API, auth and script syntax are
-  tested); Playwright is not installed.
-- Research with real WebSearch/WebFetch and the QA reviewer against the real CLI: only mock-tested so far.
+- Research with real WebSearch/WebFetch: not run live (the live pipeline ran with web disabled).
+- Live pipeline (2026-11-07): planning + task 1 coding + independent QA PASSED on the real CLI; task 2 stopped at a
+  `destructive_delete` approval (worker cleaned a scratch dir with `rm -rf`); owner decision pending in the sandbox.
+- Playwright UI QA of generated products: not implemented (dependency + browser download = owner decision).
+
+## Done since the last checkpoint
+
+- Commit `4d840a5`: keepalive + stop --hold, ERP sync preparation, security verifier, requirement aggregation, ops docs.
+- Command center checked in real Edge (`scripts/ui-browser-check.ts`): fixed Referrer-Policy/Origin null login
+  refusal, CSP-blocked inline styles, layout overflow, evidence count. Screenshots in `docs/screenshots/`.
+- `docs/ACCEPTANCE_REPORT.md` (Stage 8) with evidence per criterion and the list of tests not performed.
 
 ## Next (in order)
 
-1. Commit Stage 1 + Phase 2 + Phase 3 + Phase 5 (this checkpoint), re-run the scheduler acceptance.
-2. Phase 6: backups + restore test, `systemd` unit + non-root install script, health/error notifications, operations docs.
-3. Phase 4 preparation: typed adapter contracts, auth interfaces, sync designs, idempotency, pagination, audit, mock tests,
-   integration checklist (real integration stays blocked until the ERP repo/API docs and read-only credentials arrive).
-4. Phase 3 remainder: Playwright UI QA runner (needs `@playwright/test` + browser download: owner network decision),
-   security verifier (secret scan) for `SECURITY_CHECKS_PASS`, project-level `REQUIREMENTS_SATISFIED` aggregation.
-5. Live run of the full pipeline on the real CLI with a tiny assignment (intake -> plan -> approve -> code -> QA).
-6. Final acceptance report (Stage 8) with exact evidence and the list of real-world tests not performed.
+1. Owner decisions (see the final report in the conversation): ERP/CRM resources (`docs/ERP_INTEGRATION_CHECKLIST.md`),
+   Playwright download, a real reboot check of the Windows task, installing the production scheduled task.
+2. Optional live run with web research enabled and a test-command-bearing assignment, after the owner decides on
+   destructive-delete policy for scratch directories inside managed workspaces.
+3. Merge `feat/windows-compat` into the baseline branch through a PR once the owner has reviewed it.

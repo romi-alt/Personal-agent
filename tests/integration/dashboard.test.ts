@@ -220,6 +220,27 @@ describe('Phase 5: owner command center', () => {
     expect(() => new Function(script)).not.toThrow();
   });
 
+  it('browser login: same-origin Origin header accepted, Origin null refused (regression from the real-browser check)', async () => {
+    const { base, token, p } = await boot();
+    const page = await fetch(`${base}/`);
+    expect(page.headers.get('referrer-policy')).toBe('same-origin'); // no-referrer made browsers send Origin: null
+    const ok = await fetch(`${base}/login`, {
+      method: 'POST',
+      body: new URLSearchParams({ token }),
+      redirect: 'manual',
+      headers: { origin: `http://127.0.0.1:${p}` },
+    });
+    expect(ok.status).toBe(303);
+    const nul = await fetch(`${base}/login`, {
+      method: 'POST',
+      body: new URLSearchParams({ token }),
+      redirect: 'manual',
+      headers: { origin: 'null' },
+    });
+    expect(nul.status).toBe(403);
+    expect(await page.text()).not.toMatch(/style="/); // inline style attributes are blocked by the CSP
+  });
+
   it('refuses to bind to a non-loopback interface unless explicitly allowed', async () => {
     env = await makeEnv();
     const app = { config: env.config, store: env.store, log: env.log } as unknown as App;

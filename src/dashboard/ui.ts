@@ -12,20 +12,20 @@ const CSS = String.raw`
 --auth:#b993ff;--auth-bg:#241a37;--appr:#ffab6b;--appr-bg:#33200f;--bad:#ff7a6e;--bad-bg:#371614;--idle:#98a2b3;--idle-bg:#1d2330}}
 *{box-sizing:border-box}html,body{margin:0;height:100%}body{background:var(--bg);color:var(--ink);font:14px/1.5 var(--font)}
 a{color:var(--accent);text-decoration:none}a:hover{text-decoration:underline}
-.app{display:grid;grid-template-columns:232px 1fr;min-height:100%}
+.app{display:grid;grid-template-columns:232px minmax(0,1fr);min-height:100%}
 nav.side{background:var(--panel);border-right:1px solid var(--line);padding:20px 14px;position:sticky;top:0;height:100vh}
 .brand{font-weight:700;letter-spacing:.2px;font-size:15px;margin:2px 8px 18px}.brand small{display:block;color:var(--muted);font-weight:500;font-size:12px}
 nav.side a{display:flex;justify-content:space-between;align-items:center;padding:8px 10px;border-radius:8px;color:var(--ink);margin-bottom:2px}
 nav.side a.on{background:var(--soft);font-weight:600}nav.side a:hover{text-decoration:none;background:var(--soft)}
 .count{font-size:12px;background:var(--appr-bg);color:var(--appr);border-radius:999px;padding:0 8px;font-weight:600}
-main{padding:24px 32px 48px;max-width:1400px;width:100%}
+main{padding:24px 32px 48px;max-width:1400px;width:100%;min-width:0}
 header.top{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:20px;flex-wrap:wrap}
 h1{font-size:22px;margin:0;letter-spacing:-.2px}h2{font-size:15px;margin:0 0 12px}h3{font-size:13px;margin:16px 0 8px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px}
 .muted{color:var(--muted)}.mono{font-family:var(--mono);font-size:12.5px}
 .grid{display:grid;gap:16px}.g4{grid-template-columns:repeat(auto-fill,minmax(170px,1fr))}.g2{grid-template-columns:minmax(0,2fr) minmax(0,1fr)}
 @media (max-width:1100px){.g2{grid-template-columns:1fr}.app{grid-template-columns:1fr}nav.side{position:static;height:auto}}
 .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:16px}
-.kpi .v{font-size:26px;font-weight:700;letter-spacing:-.5px}.kpi .l{color:var(--muted);font-size:12.5px}
+.kpi .v{font-size:26px;font-weight:700;letter-spacing:-.5px}.kpi .badge{white-space:normal;max-width:100%}.kpi .l{color:var(--muted);font-size:12.5px}
 .badge{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:2px 10px;font-size:12px;font-weight:600;white-space:nowrap}
 .badge::before{content:"";width:7px;height:7px;border-radius:50%;background:currentColor}
 .s-RUNNING,.s-CHECKPOINTING{color:var(--run);background:var(--run-bg)}.s-WAITING_FOR_USAGE_RESET,.s-WAITING_FOR_CAPACITY,.s-RETRY_SCHEDULED{color:var(--wait);background:var(--wait-bg)}
@@ -36,7 +36,7 @@ h1{font-size:22px;margin:0;letter-spacing:-.2px}h2{font-size:15px;margin:0 0 12p
 table{width:100%;border-collapse:collapse}th{text-align:left;font-size:12px;color:var(--muted);font-weight:600;padding:8px 10px;border-bottom:1px solid var(--line);white-space:nowrap}
 td{padding:9px 10px;border-bottom:1px solid var(--line);vertical-align:top}tr:last-child td{border-bottom:0}
 .bar{height:8px;background:var(--soft);border-radius:99px;overflow:hidden;min-width:90px}.bar>i{display:block;height:100%;background:var(--ok)}
-.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin:0 0 16px;overflow-x:auto}
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin:0 0 16px;overflow-x:auto;scrollbar-width:thin}
 .tabs a{padding:8px 12px;color:var(--muted);border-bottom:2px solid transparent;white-space:nowrap}.tabs a.on{color:var(--ink);border-color:var(--accent);font-weight:600}
 .tabs a:hover{text-decoration:none;color:var(--ink)}
 .timeline{list-style:none;margin:0;padding:0}.timeline li{display:grid;grid-template-columns:92px 1fr;gap:10px;padding:7px 0;border-bottom:1px dashed var(--line)}
@@ -50,6 +50,7 @@ pre{white-space:pre-wrap;word-break:break-word;background:var(--soft);padding:12
 .kv{display:grid;grid-template-columns:180px 1fr;gap:6px 14px}.kv dt{color:var(--muted)}.kv dd{margin:0}
 .empty{color:var(--muted);padding:12px 0}.err{color:var(--bad)}.toast{position:fixed;bottom:20px;right:20px;background:var(--ink);color:var(--bg);padding:10px 14px;border-radius:8px}
 .health{display:flex;gap:10px;flex-wrap:wrap;align-items:center}.sr{position:absolute;left:-9999px}
+.login{max-width:420px;margin:12vh auto;padding:0 16px}.login-title{margin-bottom:6px}.login-actions{margin-top:12px}
 `;
 
 const JS = String.raw`
@@ -62,6 +63,7 @@ function h(tag, props) {
     var v = props[k];
     if (v == null || v === false) continue;
     if (k === 'class') el.className = v; else if (k === 'text') el.textContent = String(v);
+    else if (k === 'style') el.style.cssText = String(v); // CSSOM: allowed under the nonce CSP (style attributes are not)
     else if (k.slice(0, 2) === 'on') el.addEventListener(k.slice(2), v); else el.setAttribute(k, v === true ? '' : String(v));
   }
   for (var i = 2; i < arguments.length; i++) add(el, arguments[i]);
@@ -146,7 +148,7 @@ function viewProject(id, tab) {
     return page(p.name, p.lifecycle.replace(/_/g, ' ') + ' - ' + p.repoPath, [tabs, (PROJECT_TABS[tab] || PROJECT_TABS.overview)(d)], actions);
   });
 }
-function priorityControl(value, save) { var inp = h('input', { type: 'number', value: value, style: 'width:90px', 'aria-label': 'priority' }); return h('span', { class: 'actions' }, inp, act('Set priority', function () { return save(parseInt(inp.value, 10)); })); }
+function priorityControl(value, save) { var inp = h('input', { type: 'number', value: value, style: 'width:90px', 'aria-label': 'priority' }); return h('span', { class: 'actions' }, h('label', { class: 'muted', text: 'Priority' }), inp, act('Set priority', function () { return save(parseInt(inp.value, 10)); })); }
 function kv(pairs) { return h('dl', { class: 'kv' }, pairs.map(function (p) { return [h('dt', { text: p[0] }), h('dd', null, p[1] == null || p[1] === '' ? '-' : p[1])]; })); }
 function list(items) { return items && items.length ? h('ul', null, items.map(function (x) { return h('li', { text: x }); })) : h('span', { class: 'muted', text: '-' }); }
 var PROJECT_TABS = {
@@ -162,7 +164,7 @@ var PROJECT_TABS = {
   research: function (d) { return card('Research findings', [h('p', { class: 'muted', text: 'Verified = every cited source was actually retrieved by the research session. Everything else is an assumption.' }), table([['ID', function (f) { return f.findingId; }], ['Area', function (f) { return f.area; }], ['Kind', function (f) { return badge(f.kind, f.kind + (f.claimedKind !== f.kind ? ' (claimed ' + f.claimedKind + ')' : '')); }], ['Confidence', function (f) { return f.confidence; }], ['Statement', function (f) { return f.statement; }], ['Sources', function (f) { return f.sources.length ? h('div', null, f.sources.map(function (s) { return h('div', null, h('a', { href: s.url, rel: 'noopener noreferrer', target: '_blank', text: s.title })); })) : '-'; }], ['Date', function (f) { return when(f.researchedAt); }]], d.research, 'No research yet.')]); },
   architecture: function (d) { var a = d.architecture; if (!a) return card(null, h('div', { class: 'empty', text: 'No architecture yet.' })); return h('div', { class: 'grid' }, Object.keys(a.sections).map(function (k) { return card(k.charAt(0).toUpperCase() + k.slice(1), h('pre', { text: a.sections[k] || '(not specified)' })); }), card('Diagrams (Mermaid source; rendered in docs/architecture/ARCHITECTURE.md)', a.diagrams.length ? a.diagrams.map(function (g) { return [h('h3', { text: g.title }), h('pre', { text: g.mermaid })]; }) : h('div', { class: 'empty', text: 'No diagrams.' }))); },
   adrs: function (d) { return h('div', { class: 'grid' }, d.adrs.length ? d.adrs.map(function (a) { return card('ADR ' + String(a.number).padStart(4, '0') + ': ' + a.title, kv([['Status', badge(a.status)], ['Significant', a.significant ? 'yes - owner review' : 'no'], ['Date', when(a.decidedAt)], ['Context', a.context], ['Decision', a.decision], ['Alternatives', list(a.alternatives)], ['Rationale', a.rationale], ['Consequences', a.consequences], ['File', a.filePath]])); }) : card(null, h('div', { class: 'empty', text: 'No decision records yet.' }))); },
-  roadmap: function (d) { var r = d.roadmap; return h('div', { class: 'grid' }, card('Milestones', table([['Key', function (m) { return m.key; }], ['Title', function (m) { return m.title; }], ['Goal', function (m) { return m.goal; }], ['Verified', function (m) { var g = r.progress.milestones.filter(function (x) { return x.key === m.key; })[0]; return g ? h('div', null, bar(g.ratio), h('span', { class: 'muted', text: g.delivered + '/' + g.total })) : '-'; }]], r.milestones)), r.epics.length ? card('Epics', table([['Key', function (e) { return e.key; }], ['Title', function (e) { return e.title; }], ['Verified', function (e) { var g = r.progress.epics.filter(function (x) { return x.key === e.key; })[0]; return g ? g.delivered + '/' + g.total : '-'; }]], r.epics)) : null, card('Task graph (critical path marked)', table([['Key', function (t) { return h('span', { class: 'mono', text: (r.criticalPath.path.indexOf(t.key) >= 0 ? '* ' : '') + t.key }); }], ['Task', function (t) { return t.title; }], ['Milestone', function (t) { return t.milestone; }], ['Size', function (t) { return t.size; }], ['Depends on', function (t) { return t.dependsOn.join(', ') || '-'; }], ['Status', function (t) { return badge(t.status); }], ['Evidence', function (t) { return t.delivered ? badge('PASSED', 'verified') : t.passed.length + '/' + t.required.length; }]], r.tasks, 'No plan yet.'))); },
+  roadmap: function (d) { var r = d.roadmap; return h('div', { class: 'grid' }, card('Milestones', table([['Key', function (m) { return m.key; }], ['Title', function (m) { return m.title; }], ['Goal', function (m) { return m.goal; }], ['Verified', function (m) { var g = r.progress.milestones.filter(function (x) { return x.key === m.key; })[0]; return g ? h('div', null, bar(g.ratio), h('span', { class: 'muted', text: g.delivered + '/' + g.total })) : '-'; }]], r.milestones)), r.epics.length ? card('Epics', table([['Key', function (e) { return e.key; }], ['Title', function (e) { return e.title; }], ['Verified', function (e) { var g = r.progress.epics.filter(function (x) { return x.key === e.key; })[0]; return g ? g.delivered + '/' + g.total : '-'; }]], r.epics)) : null, card('Task graph (critical path marked)', table([['Key', function (t) { return h('span', { class: 'mono', text: (r.criticalPath.path.indexOf(t.key) >= 0 ? '* ' : '') + t.key }); }], ['Task', function (t) { return t.title; }], ['Milestone', function (t) { return t.milestone; }], ['Size', function (t) { return t.size; }], ['Depends on', function (t) { return t.dependsOn.join(', ') || '-'; }], ['Status', function (t) { return badge(t.status); }], ['Evidence', function (t) { var ok = t.required.filter(function (l) { return t.passed.indexOf(l) >= 0; }); var missing = t.required.filter(function (l) { return t.passed.indexOf(l) < 0; }); return t.delivered ? badge('PASSED', 'verified') : h('span', { title: 'missing: ' + missing.join(', ') }, ok.length + '/' + t.required.length + ' (missing ' + missing.join(', ').replace(/_/g, ' ').toLowerCase() + ')'); }]], r.tasks, 'No plan yet.'))); },
   tasks: function (d) { return card('Tasks', table([['Task', function (t) { return h('div', null, h('div', { text: t.title }), h('div', { class: 'muted mono', style: 'font-size:11.5px', text: t.id + ' - ' + t.kind + (t.role ? ' - ' + t.role : '') })); }], ['Status', function (t) { return badge(t.status); }], ['Prio', function (t) { return String(t.priority); }], ['Attempts', function (t) { return t.attemptCount + '/' + t.maxRetries; }], ['Last error', function (t) { return t.lastErrorMessage ? h('span', { class: 'err', text: t.lastErrorMessage.slice(0, 160) }) : '-'; }], ['Controls', taskControls]], d.tasks)); },
   executions: function (d) { return card('Execution history', table([['Started', function (e) { return when(e.startedAt); }], ['Task', function (e) { return e.taskTitle; }], ['Provider', function (e) { return e.provider; }], ['Session', function (e) { return h('span', { class: 'mono', text: (e.providerSessionId || '-').slice(0, 13) }); }], ['Outcome', function (e) { return e.outcome ? badge(e.outcome === 'completed' ? 'COMPLETED' : e.outcome === 'interrupted' || e.outcome === 'failed' ? 'FAILED' : e.outcome, e.outcome) : badge('RUNNING'); }], ['Error', function (e) { return e.errorClass || '-'; }], ['Log', function (e) { return h('a', { href: '#/log/' + e.id, text: 'transcript' }); }]], d.executions)); },
   checkpoints: function (d) { return card('Latest checkpoint per task', table([['Task', function (c) { return c.taskTitle; }], ['When', function (c) { return when(c.createdAt); }], ['Repo ref', function (c) { return h('span', { class: 'mono', text: (c.repoRef || '-').slice(0, 12) }); }], ['Completed', function (c) { return (c.completed || '').slice(0, 200); }], ['Next', function (c) { return (c.next || '').slice(0, 200); }]], d.checkpoints)); },
@@ -229,7 +231,7 @@ S.timer = setInterval(function () { if (S.route[0] !== 'assign' && S.route[0] !=
 `;
 
 const shell = (nonce: string, body: string, script = '') =>
-  `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="referrer" content="no-referrer"><title>ELEVARIQ Command Center</title><style nonce="${nonce}">${CSS}</style></head><body>${body}${script ? `<script nonce="${nonce}">${script}</script>` : ''}</body></html>`;
+  `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="referrer" content="same-origin"><title>ELEVARIQ Command Center</title><style nonce="${nonce}">${CSS}</style></head><body>${body}${script ? `<script nonce="${nonce}">${script}</script>` : ''}</body></html>`;
 
 export function uiPage(nonce: string): string {
   return shell(
@@ -243,6 +245,6 @@ const esc = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`)
 export function loginPage(nonce: string, error?: string): string {
   return shell(
     nonce,
-    `<main style="max-width:420px;margin:12vh auto;padding:0 16px"><div class="card"><h1 style="margin-bottom:6px">ELEVARIQ Command Center</h1><p class="muted">Local owner console. Sign in with the owner token from <span class="mono">dashboard.token</span> in the agent home (<span class="mono">npm run agent -- dashboard:token</span>).</p>${error ? `<p class="err" role="alert">${esc(error)}</p>` : ''}<form method="post" action="/login"><label for="t" class="muted">Owner token</label><input id="t" name="token" type="password" autocomplete="current-password" required autofocus><div style="margin-top:12px"><button class="primary" type="submit">Sign in</button></div></form></div></main>`,
+    `<main class="login"><div class="card"><h1 class="login-title">ELEVARIQ Command Center</h1><p class="muted">Local owner console. Sign in with the owner token from <span class="mono">dashboard.token</span> in the agent home (<span class="mono">npm run agent -- dashboard:token</span>).</p>${error ? `<p class="err" role="alert">${esc(error)}</p>` : ''}<form method="post" action="/login"><label for="t" class="muted">Owner token</label><input id="t" name="token" type="password" autocomplete="current-password" required autofocus><div class="login-actions"><button class="primary" type="submit">Sign in</button></div></form></div></main>`,
   );
 }
