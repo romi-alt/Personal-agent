@@ -22,6 +22,10 @@ fi
 # The service user must be able to read the app but not write to it.
 chown -R root:root "$APP_DIR"; chmod -R go-w "$APP_DIR"
 install -m 0644 "$APP_DIR/scripts/linux/elevariq-agent.service" /etc/systemd/system/elevariq-agent.service
+install -m 0644 "$APP_DIR/scripts/linux/elevariq-dashboard.service" /etc/systemd/system/elevariq-dashboard.service
 systemctl daemon-reload
 if [ "${1:-}" = "--enable" ]; then systemctl enable --now elevariq-agent.service; else
   echo "Installed. Start with: sudo systemctl enable --now elevariq-agent   (status: systemctl status elevariq-agent)"; fi
+echo "Command center (optional, loopback only): sudo systemctl enable --now elevariq-dashboard"
+echo "  then from your machine: ssh -L 4317:127.0.0.1:4317 <user>@<this-host>  and open http://127.0.0.1:4317/"
+echo "Firewall: expose only SSH, e.g.  ufw default deny incoming && ufw allow OpenSSH && ufw enable"

@@ -1,0 +1,35 @@
+# ELEVARIQ Personal Agent command center - systemd unit (binds 127.0.0.1 only)
+# Reach it from your own machine through an SSH tunnel:  ssh -L 4317:127.0.0.1:4317 <user>@<vps>
+# then open http://127.0.0.1:4317/ (sign in with the owner token: sudo -u elevariq-agent cat /var/lib/elevariq-agent/dashboard.token)
+[Unit]
+Description=ELEVARIQ Personal Agent command center (local only)
+After=network-online.target elevariq-agent.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=elevariq-agent
+Group=elevariq-agent
+WorkingDirectory=/opt/elevariq-personal-agent
+Environment=NODE_ENV=production
+Environment=AGENT_HOME=/var/lib/elevariq-agent
+Environment=AGENT_ENV_FILE=/etc/elevariq-agent/agent.env
+Environment=HOME=/var/lib/elevariq-agent
+# Never change this to 0.0.0.0: put a VPN or SSH tunnel in front instead (see docs/OPERATIONS.md, Phase 6).
+Environment=DASHBOARD_HOST=127.0.0.1
+EnvironmentFile=-/etc/elevariq-agent/agent.env
+ExecStart=/usr/bin/node dist/cli/index.js dashboard
+Restart=on-failure
+RestartSec=5
+
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+ReadWritePaths=/var/lib/elevariq-agent
+
+[Install]
+WantedBy=multi-user.target

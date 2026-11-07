@@ -10,6 +10,9 @@ import { TaskRunner } from '../workers/runner.js';
 import type { WorkspaceRegistry } from '../workspaces/registry.js';
 import type { ExecutionRecord, Task } from '../types/index.js';
 import type { WorkflowEngine } from '../workflows/engine.js';
+import type { QaEngine } from '../engineering/qa.js';
+import { createBackup, listBackups, pruneBackups } from '../ops/backup.js';
+import { Notifier } from '../ops/notify.js';
 
 export interface SupervisorDeps {
   config: AppConfig;
@@ -21,6 +24,8 @@ export interface SupervisorDeps {
   rng?: () => number;
   /** Planning-workflow orchestrator; advanced on every tick (local SQL only). */
   workflows?: WorkflowEngine;
+  /** Independent QA (Phase 3): reviews completed coding tasks, creates corrections, escalates. */
+  qa?: QaEngine;
 }
 
 export interface GateResult {
@@ -108,6 +113,7 @@ export class Supervisor {
       runner: this.runner,
       registry: this.d.registry,
       providerName: this.d.provider.name,
+      workerImage: this.d.provider.workerImage,
       isLocallyActive: (id) => this.workers.has(id),
     });
   }
@@ -191,6 +197,45 @@ export class Supervisor {
     }
   }
 
+  private lastMaintenance = 0;
+  private notifier?: Notifier;
+  /**
+   * Periodic operations (at most once a minute): scheduled online backup with retention, owner notifications.
+   * Failures are recorded as error events (which are themselves notified) and never stop the supervisor.
+   */
+  private async maintenance(): Promise<void> {
+    const { store, config, log } = this.d;
+    const now = Date.now();
+    if (now - this.lastMaintenance < 60_000) return;
+    this.lastMaintenance = now;
+    if (config.backup.intervalHours > 0) {
+      try {
+        const newest = listBackups(config.backup.dir).at(-1);
+        if (!newest || now - newest.createdAt >= config.backup.intervalHours * 3_600_000) {
+          const m = await createBackup(store.db, config.backup.dir);
+          const removed = pruneBackups(config.backup.dir, config.backup.retention);
+          store.recordEvent({
+            type: 'backup.created',
+            payload: { file: m.file, bytes: m.bytes, removed: removed.length },
+          });
+        }
+      } catch (err) {
+        log.error('backup.failed', { error: err });
+        store.recordEvent({ type: 'backup.failed', severity: 'error', payload: { error: String(err) } });
+      }
+    }
+    try {
+      this.notifier ??= new Notifier(
+        store,
+        { agentHome: config.agentHome, webhookUrl: config.notifyWebhookUrl },
+        log,
+      );
+      await this.notifier.flush();
+    } catch (err) {
+      log.warn('notify.failed', { error: err });
+    }
+  }
+
   /** One scheduling pass. Exposed for deterministic tests. */
   async tick(): Promise<{ claimed: number; gate: GateResult }> {
     const { store, config, log, provider } = this.d;
@@ -198,6 +243,12 @@ export class Supervisor {
     // Workflow orchestration is pure database work, so it also runs while the provider gate is closed
     // (e.g. creating the next planning task or recording an owner's answer).
     this.d.workflows?.advanceAll();
+    try {
+      await this.d.qa?.tick();
+    } catch (err) {
+      this.d.log.error('qa.tick_error', { error: err });
+    }
+    await this.maintenance();
     const gate = await this.gate();
     if (gate.reason !== this.lastGate) {
       this.lastGate = gate.reason;

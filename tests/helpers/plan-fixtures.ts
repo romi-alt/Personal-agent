@@ -51,6 +51,23 @@ export const architectureJson = (over: Record<string, unknown> = {}) =>
       { name: 'Auth', responsibility: 'roles and permissions', requirementIds: ['NFR-1'] },
     ],
     dataModel: 'Student, Guardian, Class, Session, AttendanceRecord, User, Role',
+    sections: {
+      system: 'Single Node.js service with a server-rendered UI',
+      database: 'PostgreSQL; one schema per school',
+      backend: 'Express + TypeScript modules per bounded context',
+      frontend: 'Server-rendered pages',
+      api: 'REST JSON under /api/v1',
+      authentication: 'Email + password, argon2id hashes, session cookies',
+      authorization: 'RBAC: admin, teacher, guardian; checked in middleware',
+      integration: '',
+      deployment: 'Single VPS, systemd service',
+      security: 'OWASP ASVS L1; input validation; audit log',
+      monitoring: 'Structured logs and a health endpoint',
+    },
+    diagrams: [
+      { title: 'Components', mermaid: 'flowchart LR\n  UI-->API\n  API-->DB' },
+      { title: 'Data model', mermaid: 'erDiagram\n  STUDENT ||--o{ GUARDIAN : has' },
+    ],
     ...over,
   });
 
@@ -110,12 +127,50 @@ export const planJson = (mutate?: (p: ReturnType<typeof planObject>) => void) =>
   return JSON.stringify(p);
 };
 
+export const researchJson = (over: Record<string, unknown> = {}) =>
+  JSON.stringify({
+    findings: [
+      {
+        id: 'F-1',
+        area: 'domain',
+        statement: 'Schools track daily attendance per class session',
+        kind: 'assumption',
+        confidence: 'medium',
+        sources: [],
+      },
+      {
+        id: 'F-2',
+        area: 'technical_standards',
+        statement: 'OWASP ASVS defines verification requirements for authentication',
+        kind: 'verified',
+        confidence: 'high',
+        sources: [
+          {
+            title: 'OWASP ASVS',
+            url: 'https://owasp.org/www-project-application-security-verification-standard/',
+          },
+        ],
+      },
+    ],
+    openQuestions: ['Which national student-id format applies?'],
+    ...over,
+  });
+
+export const reviewJson = (over: Record<string, unknown> = {}) =>
+  JSON.stringify({ verdict: 'approve', issues: [], ...over });
+
 /** Mock scenario step whose final reply is the given text. */
-export const reply = (text: string): MockStep => ({ type: 'success', summary: text });
+export const reply = (text: string, extra: Partial<MockStep> = {}): MockStep => ({
+  type: 'success',
+  summary: text,
+  ...extra,
+});
 
 /** Scenario for a fully successful planning run. */
 export const happyPlanning = () => ({
   'Plan: analyze': [reply(analysisJson())],
+  'Plan: research': [reply(researchJson())],
   'Plan: architect': [reply(architectureJson())],
   'Plan: decompose': [reply(planJson())],
+  'Plan: review': [reply(reviewJson())],
 });

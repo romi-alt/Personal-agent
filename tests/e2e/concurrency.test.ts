@@ -1,11 +1,11 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { spawn } from 'node:child_process';
 import { mkdtempSync } from 'node:fs';
-import { removeDir } from '../helpers/fs.js';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { openDatabase } from '../../src/database/connection.js';
 import { Store } from '../../src/queue/store.js';
+import { removeTempDir } from '../helpers/fs.js';
 
 /**
  * Real OS processes sharing ONE database file: proves the write transactions (IMMEDIATE) neither deadlock nor
@@ -16,7 +16,7 @@ let home: string;
 beforeAll(() => {
   home = mkdtempSync(path.join(tmpdir(), 'elevariq-conc-'));
 });
-afterAll(() => removeDir(home));
+afterAll(() => removeTempDir(home));
 
 function runWorker(args: string[]): Promise<{ workerId: string; claimed: string[]; errors: string[] }> {
   return new Promise((resolve, reject) => {

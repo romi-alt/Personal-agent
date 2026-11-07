@@ -228,16 +228,12 @@ describe('independent verification and owner acceptance', () => {
       CHANGES_EXIST: 'PASSED',
       BUILD_PASSES: 'PASSED',
       TESTS_PASS: 'PASSED',
-      REQUIREMENTS_SATISFIED: 'NOT_EVALUATED',
-      SECURITY_CHECKS_PASS: 'NOT_EVALUATED',
+      REQUIREMENTS_SATISFIED: 'NOT_EVALUATED', // no planned tasks with independent review in this test
+      SECURITY_CHECKS_PASS: 'PASSED', // secret scan of a clean workspace
     });
     expect(r.readiness.ready).toBe(false);
     expect(r.readiness.blockers).toEqual(
-      expect.arrayContaining([
-        'REQUIREMENTS_SATISFIED: NOT_EVALUATED',
-        'SECURITY_CHECKS_PASS: NOT_EVALUATED',
-        'OWNER_APPROVAL: MISSING',
-      ]),
+      expect.arrayContaining(['REQUIREMENTS_SATISFIED: NOT_EVALUATED', 'OWNER_APPROVAL: MISSING']),
     );
     expect(env.store.getProject(project.id)!.lifecycle).toBe('AWAITING_OWNER_APPROVAL');
   });
@@ -254,10 +250,7 @@ describe('independent verification and owner acceptance', () => {
     expect(r.ready).toBe(false); // still strict: requirements/security were never verified by the system
     expect(env.store.getProject(project.id)!.lifecycle).toBe('READY_FOR_DELIVERY');
     const approval = env.store.listEvidence({ projectId: project.id, level: 'OWNER_APPROVAL' })[0]!;
-    expect(approval.evidence['acknowledgedUnverified']).toEqual([
-      'REQUIREMENTS_SATISFIED',
-      'SECURITY_CHECKS_PASS',
-    ]);
+    expect(approval.evidence['acknowledgedUnverified']).toEqual(['REQUIREMENTS_SATISFIED']);
     expect(() => env.store.transitionProject(project.id, 'DELIVERED', 'owner delivered')).not.toThrow();
   });
 

@@ -1,6 +1,20 @@
 import { rmSync } from 'node:fs';
 
-/** rm -rf that tolerates Windows file locks that linger briefly after a process or DB handle closes. */
-export function removeDir(dir: string): void {
-  rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
+/**
+ * Remove a test's temporary directory. On Windows a file cannot be deleted while any process holds it open
+ * (a just-killed child's SQLite/WAL handles are released asynchronously, and antivirus scanners briefly open
+ * new files), so retry; if it is still locked, leave it to the OS temp cleaner rather than failing the test.
+ */
+export function removeTempDir(dir: string): void {
+  try {
+    rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
+  } catch (err) {
+    const code = (err as NodeJS.ErrnoException).code;
+    if (process.platform === 'win32' && (code === 'EPERM' || code === 'EBUSY' || code === 'ENOTEMPTY'))
+      return;
+    throw err;
+  }
 }
+
+/** Name used by the upstream Windows fixes (a98aa95); same behaviour. */
+export const removeDir = removeTempDir;

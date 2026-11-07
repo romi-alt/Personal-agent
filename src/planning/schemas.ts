@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { ROLES } from '../engineering/roles.js';
 
 /**
  * Structured outputs of the planning workflows. Model output is DATA: it is parsed with these schemas and then
@@ -40,19 +41,81 @@ export const analysisSchema = z.object({
 });
 export type Analysis = z.infer<typeof analysisSchema>;
 
+// ------------------------------------------------------------------ research
+export const RESEARCH_AREAS = [
+  'domain',
+  'industry_requirements',
+  'existing_solutions',
+  'technical_standards',
+  'security',
+  'apis',
+  'integrations',
+  'performance',
+  'risks',
+] as const;
+export const researchSchema = z.object({
+  findings: z
+    .array(
+      z.object({
+        id: key,
+        area: z.enum(RESEARCH_AREAS),
+        statement: z.string().min(5),
+        /** 'verified' requires sources the research session actually retrieved; anything else is an assumption. */
+        kind: z.enum(['verified', 'assumption']),
+        confidence: z.enum(['high', 'medium', 'low']).default('medium'),
+        sources: z.array(z.object({ title: z.string().min(1), url: z.string().url() })).default([]),
+      }),
+    )
+    .min(1),
+  /** Research questions that could not be answered (shown to the owner; never silently filled in). */
+  openQuestions: z.array(z.string().min(3)).default([]),
+});
+export type Research = z.infer<typeof researchSchema>;
+
 // -------------------------------------------------------------- architecture
+export const ARCHITECTURE_SECTIONS = [
+  'system',
+  'database',
+  'backend',
+  'frontend',
+  'api',
+  'authentication',
+  'authorization',
+  'integration',
+  'deployment',
+  'security',
+  'monitoring',
+] as const;
+export type ArchitectureSection = (typeof ARCHITECTURE_SECTIONS)[number];
 export const architectureSchema = z.object({
   decisions: z
     .array(
       z.object({
         id: key,
         title: z.string().min(3),
+        /** ADR fields. `context`/`consequences` default to empty for backwards compatibility; the review flags them. */
+        context: z.string().default(''),
         decision: z.string().min(3),
         rationale: z.string().min(3),
         alternatives: z.array(z.string()).default([]),
+        consequences: z.string().default(''),
+        /** Significant decisions (stack, data store, auth model, hosting, integrations) need owner review. */
+        significant: z.boolean().default(false),
       }),
     )
     .min(1),
+  /** Technical specification per area (markdown). */
+  sections: z
+    .object(
+      Object.fromEntries(ARCHITECTURE_SECTIONS.map((s) => [s, z.string().default('')])) as {
+        [K in ArchitectureSection]: z.ZodDefault<z.ZodString>;
+      },
+    )
+    .default(
+      Object.fromEntries(ARCHITECTURE_SECTIONS.map((s) => [s, ''])) as Record<ArchitectureSection, string>,
+    ),
+  /** Mermaid diagrams (system context, components, data model, deployment, ...). */
+  diagrams: z.array(z.object({ title: z.string().min(3), mermaid: z.string().min(10) })).default([]),
   technology: z
     .array(z.object({ area: z.string().min(2), choice: z.string().min(1), rationale: z.string().min(3) }))
     .default([]),
@@ -77,6 +140,14 @@ export const planTaskSchema = z.object({
   instructions: z.string().min(10),
   acceptanceCriteria: z.string().default(''),
   milestone: key,
+  /** Optional epic grouping (cross-milestone feature area). */
+  epic: key.optional(),
+  /** Ordered checklist inside the task. */
+  subtasks: z.array(z.string().min(3)).default([]),
+  /** Tests the task must add or run. */
+  testing: z.string().default(''),
+  /** Specialist role (bounded brief; see src/engineering/roles.ts). Inferred when absent. */
+  role: z.enum(ROLES).optional(),
   dependsOn: z.array(key).default([]),
   requirementIds: z.array(key).min(1),
   priority: z.number().int().min(-100).max(100).default(0),
@@ -95,7 +166,40 @@ export const planSchema = z.object({
       }),
     )
     .min(1),
+  epics: z.array(z.object({ key, title: z.string().min(3), goal: z.string().min(3) })).default([]),
   tasks: z.array(planTaskSchema).min(1),
 });
 export type Plan = z.infer<typeof planSchema>;
 export type PlanTask = z.infer<typeof planTaskSchema>;
+
+// -------------------------------------------------------------- plan review
+export const REVIEW_CATEGORIES = [
+  'missing_requirement',
+  'contradiction',
+  'security_gap',
+  'data_model',
+  'missing_api',
+  'dependency',
+  'unrealistic',
+  'other',
+] as const;
+export const reviewIssueSchema = z.object({
+  id: key,
+  category: z.enum(REVIEW_CATEGORIES),
+  severity: z.enum(['low', 'medium', 'high']),
+  description: z.string().min(5),
+  recommendation: z.string().default(''),
+});
+export type ReviewIssue = z.infer<typeof reviewIssueSchema>;
+export const reviewSchema = z.object({
+  verdict: z.enum(['approve', 'revise']),
+  issues: z.array(reviewIssueSchema).default([]),
+});
+export type PlanReview = z.infer<typeof reviewSchema>;
+
+// -------------------------------------------------------------------- intake
+/**
+ * Free-text assignment -> structured contract. Workspace, source and the approval policy are set by the system, never
+ * by the model: text in an attachment must not be able to pre-approve anything.
+ */
+export const INTAKE_OMITTED_FIELDS = ['workspace', 'source', 'approvalPolicy'] as const;

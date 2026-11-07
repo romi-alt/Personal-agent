@@ -120,3 +120,163 @@ npm run agent -- plan:show <project>         # requirements <-> tasks coverage, 
 
 New settings: `PLAN_APPROVAL` (`required`|`auto`), `MAX_PLAN_TASKS`, `MAX_PLAN_REPAIRS`. A run that `FAILED` (invalid output after the repairs, or a failed planning task) leaves the project `BLOCKED`;
 read `workflow:show`, fix the cause (assignment wording, budget, provider), then `plan:start` again. Planning uses the same budgets/caps as coding tasks, so check `provider:status` first.
+
+---
+
+# Session 3 addendum (2026-11-07) - project intelligence, QA, command center, operations
+
+## Assign work in plain language
+
+```bash
+npm run agent -- intake "Build a complete educational ERP for Pakistani institutions." --attach spec.md
+npm run agent -- workflow:show <run>          # intake -> analyse -> research -> architect -> decompose -> review -> approval
+npm run agent -- research:show <project>      # findings: verified (cited source actually retrieved) vs assumption
+npm run agent -- architecture:show <project>  # 11 areas; diagrams + ADRs are also written to docs/ in the project repo
+npm run agent -- adr:list <project>           # significant decisions need your approval together with the plan
+npm run agent -- review:show <project>        # deterministic + independent model planning review rounds
+npm run agent -- approve <approval-id>        # approve plan + significant ADRs -> coding tasks are created
+npm run agent -- roadmap <project>            # milestones, epics, critical path, progress counted from evidence only
+npm run agent -- qa <project>                 # independent review per completed task, corrections, escalations
+```
+
+Settings: `RESEARCH_WEB_ACCESS` (default true; never when the assignment requires `web_access` approval),
+`WRITE_PLAN_DOCS`, `INDEPENDENT_REVIEW` (default true), `MAX_CORRECTION_ROUNDS` (default 2).
+A `qa_escalation` approval means the independent reviewer could not confirm a task after the correction rounds:
+approve to accept it anyway (recorded as an owner override), deny to keep its dependants blocked.
+
+## Command center
+
+```bash
+npm run agent -- dashboard                    # http://127.0.0.1:4317/  (DASHBOARD_PORT)
+npm run agent -- dashboard:token [--rotate]   # owner token (stored in AGENT_HOME/dashboard.token)
+```
+
+Loopback only by default. Remote use: VPN or `ssh -L 4317:127.0.0.1:4317 host`; never bind 0.0.0.0 without a TLS
+proxy (`DASHBOARD_ALLOW_REMOTE=true`, `DASHBOARD_ALLOWED_HOSTS`, `DASHBOARD_SECURE_COOKIES=true`). Every owner action
+(pause/resume/priority/cancel/approve/deny/assign) is an audit event with actor, channel and address.
+
+## Backups, restore, notifications
+
+```bash
+npm run agent -- backup                       # online backup + verification (AGENT_HOME/backups)
+npm run agent -- backup:list
+npm run agent -- backup:verify [file]         # restore drill: checksum, integrity_check, row counts
+npm run agent -- stop && npm run agent -- restore <file> --reason "why"   # old DB kept as *.pre-restore-*
+```
+
+The supervisor backs up every `BACKUP_INTERVAL_HOURS` (24; 0 = off) and keeps `BACKUP_RETENTION` (14). Back up
+`AGENT_HOME/workspaces` (git repositories) and the env file separately; the owner token is intentionally not in backups.
+Errors, escalations and approval requests go to `AGENT_HOME/notifications.jsonl` and, only if you set it,
+`NOTIFY_WEBHOOK_URL` (payload: type, severity, short title, ids - no task output or credentials).
+
+## Windows background operation (verified on the owner PC, 2026-11-07)
+
+`scripts\windows\install-task.ps1` registers a logon trigger plus a keepalive trigger (`-KeepAliveMinutes`, default 5)
+that restarts the agent if the whole task process tree ends. `npm run agent -- stop` stops it until the next keepalive;
+`npm run agent -- stop --hold` keeps it stopped until you run `start` explicitly. Live acceptance:
+`powershell -ExecutionPolicy Bypass -File scripts\windows\scheduler-acceptance.ps1 [-RealCli]` (isolated task + home).
+**Not automatable here:** verify after a real reboot + sign-in that `status` shows a live supervisor within 2 minutes.
+
+## Ubuntu VPS (prepared, never deployed by the agent)
+
+`sudo scripts/linux/install.sh` installs `elevariq-agent.service` (non-root `elevariq-agent`, hardened, state in
+`/var/lib/elevariq-agent`) and the loopback-only `elevariq-dashboard.service`. Firewall: `ufw default deny incoming;
+ufw allow OpenSSH; ufw enable`. For `EXECUTION_PROVIDER=claude-cli` install Claude Code for the service user and log
+in once interactively (`sudo -u elevariq-agent -H bash -lc claude`, then `/login`); confirm with
+`sudo -u elevariq-agent -H node dist/cli/index.js provider:status`. Moving from Windows: stop the agent, `backup`,
+copy the backup + workspaces, `restore` on the VPS, start the service.
+# Final stabilization addendum (2026-11-07)
+
+## Scoped scratch-directory cleanup (replaces `rm -rf` for throw-away directories)
+
+Recursive deletes from a worker still need owner approval (`destructive_delete`). For the one routine case - a
+throw-away directory the worker created itself - workers get a scoped tool (CLI provider, when `dist/` is built):
+
+```
+"$ELEVARIQ_NODE" "$ELEVARIQ_SCRATCH_CLEAN" .qa-mut          # worker, inside its workspace
+npm run agent -- scratch:clean <project> .qa-mut [--dry-run]  # owner, same checks
+```
+
+It deletes exactly one directory named `.qa-*`, `.scratch-*` or `.tmp-*` strictly inside the project workspace and
+refuses: the workspace root, parents, anything outside the workspace (e.g. `E:\elevariq-ui-tmp`), `..`/wildcards/
+variables/`~`, `.git` internals, links/junctions (target, ancestors, or anywhere inside), protected paths, trees over
+50 000 entries, and any call without a valid AGENT_HOME. A missing directory returns `absent` (repeats are harmless).
+Every call appends to `<AGENT_HOME>\logs\scratch-cleanup.jsonl`; the intent line is written before deletion.
+
+## Production scheduled task
+
+**Installed 2026-11-07 15:40 with the owner's authorisation** and running (verify-install: all checks passed).
+`.env` was switched to `EXECUTION_PROVIDER=claude-cli`, `ENVIRONMENT=production` (old file: `.env.bak-20261107`).
+
+Updating the code the task runs (rebuild) without leaving a stray supervisor outside the task:
+
+```
+node dist\cli\index.js stop --hold        # graceful; keepalive will not restart it
+npm run build
+node dist\cli\index.js start --detach     # clears the hold (runs outside the task for a moment)
+node dist\cli\index.js stop               # graceful, no hold
+Start-ScheduledTask -TaskName ElevariqPersonalAgent
+node dist\cli\index.js health
+```
+
+(Removing `%LOCALAPPDATA%\ElevariqAgent\STOP-HOLD` by hand and running `Start-ScheduledTask` is equivalent.)
+Remove the task: `powershell -File scripts\windows\uninstall-task.ps1`.
+
+Browser tests of the command center: `npm run test:browser` (Playwright + installed Edge; isolated temp home).
+
+Original install procedure, for reference / reinstallation. Preview:
+
+```
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\windows\install-task.ps1 -WhatIf
+```
+
+Before installing, set in `E:\Agent\Personal-agent\.env` (with `EXECUTION_PROVIDER=mock` the task would run the
+mock provider, not Claude Code; done on 2026-11-07):
+
+```
+EXECUTION_PROVIDER=claude-cli
+ENVIRONMENT=production
+```
+
+Then `npm run build` and install (no restart is triggered):
+
+```
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\windows\install-task.ps1
+Start-ScheduledTask -TaskName ElevariqPersonalAgent
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\windows\verify-install.ps1
+node dist\cli\index.js status
+```
+
+What the task is: user `<PC>\<owner>`, Interactive logon, Limited run level; action `powershell.exe -File
+scripts\windows\run-supervisor.ps1 -RepoPath E:\Agent\Personal-agent -NodePath "C:\Program Files\nodejs\node.exe"`;
+working dir = repo; triggers = at logon of the owner + keepalive every 5 min; restart 999 x 1 min; no time limit;
+`IgnoreNew` (one instance); starts and keeps running on battery; hidden. State: `%LOCALAPPDATA%\ElevariqAgent`
+(`agent.db`, `logs\wrapper.log`, `logs\supervisor-std*.log`, app logs, `workspaces\`). Duplicate prevention: Task
+Scheduler `IgnoreNew` + the supervisor lease (a second supervisor exits with code 3 and its wrapper only monitors).
+Watchdog variables come from the app config (defaults on) and are injected per worker, not via the task.
+The task runs the build in the repo working tree: switching branches or rebuilding changes what runs - stop the agent
+(`stop --hold`) before doing either.
+
+## Manual reboot verification (owner; not performed by the agent)
+
+1. `node dist\cli\index.js status` before rebooting; note running/queued tasks.
+2. Reboot normally, sign in.
+3. Within ~2 minutes: `Get-ScheduledTask ElevariqPersonalAgent | Get-ScheduledTaskInfo` -> LastRunTime after the
+   sign-in, LastTaskResult 267009 (running).
+4. `node dist\cli\index.js health` exits 0; `status` shows a live supervisor.
+5. `claude auth status` -> `loggedIn: true`, `authMethod: claude.ai`; `node dist\cli\index.js provider:status` ready.
+6. `node dist\cli\index.js projects` / `tasks` -> same projects and tasks as before.
+7. A task that was RUNNING before the reboot is recovered (`task:show <id>`: `interrupted` then re-queued/completed).
+8. Exactly one supervisor: `Get-CimInstance Win32_Process -Filter "Name='node.exe'" | ? CommandLine -match 'cli\\index\.js"? start'`
+   returns one process; `logs\wrapper.log` shows one `supervisor launched` after the boot (or `monitoring`).
+
+## Claude Code health (checked 2026-11-07)
+
+`claude doctor`: native install 2.1.319 (= latest published), "No installation issues found", auto-updates enabled
+(channel latest), **last update attempt failed (install_failed)**. Doctor gives no further reason. Most likely cause
+(inference, not confirmed): on Windows the running `claude.exe` (this interactive session, started 05:57) locks the
+file the updater must replace. No action is required now - nothing newer exists. If a later update fails again: close
+all Claude Code sessions, `stop --hold` the agent, run `claude update`, then `start`. Do not reinstall; the
+subscription login lives in `%USERPROFILE%\.claude` and is not touched by an update.
+`claude auth status`: logged in, `claude.ai`, Max. `loginExpiresAt` = 2026-12-04 - check `claude auth status` before
+that date; an expired login stops all CLI workers (`provider:status` reports it).

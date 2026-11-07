@@ -1,7 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { type ChildProcess, spawn, spawnSync } from 'node:child_process';
 import { mkdtempSync, writeFileSync } from 'node:fs';
-import { removeDir } from '../helpers/fs.js';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { openDatabase } from '../../src/database/connection.js';
@@ -9,7 +8,15 @@ import { Store } from '../../src/queue/store.js';
 import { WorkflowRepository } from '../../src/workflows/repository.js';
 import { assignmentExample } from '../helpers/assignment.js';
 import { waitFor } from '../helpers/env.js';
-import { analysisJson, architectureJson, planJson, reply } from '../helpers/plan-fixtures.js';
+import { removeTempDir } from '../helpers/fs.js';
+import {
+  analysisJson,
+  architectureJson,
+  planJson,
+  reply,
+  researchJson,
+  reviewJson,
+} from '../helpers/plan-fixtures.js';
 
 /**
  * Phase 2 end to end with REAL processes and a real database file: assignment -> plan -> tasks -> execution -> VERIFYING,
@@ -59,14 +66,17 @@ beforeEach(() => {
     SHUTDOWN_GRACE_MS: '3000',
     BACKOFF_BASE_MS: '500',
     PLAN_APPROVAL: 'required',
+    INDEPENDENT_REVIEW: 'false', // QA has its own suite (tests/integration/independent-qa.test.ts)
     NODE_NO_WARNINGS: '1',
   };
 });
-afterEach(() => {
-  for (const p of procs) if (p.exitCode === null) p.kill('SIGKILL');
+afterEach(async () => {
+  const alive = procs.filter((p) => p.exitCode === null && p.signalCode === null);
+  for (const p of alive) p.kill('SIGKILL');
+  await Promise.all(alive.map(exited));
   procs.length = 0;
   for (const s of opened.splice(0)) s.db.close(); // Windows cannot delete a database file that is still open
-  removeDir(home);
+  removeTempDir(home);
 });
 
 describe('E2E: assignment -> planned tasks -> executed -> VERIFYING, across a SIGKILL during planning', () => {
@@ -76,6 +86,8 @@ describe('E2E: assignment -> planned tasks -> executed -> VERIFYING, across a SI
       JSON.stringify({
         tasks: {
           'Plan: analyze': [reply(analysisJson())],
+          'Plan: research': [reply(researchJson())],
+          'Plan: review': [reply(reviewJson())],
           'Plan: architect': ['hang', reply(architectureJson())], // first attempt hangs: we kill the supervisor there
           'Plan: decompose': [reply(planJson())],
         },
@@ -126,7 +138,7 @@ describe('E2E: assignment -> planned tasks -> executed -> VERIFYING, across a SI
     const tasks = store.listTasks({ projectId: project.id });
     const coding = tasks.filter((t) => t.kind === 'CODING');
     const planning = tasks.filter((t) => t.kind === 'PLANNING');
-    expect(planning).toHaveLength(3);
+    expect(planning).toHaveLength(5); // analyze, research, architect, decompose, review
     expect(coding.map((t) => t.title)).toEqual([
       'Scaffold project and auth',
       'Enrollment module',

@@ -38,7 +38,13 @@ describe('Windows scripts (static review guards)', () => {
     const c = code('run-supervisor.ps1');
     expect(c).toMatch(/-eq 0\)[^\n]*exit 0/);
     expect(c).toMatch(/-eq 2\)[^\n]*exit 2/);
-    expect(c).toMatch(/-eq 3\)[^\n]*exit 0/);
+    // 3: another supervisor is live -> monitor it; exit only when it stops gracefully, take over if it dies
+    expect(c).toMatch(/-eq 3\)/);
+    expect(c).toMatch(/monitoring it/);
+    expect(c).toMatch(/status -eq 'STOPPED'\)[^\n]*exit 0/);
+    expect(c).toMatch(/taking over/);
+    // PS 5.1: $PSScriptRoot is empty inside param() defaults
+    expect(c).not.toMatch(/param\([^)]*\$PSScriptRoot/s);
     expect(c).toMatch(/Start-Process/); // avoids 5.1 native-stderr terminating errors
     expect(c).toMatch(/LOG_TO_CONSOLE/); // no unbounded console capture
     expect(c).toMatch(/Set-Location/); // .env is resolved relative to the working directory

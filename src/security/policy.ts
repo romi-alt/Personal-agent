@@ -81,6 +81,38 @@ export const APPROVAL_RULES: Rule[] = [
   },
 ];
 
+/**
+ * Commands that would let a worker act on the agent itself - decide its own approvals, read the owner token, edit the
+ * agent database or the per-execution policy file, or lift a stop hold. These are DENIED outright and are not
+ * approvable: no approval category (not even one the owner granted) unlocks them. Guardrail, not a sandbox.
+ */
+export const AGENT_CONTROL_PATTERN =
+  /(\b(approve|deny)\s+["']?apr_|\bapr_[a-z0-9]{8,}\b|\bworkspace:approve\b|\bdashboard:token\b|\bdashboard\.token\b|\bagent\.db\b|\bSTOP-HOLD\b|\/api\/approvals\b|\.policy\.json\b|\.decisions\.jsonl\b|\bnpm\s+run\s+agent(:dist)?\b|\belevariq-agent\b)/i;
+
+const slashVariants = (p: string): string[] => {
+  const back = path.resolve(p).replace(/\//g, '\\').replace(/\\+$/, '').toLowerCase();
+  const fwd = back.replace(/\\/g, '/');
+  const drive = /^([a-z]):\//.exec(fwd);
+  const msys = drive ? `/${drive[1]}/${fwd.slice(3)}` : null; // Git Bash form: /c/Users/...
+  return [back, fwd, ...(msys ? [msys] : [])];
+};
+
+/**
+ * True when `command` mentions a protected agent path (AGENT_HOME, the agent's own repository) anywhere OTHER than as
+ * part of the project workspace path (workspaces normally live under AGENT_HOME, so references to the workspace itself
+ * are removed before the check).
+ */
+export function mentionsProtectedPath(
+  command: string,
+  workspace: string,
+  protectedPaths: readonly string[],
+): boolean {
+  let c = command.toLowerCase().replace(/["']/g, '');
+  for (const w of slashVariants(workspace).sort((a, b) => b.length - a.length))
+    c = c.split(w).join(' <workspace> ');
+  return protectedPaths.some((p) => slashVariants(p).some((v) => v.length > 3 && c.includes(v)));
+}
+
 /** Tools that read/write files take a path; ensure it stays inside the project workspace. */
 const FILE_TOOLS: Record<string, string[]> = {
   Read: ['file_path'],
@@ -98,8 +130,12 @@ export interface PolicyOptions {
   approvedTypes?: readonly string[];
   /** Planning mode: only Read/Glob/Grep/TodoWrite are allowed. */
   readOnly?: boolean;
+  /** Read-only research mode: WebSearch/WebFetch are allowed too (subject to web_access approval). */
+  allowWeb?: boolean;
   /** Extra categories this project forces to need approval (e.g. 'web_access'). */
   alsoRequire?: readonly string[];
+  /** Agent-owned directories (AGENT_HOME, the agent repository) a shell command must not reference. */
+  protectedPaths?: readonly string[];
 }
 
 export function evaluateToolUse(
@@ -109,7 +145,14 @@ export function evaluateToolUse(
   options: PolicyOptions = {},
 ): PolicyDecision {
   const extraReadable = options.extraReadable ?? [];
-  if (options.readOnly && !['Read', 'Glob', 'Grep', 'TodoWrite'].includes(toolName)) {
+  const readOnlyTools = [
+    'Read',
+    'Glob',
+    'Grep',
+    'TodoWrite',
+    ...(options.allowWeb ? ['WebSearch', 'WebFetch'] : []),
+  ];
+  if (options.readOnly && !readOnlyTools.includes(toolName)) {
     return { allow: false, reason: `${toolName} is not permitted: this is a read-only planning task` };
   }
   const pathKeys = FILE_TOOLS[toolName];
@@ -128,6 +171,18 @@ export function evaluateToolUse(
   }
   if (toolName === 'Bash' || toolName === 'PowerShell') {
     const command = String(input['command'] ?? '');
+    if (AGENT_CONTROL_PATTERN.test(command))
+      return {
+        allow: false,
+        reason:
+          'Commands that operate on the agent itself (approvals, owner token, agent database, policy) are not permitted',
+      };
+    if (options.protectedPaths?.length && mentionsProtectedPath(command, workspace, options.protectedPaths))
+      return {
+        allow: false,
+        reason:
+          'Commands that reference the agent home or the agent repository outside the project workspace are not permitted',
+      };
     for (const rule of APPROVAL_RULES) {
       if (rule.pattern.test(command)) {
         if (options.approvedTypes?.includes(rule.type))

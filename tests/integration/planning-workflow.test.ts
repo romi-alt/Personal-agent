@@ -37,7 +37,13 @@ describe('planning workflow: analyse -> architect -> decompose -> tasks', () => 
 
     // planning steps were read-only PLANNING tasks, executed by the ordinary queue
     const planning = planningTasks(project.id);
-    expect(planning.map((t) => t.title)).toEqual(['Plan: analyze', 'Plan: architect', 'Plan: decompose']);
+    expect(planning.map((t) => t.title)).toEqual([
+      'Plan: analyze',
+      'Plan: research',
+      'Plan: architect',
+      'Plan: decompose',
+      'Plan: review',
+    ]);
     expect(planning.every((t) => t.readOnly && t.status === 'COMPLETED')).toBe(true);
     expect(env.mock!.runs.filter((r) => r.taskTitle.startsWith('Plan:')).every((r) => r.readOnly)).toBe(true);
     expect(env.mock!.runs.filter((r) => !r.taskTitle.startsWith('Plan:')).every((r) => !r.readOnly)).toBe(
@@ -310,7 +316,7 @@ describe('durability: crashes, waits and replays', () => {
     const run = env.workflows.startPlanning(project.id);
     // run only the first step, then "crash"
     await env.supervisor.tick();
-    await waitFor(() => env.supervisor.activeWorkers === 0); // not a fixed sleep: Windows is slower
+    await waitFor(() => env.supervisor.activeWorkers === 0, 20_000); // not a fixed sleep: Windows is slower
     env.workflows.advanceAll();
     expect(env.workflows.repo.latestStep(run.id, 'analyze')!.status).toBe('COMPLETED');
     expect(env.workflows.repo.latestStep(run.id, 'architect')).toBeNull();
@@ -334,7 +340,7 @@ describe('durability: crashes, waits and replays', () => {
     await settle(env2);
 
     expect(engine2.repo.getRun(run.id)!.status).toBe('COMPLETED');
-    expect(planningTasks(project.id)).toHaveLength(3);
+    expect(planningTasks(project.id)).toHaveLength(5);
     expect(codingTasks(project.id)).toHaveLength(3);
     // advancing again (replay) changes nothing
     expect(engine2.advanceAll()).toBe(0);

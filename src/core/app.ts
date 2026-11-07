@@ -3,11 +3,13 @@ import { openDatabase, type Db } from '../database/connection.js';
 import { createLogger, type Logger } from '../logging/logger.js';
 import { MockProvider } from '../providers/mock/mock-provider.js';
 import { ClaudeProvider } from '../providers/claude/claude-provider.js';
+import { ClaudeCliProvider } from '../providers/claude-cli/cli-provider.js';
 import { EnvCredentialSource } from '../providers/claude/credentials.js';
 import type { ExecutionProvider } from '../providers/types.js';
 import { Store } from '../queue/store.js';
 import { WorkspaceRegistry } from '../workspaces/registry.js';
 import { WorkflowEngine } from '../workflows/engine.js';
+import { QaEngine } from '../engineering/qa.js';
 
 export interface App {
   config: AppConfig;
@@ -17,13 +19,16 @@ export interface App {
   registry: WorkspaceRegistry;
   provider: ExecutionProvider;
   workflows: WorkflowEngine;
+  qa: QaEngine;
   close(): void;
 }
 
 export function createProvider(config: AppConfig): ExecutionProvider {
+  // The provider is an explicit owner choice; there is never an automatic fallback between them.
   if (config.provider === 'claude') {
     return new ClaudeProvider({ config, credentials: new EnvCredentialSource(config.envFile) });
   }
+  if (config.provider === 'claude-cli') return new ClaudeCliProvider({ config });
   return new MockProvider({
     scenarioFile: config.mockScenarioFile,
     capacityFile: config.mockScenarioFile
@@ -46,8 +51,21 @@ export function createApp(opts: LoadConfigOptions & { provider?: ExecutionProvid
       maxPlanTasks: config.maxPlanTasks,
       maxPlanRepairs: config.maxPlanRepairs,
       defaultMaxRetries: config.defaultMaxRetries,
+      researchWeb: config.researchWeb,
+      writeDocs: config.writePlanDocs,
+      independentReview: config.independentReview,
     },
     log,
   );
-  return { config, db, store, log, registry, provider, workflows, close: () => db.close() };
+  const qa = new QaEngine(
+    store,
+    {
+      enabled: config.independentReview,
+      maxCorrectionRounds: config.maxCorrectionRounds,
+      maxReviewRepairs: config.maxPlanRepairs,
+      defaultMaxRetries: config.defaultMaxRetries,
+    },
+    log,
+  );
+  return { config, db, store, log, registry, provider, workflows, qa, close: () => db.close() };
 }
