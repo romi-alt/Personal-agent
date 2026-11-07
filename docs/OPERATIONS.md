@@ -120,3 +120,14 @@ npm run agent -- plan:show <project>         # requirements <-> tasks coverage, 
 
 New settings: `PLAN_APPROVAL` (`required`|`auto`), `MAX_PLAN_TASKS`, `MAX_PLAN_REPAIRS`. A run that `FAILED` (invalid output after the repairs, or a failed planning task) leaves the project `BLOCKED`;
 read `workflow:show`, fix the cause (assignment wording, budget, provider), then `plan:start` again. Planning uses the same budgets/caps as coding tasks, so check `provider:status` first.
+
+---
+
+# Phase 2 stage 5 addendum
+
+```bash
+npm run agent -- inbox [--project P] [--json]      # what is waiting for you, with the resolving commands
+npm run agent -- progress <project> [--history]    # evidence-based progress; "claimed" is never the headline
+```
+
+`status` shows the inbox count. Check `inbox` after any `BLOCKED`/`WAITING_FOR_*` state; each item says exactly what to run. See `docs/PROGRESS.md`.

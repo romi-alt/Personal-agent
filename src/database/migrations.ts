@@ -313,6 +313,23 @@ CREATE TABLE plan_tasks (
 );
 `,
   },
+  {
+    version: 4,
+    name: 'phase_2_stage_5_progress_snapshots',
+    sql: `
+-- Evidence-based progress history (appended only when the numbers change)
+CREATE TABLE progress_snapshots (
+  id TEXT PRIMARY KEY,
+  project_id TEXT NOT NULL REFERENCES projects(id),
+  at INTEGER NOT NULL,
+  verified_percent REAL NOT NULL,
+  claimed_percent REAL NOT NULL,
+  fingerprint TEXT NOT NULL,
+  data TEXT NOT NULL
+);
+CREATE INDEX idx_progress_project ON progress_snapshots(project_id, at);
+`,
+  },
 ];
 
 export function runMigrations(db: Database.Database, migrations: Migration[] = MIGRATIONS): number[] {

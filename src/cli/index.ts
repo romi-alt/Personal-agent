@@ -22,6 +22,8 @@ import {
 } from '../verification/service.js';
 import { providerReadiness, verifyApiAccess } from '../providers/readiness.js';
 import { validatePlan } from '../planning/validate-plan.js';
+import { buildInbox } from '../progress/inbox.js';
+import { listSnapshots, recordSnapshotIfChanged } from '../progress/snapshots.js';
 import type { Plan } from '../planning/schemas.js';
 import { EnvCredentialSource } from '../providers/claude/credentials.js';
 import { Supervisor } from '../supervisor/supervisor.js';
@@ -72,6 +74,7 @@ const OPTIONS = {
   question: { type: 'string' },
   text: { type: 'string' },
   assume: { type: 'boolean' },
+  history: { type: 'boolean' },
 } as const;
 
 const HELP = `ELEVARIQ Personal Agent - Phase 1
@@ -103,6 +106,8 @@ Usage: npm run agent -- <command> [options]
   project:verify <project>                 Run independent verification (changes/build/tests); records evidence
   project:accept <project> [--acknowledge-unverified "why"]   Owner acceptance (never automatic)
   project:deliver <project> --reason R     Mark a READY_FOR_DELIVERY project DELIVERED (records only; deploys nothing)
+  inbox [--project P] [--json]             Everything waiting for YOUR decision, with the command that resolves each item
+  progress <project> [--json|--history]    Evidence-based progress (verified vs claimed), milestones, requirements, blockers
   plan:start <project>                     Start the planning workflow (analyse -> architect -> decompose -> owner approval -> tasks)
   plan:show <project>                      Requirements, milestones, planned tasks and requirement coverage
   workflow:list | workflow:show <run>      Workflow runs, steps and what they are waiting for
@@ -281,6 +286,9 @@ async function main(): Promise<void> {
               .map(([k, v]) => `${k}=${v}`)
               .join(' ') || 'empty'
           })`,
+        );
+        out(
+          `Owner inbox       : ${s.inbox.total} item(s) waiting for you${s.inbox.high ? ` (${s.inbox.high} high priority)` : ''}${s.inbox.total ? '  -> npm run agent -- inbox' : ''}`,
         );
         out(
           `Last checkpoint   : ${s.lastCheckpoint ? `${s.lastCheckpoint.id} at ${fmtTime(s.lastCheckpoint.createdAt)} ${s.lastCheckpoint.repoRef ?? ''}` : '-'}`,
@@ -740,6 +748,106 @@ async function main(): Promise<void> {
         const p = resolveProject(rest[0]);
         for (const m of store.listMemory(p.id).filter((x) => !rest[1] || x.section === rest[1]))
           out(`## ${m.section}\n${m.content}\n`);
+        break;
+      }
+      case 'inbox': {
+        const items = buildInbox(store, app.workflows.repo, {
+          projectId: values.project ? resolveProject(values.project).id : undefined,
+        });
+        if (values.json) {
+          out(JSON.stringify(items, null, 2));
+          break;
+        }
+        if (items.length === 0) {
+          out('Inbox is empty: nothing is waiting for you.');
+          break;
+        }
+        for (const [i, it] of items.entries()) {
+          out(
+            `${i + 1}. [${it.severity.toUpperCase()}] ${it.title}${it.projectSlug ? `  (${it.projectSlug})` : ''}`,
+          );
+          out(`     ${it.detail}`);
+          out(`     since ${relative(it.since)}`);
+          for (const a of it.actions) out(`     > npm run agent -- ${a}`);
+        }
+        break;
+      }
+      case 'progress': {
+        const p = resolveProject(rest[0]);
+        if (values.history) {
+          const snaps = listSnapshots(store, p.id, Number(values.limit ?? 50));
+          out(
+            table(
+              snaps.map((x) => ({
+                at: fmtTime(x.at),
+                verified: `${x.verifiedPercent}%`,
+                claimed: `${x.claimedPercent}%`,
+              })),
+              ['at', 'verified', 'claimed'],
+            ),
+          );
+          break;
+        }
+        const { progress } = recordSnapshotIfChanged(store, app.workflows.repo, p.id);
+        if (values.json) {
+          out(JSON.stringify(progress, null, 2));
+          break;
+        }
+        out(`${p.name}  lifecycle=${progress.lifecycle}`);
+        out(
+          `VERIFIED ${progress.verifiedPercent}%   (claimed by the model: ${progress.claimedPercent}%)   tasks: ${progress.totals.verified} verified, ${progress.totals.claimedOnly} claimed only, ${progress.totals.failedVerification} failed verification, ${progress.totals.notDone} not done`,
+        );
+        out(
+          `estimated spend $${progress.spendUsdEstimate.toFixed(4)} over ${progress.executions} execution(s); no completion estimate is given (no basis for one)`,
+        );
+        out(
+          '\nMilestones:\n' +
+            table(
+              progress.milestones.map((m) => ({
+                pos: m.position + 1,
+                key: m.key,
+                state: m.state,
+                verified: `${m.verifiedPercent}%`,
+                claimed: `${m.claimedPercent}%`,
+                title: m.title,
+              })),
+              ['pos', 'key', 'state', 'verified', 'claimed', 'title'],
+            ),
+        );
+        out(
+          '\nTasks:\n' +
+            table(
+              progress.tasks.map((t) => ({
+                key: t.planKey ?? '-',
+                status: t.status,
+                verification: t.verification,
+                weight: t.weight,
+                note: t.note,
+                title: t.title,
+              })),
+              ['key', 'status', 'verification', 'weight', 'note', 'title'],
+            ),
+        );
+        out(
+          '\nRequirements (TASKS_VERIFIED means the tasks covering it passed their checks; requirement satisfaction itself is not yet independently reviewed):\n' +
+            table(
+              progress.requirements.map((r) => ({ id: r.id, state: r.state, tasks: r.taskKeys.join(',') })),
+              ['id', 'state', 'tasks'],
+            ),
+        );
+        if (progress.blockers.length)
+          out(
+            '\nBlocked or waiting:\n' +
+              table(
+                progress.blockers.map((b) => ({
+                  task: b.taskId,
+                  status: b.status,
+                  title: b.title,
+                  reason: b.reason,
+                })),
+                ['task', 'status', 'title', 'reason'],
+              ),
+          );
         break;
       }
       case 'plan:start': {

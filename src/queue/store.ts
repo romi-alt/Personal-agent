@@ -668,6 +668,7 @@ export class Store {
             (d) => (statusOf.get(d) as { status: string } | undefined)?.status === 'COMPLETED',
           );
           if (!depsDone) return false;
+          if (!this.milestoneGateOpen(t.id, t.projectId)) return false;
           if (!overBudget.has(t.projectId)) overBudget.set(t.projectId, this.projectOverBudget(t.projectId));
           return !overBudget.get(t.projectId);
         });
@@ -1126,6 +1127,33 @@ export class Store {
       head: (r['start_ref'] as string | null) ?? null,
       statusHash: (r['start_status_hash'] as string | null) ?? null,
     };
+  }
+
+  // ------------------------------------------------------- milestone gating
+  /**
+   * Strict milestone gating: a planned task may start only when every task of an earlier milestone of the same
+   * project is terminal (COMPLETED/CANCELLED). Tasks with no plan link, and projects with gating 'off', are not gated.
+   */
+  milestoneGateOpen(taskId: string, projectId: string): boolean {
+    const link = this.db
+      .prepare(
+        `SELECT m.position AS pos FROM plan_tasks pt JOIN milestones m ON m.project_id = ? AND m.key = pt.milestone_key WHERE pt.task_id = ?`,
+      )
+      .get(projectId, taskId) as { pos: number } | undefined;
+    if (!link || link.pos === 0) return true;
+    const gating = (
+      this.getAssignmentData(projectId)?.['execution'] as { milestoneGating?: string } | undefined
+    )?.milestoneGating;
+    if (gating === 'off') return true;
+    const open = this.db
+      .prepare(
+        `SELECT COUNT(*) AS n FROM plan_tasks pt
+         JOIN milestones m ON m.project_id = ? AND m.key = pt.milestone_key
+         JOIN tasks t ON t.id = pt.task_id
+         WHERE t.project_id = ? AND m.position < ? AND t.status NOT IN ('COMPLETED','CANCELLED')`,
+      )
+      .get(projectId, projectId, link.pos) as { n: number };
+    return open.n === 0;
   }
 
   // --------------------------------------------------------- project spend
