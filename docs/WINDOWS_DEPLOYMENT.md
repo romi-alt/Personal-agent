@@ -24,7 +24,7 @@
 ## Prerequisites
 
 * Windows 11, Node.js **22.12 or newer** (x64), Git for Windows, this repository.
-* `better-sqlite3` ships a prebuilt Windows x64 binary; if `npm ci` tries to compile it you need Visual Studio Build Tools.
+* `better-sqlite3` ships a prebuilt Windows x64 binary. **Verified failure on a real Windows runner (GitHub `windows-latest`, Node 22.23.4):** `npm ci` ran `node-gyp rebuild` for it anyway and failed because node-gyp 11.5 could not use the installed Visual Studio. The repository now contains an `.npmrc` with `ignore-scripts=true`, which stops that rebuild so the shipped prebuilt binary is used (no Visual Studio needed). If you ever see `gyp ERR! find VS` during `npm ci`, make sure `.npmrc` was not removed.
 * Keep the data folder (`AGENT_HOME`) on a **local NTFS disk** - not a network share or OneDrive-synced folder (SQLite WAL is unsafe there).
   Prefer a path outside OneDrive, e.g. `setx AGENT_HOME "C:\ElevariqAgent"`.
 

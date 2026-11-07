@@ -59,8 +59,7 @@ A dependency is labelled **Verified** only when a command succeeded; otherwise i
   for unattended work; the SDK adapter strips `CLAUDE_CODE_OAUTH_TOKEN`/`ANTHROPIC_AUTH_TOKEN` from the child environment and
   aborts if the CLI reports any credential source other than `ANTHROPIC_API_KEY`.
 * `node:sqlite` exists in this Node but is still experimental, so `better-sqlite3` was chosen (stable, synchronous, WAL).
-  `better-sqlite3` ships prebuilt binaries for Windows x64 and Linux x64; on exotic platforms it compiles from source and needs
-  a C++ toolchain (Visual Studio Build Tools on Windows).
+  `better-sqlite3` ships prebuilt binaries for Windows x64 and Linux x64, **but `npm ci` still ran `node-gyp rebuild` for it** (Phase 1.5 CI evidence: it failed on a Windows runner for lack of a compatible Visual Studio). Fixed by a committed `.npmrc` (`ignore-scripts=true`) so the prebuilt binary is used.
 * `npm audit`: **0 vulnerabilities in production dependencies**; 1 moderate advisory (minimatch DoS) reachable only through the
   ESLint dev-toolchain. The suggested fix downgrades ESLint (breaking), so it was not applied. It does not ship in the runtime.
 * TypeScript 5.9 was chosen over TypeScript 7 because `typescript-eslint` 8.x targets the 5.x API.
