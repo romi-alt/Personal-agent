@@ -203,16 +203,35 @@ variables/`~`, `.git` internals, links/junctions (target, ancestors, or anywhere
 50 000 entries, and any call without a valid AGENT_HOME. A missing directory returns `absent` (repeats are harmless).
 Every call appends to `<AGENT_HOME>\logs\scratch-cleanup.jsonl`; the intent line is written before deletion.
 
-## Production scheduled task - install (owner action)
+## Production scheduled task
 
-Preview (verified 2026-11-07, nothing registered):
+**Installed 2026-11-07 15:40 with the owner's authorisation** and running (verify-install: all checks passed).
+`.env` was switched to `EXECUTION_PROVIDER=claude-cli`, `ENVIRONMENT=production` (old file: `.env.bak-20261107`).
+
+Updating the code the task runs (rebuild) without leaving a stray supervisor outside the task:
+
+```
+node dist\cli\index.js stop --hold        # graceful; keepalive will not restart it
+npm run build
+node dist\cli\index.js start --detach     # clears the hold (runs outside the task for a moment)
+node dist\cli\index.js stop               # graceful, no hold
+Start-ScheduledTask -TaskName ElevariqPersonalAgent
+node dist\cli\index.js health
+```
+
+(Removing `%LOCALAPPDATA%\ElevariqAgent\STOP-HOLD` by hand and running `Start-ScheduledTask` is equivalent.)
+Remove the task: `powershell -File scripts\windows\uninstall-task.ps1`.
+
+Browser tests of the command center: `npm run test:browser` (Playwright + installed Edge; isolated temp home).
+
+Original install procedure, for reference / reinstallation. Preview:
 
 ```
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts\windows\install-task.ps1 -WhatIf
 ```
 
-Before installing, set in `E:\Agent\Personal-agent\.env` (currently `EXECUTION_PROVIDER=mock`,
-`ENVIRONMENT=development` - with these values the task would run the mock provider, not Claude Code):
+Before installing, set in `E:\Agent\Personal-agent\.env` (with `EXECUTION_PROVIDER=mock` the task would run the
+mock provider, not Claude Code; done on 2026-11-07):
 
 ```
 EXECUTION_PROVIDER=claude-cli

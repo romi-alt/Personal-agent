@@ -204,10 +204,12 @@ async function main(): Promise<void> {
           add('git', 'FAIL', 'git not found on PATH');
         }
         try {
-          const { stdout } = await execFileP('claude', ['--version'], {
-            timeout: 15000,
-            shell: process.platform === 'win32',
-          });
+          // Windows needs a shell to resolve claude.cmd/.exe; pass one constant command string (no args array:
+          // Node 24+ deprecates args with shell=true, DEP0190).
+          const { stdout } =
+            process.platform === 'win32'
+              ? await execFileP('claude --version', [], { timeout: 15000, shell: true })
+              : await execFileP('claude', ['--version'], { timeout: 15000 });
           add('claude code cli', 'OK', stdout.trim());
         } catch {
           add('claude code cli', 'WARN', 'not found (optional: used only for diagnostics)');

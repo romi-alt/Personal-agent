@@ -100,8 +100,9 @@ clean; `.env`, `dist/`, `node_modules/` ignored; no secrets in the diff (pattern
 | Implemented + tested | Agent-control hard deny + protected paths in the policy hook (self-approval via shell closed) - 15 tests; full suite **333/333** (32 files), typecheck, lint, build, prettier clean |
 | Live verified (this PC) | compiled scratch tool: real `.qa-*` dir deleted + audited, repeat = `absent`, `E:\elevariq-ui-tmp` / workspace root / parent refused; compiled hook on the real pending payload: still `destructive_delete`, `approve apr_...` and token read denied, scoped cleanup allowed |
 | Live verified | `claude doctor` (2.1.319 = latest, no installation issues, last auto-update `install_failed`), `claude auth status` (claude.ai, Max, expires 2026-12-04) |
-| Live verified | `install-task.ps1 -WhatIf` preview; no production task installed |
-| Awaiting owner | decision on `apr_mw67xtxk4c1e992a8e` (sandbox); production task install (+ `.env` provider switch); reboot check; Playwright download; ERP/CRM resources; PR/merge |
+| Live verified (owner-authorised) | `.env` -> `claude-cli`/`production` (backup `.env.bak-20261107`); production task `ElevariqPersonalAgent` installed 15:40, verify-install all PASS, `health` 0, one supervisor, duplicate start ignored, graceful stop -> rebuild -> restart through the task |
+| Implemented + tested (owner-authorised) | `@playwright/test@1.65.0` (npm only, installed Edge): `tests/browser/command-center.spec.ts` 9/9, 4 green runs, backend state asserted; fixed 3 UI defects it found (stale approvals badge, error view without navigation, 228 px phone overflow); doctor DEP0190 warning removed |
+| Awaiting owner | decision on `apr_mw67xtxk4c1e992a8e` (sandbox); reboot check; ERP/CRM resources; PR/merge |
 | Blocked | ERP/CRM live integration (resources) |
 
 Observed facts:
@@ -109,13 +110,13 @@ Observed facts:
   It never ran (the hook blocked it), `.qa-mut` does not exist; nothing needs deleting. Approving it would grant
   `destructive_delete` for the rest of that task; with the scoped tool a retry needs no approval. No new approval
   request was created because none is required.
-- `.env` has `EXECUTION_PROVIDER=mock`, `ENVIRONMENT=development`: installing the production task as-is would run
-  the mock provider.
+- The production task runs the build in this working tree: rebuild/branch switches only via the procedure in
+  `docs/OPERATIONS.md` ("Production scheduled task").
 - ~90 `elevariq-*` temp directories in `%TEMP%` are left by test runs and smoke scripts (harmless; owner may delete).
 
 ## Next (in order)
 
 1. Owner decisions listed in the final stabilization report (`docs/ACCEPTANCE_REPORT.md`, "Owner actions").
-2. After Playwright authorization: browser tests of the command center (login, project creation/assignment, task
-   monitoring, approvals, pause/resume, live status, errors, responsive) asserting backend state, not screenshots.
+2. After the owner's reboot check: first real project through the production task (watch `capacity_wait`/`retry`
+   events for the first real usage-limit wait).
 3. Optional live run with web research enabled, then merge `feat/windows-compat` through a PR once reviewed.

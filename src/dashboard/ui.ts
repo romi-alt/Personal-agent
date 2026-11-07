@@ -51,6 +51,9 @@ pre{white-space:pre-wrap;word-break:break-word;background:var(--soft);padding:12
 .empty{color:var(--muted);padding:12px 0}.err{color:var(--bad)}.toast{position:fixed;bottom:20px;right:20px;background:var(--ink);color:var(--bg);padding:10px 14px;border-radius:8px}
 .health{display:flex;gap:10px;flex-wrap:wrap;align-items:center}.sr{position:absolute;left:-9999px}
 .login{max-width:420px;margin:12vh auto;padding:0 16px}.login-title{margin-bottom:6px}.login-actions{margin-top:12px}
+.card{min-width:0}
+@media (max-width:700px){main{padding:16px 16px 40px}.card{overflow-x:auto}.kv{grid-template-columns:1fr}.kv dt{margin-top:6px}
+.g4{grid-template-columns:repeat(auto-fill,minmax(140px,1fr))}header.top{align-items:flex-start}.toast{left:16px;right:16px}}
 `;
 
 const JS = String.raw`
@@ -198,6 +201,7 @@ function viewWorkers() {
 function viewApprovals() {
   return api('approvals').then(function (d) {
     var pending = d.approvals.filter(function (a) { return a.status === 'PENDING'; }); var done = d.approvals.filter(function (a) { return a.status !== 'PENDING'; });
+    if (S.cache.overview) S.cache.overview.totals.pendingApprovals = pending.length; // keep the nav badge current
     return page('Approval center', pending.length + ' pending', [card('Pending decisions', pending.length ? pending.map(function (a) {
       var note = h('textarea', { rows: 2, placeholder: 'Note for the audit trail (optional)', 'aria-label': 'note' });
       return h('div', { style: 'padding:12px 0;border-bottom:1px solid var(--line)' }, h('div', { class: 'actions', style: 'justify-content:space-between' }, h('strong', { text: a.actionType.replace(/_/g, ' ') }), h('span', { class: 'muted', text: 'requested ' + ago(a.requestedAt) })), h('p', { text: a.description }), h('pre', { text: JSON.stringify(a.payload, null, 2) }), h('div', { style: 'margin:8px 0' }, note),
@@ -223,7 +227,7 @@ function render() {
     var root = document.getElementById('root'); var focus = document.activeElement && document.activeElement.tagName === 'TEXTAREA';
     if (focus) return; // never wipe what the owner is typing
     root.replaceChildren(h('div', { class: 'app' }, nav(), h('main', { id: 'main' }, content)));
-  }).catch(function (e) { document.getElementById('root').replaceChildren(h('main', null, h('p', { class: 'err', text: 'Error: ' + e.message }))); });
+  }).catch(function (e) { document.getElementById('root').replaceChildren(h('div', { class: 'app' }, nav(), h('main', { id: 'main' }, h('p', { class: 'err', text: 'Error: ' + e.message })))); }); // keep navigation + sign-out on errors
 }
 api('session').then(function (s) { S.csrf = s.csrf; return api('overview'); }).then(function (o) { S.cache.overview = o; render(); });
 window.addEventListener('hashchange', render);

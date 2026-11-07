@@ -69,16 +69,31 @@ plus a layout overflow and a misleading evidence count. Screenshots: `docs/scree
 
 ## Final stabilization (2026-11-07) - status by category
 
-**Not production-ready yet**: the production scheduled task is not installed, no reboot check has happened, and
-browser tests of the command-center workflows are not implemented (Playwright not authorised).
+**Not production-ready yet**: no reboot/sign-in check of the installed task has happened, the subscription
+usage-limit wait has never been observed live, and no real project has run end to end under the production task.
 
 | Category | Items |
 | --- | --- |
-| Implemented and tested | everything in the table above marked Done; scoped scratch cleanup; agent-control (self-approval) guard |
-| Live verified on this PC | real CLI smoke 8/8 + recovery 7/7; scheduler acceptance 45/45 (isolated task); live pipeline planning + task 1 + independent QA; command center in real Edge (20 views); scratch tool + compiled hook on the real pending payload; `claude doctor` / `auth status`; install preview |
+| Implemented and tested | everything in the table above marked Done; scoped scratch cleanup; agent-control (self-approval) guard; **Playwright browser tests of the command center, 9/9** (`npm run test:browser`, installed Edge) |
+| Live verified on this PC | real CLI smoke 8/8 + recovery 7/7; scheduler acceptance 45/45 (isolated task); live pipeline planning + task 1 + independent QA; command center in real Edge; scratch tool + compiled hook on the real pending payload; `claude doctor` / `auth status`; **production task `ElevariqPersonalAgent` installed and running** (verify-install: all checks passed, `health` exit 0, one supervisor, second `Start-ScheduledTask` ignored, graceful `stop` + restart through the task) |
 | Simulated (mock provider / fake streams) | usage-limit wait and resume (`rate_limit_event`, `api_retry`), quota backoff, most pipeline stages, ERP/CRM sync |
 | Based on official documentation only | `CLAUDE_CODE_RETRY_WATCHDOG` semantics (indefinite 429/529 retry, wait until reset), `..._USAGE_LIMIT_RECHECK_MS` range, `RESUME_INTERRUPTED_TURN` behaviour |
-| Awaiting owner action | `apr_mw67xtxk4c1e992a8e`; `.env` provider switch + production task install; reboot verification; Playwright download; ERP/CRM resources; PR / merge |
+| Awaiting owner action | `apr_mw67xtxk4c1e992a8e`; reboot verification; ERP/CRM resources; PR / merge |
+
+### Browser tests (Playwright 1.65.0, installed Edge, no browser download)
+
+`tests/browser/command-center.spec.ts` drives the real UI against an in-process agent (real store, workflows and
+supervisor loop on the mock provider) and asserts the **backend** after every action: login refused + audited /
+accepted with an HttpOnly SameSite=Strict session; plain-language assignment creates the project and planning; plan
+approval approved with a note (approval row, audit event with note and channel, coding tasks materialised); a deploy
+request denied; task pause/resume and project pause/resume (store state + `owner.task_action` events); live worker in
+a simulated usage-limit wait shown, then completion; error states (stale approval -> "already decided" and backend
+untouched, unknown project, POST without CSRF -> 403 and no change, sign-out, server-side session loss -> login);
+390 px and 768 px widths without horizontal overflow; zero JS errors and no unexpected HTTP errors.
+Real defects found and fixed: (1) the Approvals nav badge was stale on the Approval center; (2) an error view removed
+navigation and Sign out, stranding the owner; (3) the overview overflowed a 390 px phone screen by 228 px.
+Each of these tests failed before its fix and passes after it; 4 consecutive green runs. Not covered: Playwright
+UI QA of the *generated* products (Phase 3 item, still not implemented).
 | Blocked | ERP/CRM live integration; full live pipeline completion (waits on the approval decision) |
 
 ### Subscription usage-limit recovery - limits of the evidence
@@ -103,13 +118,12 @@ browser tests of the command-center workflows are not implemented (Playwright no
    cleanup). Commands (set `AGENT_HOME` to the sandbox first):
    `npm run agent -- deny apr_mw67xtxk4c1e992a8e --by <you>`. Approving instead grants recursive deletes for the rest
    of that sandbox task (low impact there; `.qa-mut` does not exist).
-2. **Production task**: edit `.env` (`EXECUTION_PROVIDER=claude-cli`, `ENVIRONMENT=production`), `npm run build`, then
-   `powershell -NoProfile -ExecutionPolicy Bypass -File scripts\windows\install-task.ps1`, `Start-ScheduledTask
-   ElevariqPersonalAgent`, `scripts\windows\verify-install.ps1`. No reboot is triggered.
+2. **Production task**: DONE with your authorisation (2026-11-07 15:40): `.env` switched to
+   `EXECUTION_PROVIDER=claude-cli` / `ENVIRONMENT=production` (previous file kept as `.env.bak-20261107`, git-ignored),
+   task installed and running. Real Claude Code workers now run on your subscription when you assign work.
 3. **Reboot check** at a convenient time: `docs/OPERATIONS.md`, "Manual reboot verification".
-4. **Playwright**: authorise `npm install -D @playwright/test@1.65.0` (~14 MB, npm registry) to drive the installed
-   Edge 156 (`channel: 'msedge'`, no browser download); optionally `npx playwright install chromium` (download from
-   Playwright's CDN, size not published in advance - typically 100-200 MB; C: has 316 GB free).
+4. **Playwright**: DONE with your authorisation (`@playwright/test@1.65.0`, npm package only, drives the installed
+   Edge). A separate Chromium download is not needed.
 5. **Claude login** expires 2026-12-04: run `claude auth status` before then; re-login interactively if needed.
 6. **ERP/CRM**: provide the items in `docs/ERP_INTEGRATION_CHECKLIST.md`, "Owner request list".
 7. **Review and merge**: push `feat/windows-compat` and open a PR into `claude/dreamy-edison-hiyq3n` (or `main`) when
