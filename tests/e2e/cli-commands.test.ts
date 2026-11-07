@@ -253,3 +253,29 @@ describe('CLI: Phase 1.5 commands (assignments, project lifecycle, verification,
     expect(noKey.stdout).toMatch(/ANTHROPIC_API_KEY not configured/);
   });
 });
+
+describe('CLI: Phase 2 stage 5 commands (inbox, progress)', () => {
+  it('status reports the owner inbox, and inbox/progress print actionable, honest output', () => {
+    // pending approval + an escalated task exist from earlier tests in this file (denied approval -> BLOCKED task)
+    const status = ok('status');
+    expect(status).toMatch(/Owner inbox\s+: \d+ item\(s\) waiting for you/);
+    const inbox = ok('inbox');
+    expect(inbox).toMatch(/\[(HIGH|MEDIUM|LOW)\]/);
+    expect(inbox).toMatch(/> npm run agent -- /); // every item names the command that resolves it
+    const json = JSON.parse(ok('inbox', '--json')) as { key: string; actions: string[]; severity: string }[];
+    expect(json.length).toBeGreaterThan(0);
+    expect(json.every((i) => i.actions.length > 0 && i.key.length > 0)).toBe(true);
+    const order = json.map((i) => ['high', 'medium', 'low'].indexOf(i.severity));
+    expect(order).toEqual([...order].sort((a, b) => a - b)); // sorted by severity
+    expect(ok('inbox', '--project', 'school-management-erp')).toMatch(/school-management-erp|empty/);
+  });
+  it('progress shows verified vs claimed and never an ETA; --history and --json work', () => {
+    const out = ok('progress', 'cli-demo');
+    expect(out).toMatch(/VERIFIED \d+(\.\d+)?%\s+\(claimed by the model: \d+(\.\d+)?%\)/);
+    expect(out).toMatch(/no completion estimate is given/);
+    const j = JSON.parse(ok('progress', 'cli-demo', '--json'));
+    expect(j.verifiedPercent).toBeLessThanOrEqual(j.claimedPercent);
+    expect(ok('progress', 'cli-demo', '--history')).toBeTypeOf('string');
+    expect(run('progress').status).toBe(1); // ambiguous project -> clear error
+  });
+});

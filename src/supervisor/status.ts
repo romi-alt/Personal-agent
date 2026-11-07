@@ -1,8 +1,12 @@
 import type { ExecutionProvider } from '../providers/types.js';
 import type { Store } from '../queue/store.js';
 import type { Task } from '../types/index.js';
+import { buildInbox } from '../progress/inbox.js';
+import { WorkflowRepository } from '../workflows/repository.js';
 
 export interface StatusReport {
+  /** Items waiting for a human decision (see `inbox`). */
+  inbox: { total: number; high: number };
   supervisor: {
     live: boolean;
     status: string;
@@ -61,7 +65,9 @@ export async function buildStatus(
   const pre = await provider.preflight();
   const ps = store.getProviderState(provider.name);
   const retries = waiting.map((t) => t.nextEligibleAt).filter((x): x is number => x !== null);
+  const inboxItems = buildInbox(store, new WorkflowRepository(store));
   return {
+    inbox: { total: inboxItems.length, high: inboxItems.filter((i) => i.severity === 'high').length },
     supervisor: {
       live,
       status: sup

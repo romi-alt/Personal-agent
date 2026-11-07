@@ -79,6 +79,16 @@ export const assignmentSchema = z
         }),
       )
       .default([]),
+    execution: z
+      .object({
+        /**
+         * strict (default): a task of milestone N is not started while any task of an EARLIER milestone is still open
+         * (not completed/cancelled), so work is never built on an unfinished or broken foundation.
+         * off: only dependencies and priority order the work.
+         */
+        milestoneGating: z.enum(['strict', 'off']).default('strict'),
+      })
+      .default({ milestoneGating: 'strict' }),
     verification: z
       .object({
         buildCommand: z.string().min(1).optional(),
