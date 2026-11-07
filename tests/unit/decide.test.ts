@@ -7,6 +7,7 @@ import type { ProviderState, Task } from '../../src/types/index.js';
 const cfg = {
   backoff: { baseMs: 1000, maxMs: 60_000, jitter: 0, quotaMinWaitMs: 600_000, resetMarginMs: 5000 },
   maxContinuations: 3,
+  maxProviderFailureStreak: 3,
 };
 const now = 1_000_000;
 const task = (o: Partial<Task> = {}): Task => ({
@@ -31,6 +32,10 @@ const task = (o: Partial<Task> = {}): Task => ({
   completionEvidence: null,
   sessionId: null,
   dedupeKey: 'k',
+  leaseExecutionId: null,
+  interruptionCount: 0,
+  providerFailureStreak: 0,
+  verificationRequired: [],
   createdAt: 0,
   updatedAt: 0,
   completedAt: null,
@@ -143,6 +148,21 @@ describe('failure classification policy (each condition handled distinctly)', ()
       next: 'READY',
       consumesAttempt: false,
     });
+  });
+  it('escalates repeated network/outage/rate-limit failures instead of retrying forever', () => {
+    for (const c of ['NETWORK', 'PROVIDER_OUTAGE', 'RATE_LIMIT'] as const) {
+      const d = fail({ errorClass: c, message: 'x' }, { task: task({ providerFailureStreak: 3 }) });
+      expect(d).toMatchObject({ next: 'BLOCKED', escalated: true, providerFailureStreak: 4 });
+      expect(d.reason).toMatch(/escalated to owner/);
+      expect(
+        fail({ errorClass: c, message: 'x' }, { task: task({ providerFailureStreak: 2 }) }).next,
+      ).not.toBe('BLOCKED');
+    }
+    // quota exhaustion is a legitimate long wait and is never escalated by streak
+    expect(
+      fail({ errorClass: 'QUOTA_EXHAUSTED', message: 'x' }, { task: task({ providerFailureStreak: 99 }) })
+        .next,
+    ).toBe('WAITING_FOR_CAPACITY');
   });
   it('success completes and clears provider block; partial continues until the continuation limit', () => {
     const ok = decide({

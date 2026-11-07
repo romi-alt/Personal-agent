@@ -1,4 +1,10 @@
-import { query as sdkQuery, type Options, type SDKMessage } from '@anthropic-ai/claude-agent-sdk';
+import {
+  getSessionInfo,
+  query as sdkQuery,
+  type HookCallback,
+  type Options,
+  type SDKMessage,
+} from '@anthropic-ai/claude-agent-sdk';
 import type { AppConfig } from '../../config/index.js';
 import { evaluateToolUse } from '../../security/policy.js';
 import type {
@@ -32,6 +38,8 @@ export interface ClaudeProviderDeps {
   credentials: CredentialSource;
   /** Injectable for tests; defaults to the official SDK query(). */
   queryFn?: QueryFn;
+  /** Injectable local session lookup (no network). Defaults to the SDK's getSessionInfo. */
+  sessionExists?: (sessionId: string, cwd: string) => Promise<boolean>;
 }
 
 /** Env vars that would let the child CLI authenticate with a subscription/other identity instead of the Console API key. */
@@ -43,14 +51,31 @@ const STRIPPED_ENV = [
   'CLAUDE_CODE_USE_FOUNDRY',
 ];
 
-const ALLOWED_TOOLS = ['Read', 'Glob', 'Grep', 'Edit', 'Write', 'Bash', 'TodoWrite'];
+/**
+ * Tools the model may even see (`tools`). NOTE: we deliberately do NOT use `allowedTools`: per the SDK docs
+ * (and type definitions) tools in `allowedTools` are auto-approved and "never reach canUseTool", which would
+ * let Bash/Write bypass our approval policy. Permission decisions are made by a PreToolUse hook (runs first,
+ * and a hook deny wins over allow rules) and, as a second layer, by canUseTool.
+ */
+const AVAILABLE_TOOLS = ['Read', 'Glob', 'Grep', 'Edit', 'Write', 'Bash', 'TodoWrite'];
+
+async function defaultSessionExists(sessionId: string, cwd: string): Promise<boolean> {
+  try {
+    return !!(await getSessionInfo(sessionId, { dir: cwd })) || !!(await getSessionInfo(sessionId));
+  } catch {
+    // If the local lookup itself fails we cannot prove the session is missing: let the SDK try the resume.
+    return true;
+  }
+}
 
 export class ClaudeProvider implements ExecutionProvider {
   readonly name = 'claude';
   private readonly queryFn: QueryFn;
+  private readonly sessionExists: (sessionId: string, cwd: string) => Promise<boolean>;
 
   constructor(private readonly deps: ClaudeProviderDeps) {
     this.queryFn = deps.queryFn ?? (sdkQuery as unknown as QueryFn);
+    this.sessionExists = deps.sessionExists ?? (deps.queryFn ? async () => true : defaultSessionExists);
   }
 
   /** Local-only: verifies configuration and key presence. Never calls the API. */
@@ -86,6 +111,16 @@ export class ClaudeProvider implements ExecutionProvider {
         failure: { errorClass: 'AUTHENTICATION', message: 'ANTHROPIC_API_KEY is not configured' },
       };
     }
+    if (req.resumeSessionId && !(await this.sessionExists(req.resumeSessionId, req.cwd))) {
+      // Free, local detection: avoids a doomed request and lets recovery rebuild context immediately.
+      return {
+        kind: 'failed',
+        failure: {
+          errorClass: 'INVALID_SESSION',
+          message: `session ${req.resumeSessionId} not found in local session storage`,
+        },
+      };
+    }
     const env: Record<string, string | undefined> = { ...process.env, ANTHROPIC_API_KEY: key };
     for (const k of STRIPPED_ENV) delete env[k];
 
@@ -106,6 +141,38 @@ export class ClaudeProvider implements ExecutionProvider {
     const denials: PermissionDenial[] = [];
     const workspace = req.cwd;
 
+    const preToolUseHook: HookCallback = async (hookInput) => {
+      if (hookInput.hook_event_name !== 'PreToolUse') return {};
+      const toolInput = (hookInput.tool_input ?? {}) as Record<string, unknown>;
+      const decision = evaluateToolUse(hookInput.tool_name, toolInput, workspace, {
+        approvedTypes: req.approvedActionTypes,
+        alsoRequire: req.alsoRequireApproval,
+      });
+      if (decision.allow) return {}; // defer to the normal permission flow (canUseTool is the second layer)
+      denials.push({
+        tool: hookInput.tool_name,
+        reason: decision.reason,
+        approvalType: decision.approvalType,
+        input: toolInput,
+      });
+      req.onEvent({
+        type: 'permission_denied',
+        data: {
+          tool: hookInput.tool_name,
+          reason: decision.reason,
+          approvalType: decision.approvalType,
+          layer: 'hook',
+        },
+      });
+      return {
+        hookSpecificOutput: {
+          hookEventName: 'PreToolUse',
+          permissionDecision: 'deny',
+          permissionDecisionReason: `${decision.reason}. Do not retry this action; record it as requiring owner approval and continue with other work.`,
+        },
+      };
+    };
+
     const options: Options = {
       cwd: workspace,
       abortController: abort,
@@ -115,13 +182,18 @@ export class ClaudeProvider implements ExecutionProvider {
       maxTurns: req.limits.maxTurns,
       maxBudgetUsd: req.limits.maxBudgetUsd,
       permissionMode: 'default',
-      allowedTools: ALLOWED_TOOLS,
-      // Project-level CLAUDE.md applies; the owner's global ~/.claude settings/login are neither read nor modified.
-      settingSources: ['project'],
+      tools: AVAILABLE_TOOLS,
+      // SDK isolation mode: load NO filesystem settings (user, project or local). Project settings can define hooks,
+      // MCP servers and allow-rules; since the model can write files in its own workspace, honouring them would let it
+      // grant itself permissions or run commands outside the policy. Context is supplied by the supervisor's prompt instead.
+      // The owner's global ~/.claude settings and login are likewise neither read nor modified.
+      settingSources: [],
       systemPrompt: { type: 'preset', preset: 'claude_code', append: req.systemAppend },
+      hooks: { PreToolUse: [{ hooks: [preToolUseHook] }] },
       canUseTool: async (toolName, input) => {
         const decision = evaluateToolUse(toolName, input, workspace, {
           approvedTypes: req.approvedActionTypes,
+          alsoRequire: req.alsoRequireApproval,
         });
         if (decision.allow) return { behavior: 'allow', updatedInput: input };
         denials.push({ tool: toolName, reason: decision.reason, approvalType: decision.approvalType, input });
@@ -332,7 +404,13 @@ export class ClaudeProvider implements ExecutionProvider {
         };
       }
     }
-    return { kind: 'completed', sessionId, usage, summary: resultText || 'completed' };
+    return {
+      kind: 'completed',
+      sessionId,
+      usage,
+      summary: resultText || 'completed',
+      denials: permissionDenials.length ? permissionDenials : undefined,
+    };
   }
 }
 

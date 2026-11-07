@@ -37,6 +37,10 @@ export interface MockStep {
   summary?: string;
   /** Files (relative to cwd) to write, simulating real artifacts. */
   writes?: { file: string; content: string }[];
+  /** For 'success': do not create the default `<taskId>.done` artifact (simulates a claim of success with no changes). */
+  noArtifact?: boolean;
+  /** Estimated cost reported in usage (for budget tests). */
+  costUsd?: number;
 }
 
 export interface MockScenario {
@@ -72,6 +76,8 @@ export class MockProvider implements ExecutionProvider {
     attemptIndex: number;
     resumed: string | undefined;
     step: MockStepType;
+    /** The exact prompt the worker sent (lets tests assert recovery context). */
+    prompt: string;
   }[] = [];
 
   constructor(private readonly opts: MockProviderOptions = {}) {}
@@ -154,10 +160,13 @@ export class MockProvider implements ExecutionProvider {
 
     // Record execution marker in the workspace so tests can prove no work is duplicated.
     mkdirSync(req.cwd, { recursive: true });
-    appendFileSync(
-      path.join(req.cwd, '.mock-executions.log'),
-      `${req.taskTitle}\t${req.attemptIndex}\t${step.type}\t${req.resumeSessionId ?? 'new'}\n`,
-    );
+    // (Skipped for noArtifact steps, which must leave the working tree untouched.)
+    if (!step.noArtifact) {
+      appendFileSync(
+        path.join(req.cwd, '.mock-executions.log'),
+        `${req.taskTitle}\t${req.attemptIndex}\t${step.type}\t${req.resumeSessionId ?? 'new'}\n`,
+      );
+    }
 
     req.onEvent({ type: 'tool_use', data: { tool: 'mock_work', step: step.type } });
     await sleep(step.delayMs ?? 0, req.signal);
@@ -173,12 +182,12 @@ export class MockProvider implements ExecutionProvider {
 
     switch (step.type) {
       case 'success':
-        writeFileSync(path.join(req.cwd, `${req.taskId}.done`), 'done\n');
+        if (!step.noArtifact) writeFileSync(path.join(req.cwd, `${req.taskId}.done`), 'done\n');
         return {
           kind: 'completed',
           summary,
           sessionId,
-          usage: { turns: 1, costUsdEstimate: 0 },
+          usage: { turns: 1, costUsdEstimate: step.costUsd ?? 0 },
           testResults: 'mock: 1 passed',
         };
       case 'partial':
@@ -278,6 +287,7 @@ export class MockProvider implements ExecutionProvider {
       attemptIndex: req.attemptIndex,
       resumed: req.resumeSessionId,
       step,
+      prompt: req.prompt,
     });
   }
 }

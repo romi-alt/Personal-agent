@@ -73,3 +73,69 @@ export async function ensureBranch(dir: string, branch: string): Promise<void> {
     await git(dir, ['checkout', '-q', '-b', branch]);
   }
 }
+
+export interface TreeFingerprint {
+  head: string | null;
+  /** Hash of tracked-file diff vs HEAD plus names+content hashes of untracked files. Detects edits to already-dirty files. */
+  statusHash: string | null;
+}
+
+/** Content-level fingerprint of the working tree; two equal fingerprints mean no file content changed in between. */
+export async function treeFingerprint(cwd: string): Promise<TreeFingerprint> {
+  const { createHash } = await import('node:crypto');
+  const { readFileSync, statSync } = await import('node:fs');
+  const st = await gitState(cwd);
+  if (!st.isRepo) return { head: null, statusHash: null };
+  const h = createHash('sha256');
+  try {
+    const { stdout } = await run('git', ['diff', 'HEAD', '--no-color'], {
+      cwd,
+      timeout: 30_000,
+      windowsHide: true,
+      maxBuffer: 64 * 1024 * 1024,
+    });
+    h.update(stdout);
+  } catch {
+    /* repo without commits: untracked listing below still covers it */
+  }
+  try {
+    const { stdout } = await run('git', ['ls-files', '--others', '--exclude-standard', '-z'], {
+      cwd,
+      timeout: 30_000,
+      windowsHide: true,
+      maxBuffer: 16 * 1024 * 1024,
+    });
+    for (const rel of stdout.split('\0').filter(Boolean).sort()) {
+      h.update(`\nU:${rel}:`);
+      try {
+        const full = path.join(cwd, rel);
+        if (statSync(full).size <= 1_000_000) h.update(readFileSync(full));
+        else h.update(`size:${statSync(full).size}`);
+      } catch {
+        /* file vanished mid-scan */
+      }
+    }
+  } catch {
+    /* ignore */
+  }
+  return { head: st.head, statusHash: h.digest('hex') };
+}
+
+/** Number of commits reachable from HEAD (0 for an unborn branch). */
+export async function commitCount(cwd: string): Promise<number> {
+  try {
+    return Number(await git(cwd, ['rev-list', '--count', 'HEAD']));
+  } catch {
+    return 0;
+  }
+}
+
+/** True if `ref` names a commit that exists in the repository. */
+export async function commitExists(cwd: string, ref: string): Promise<boolean> {
+  try {
+    await git(cwd, ['cat-file', '-e', `${ref}^{commit}`]);
+    return true;
+  } catch {
+    return false;
+  }
+}

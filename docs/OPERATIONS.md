@@ -84,3 +84,22 @@ State = `AGENT_HOME`: `agent.db` (+ `-wal`, `-shm`), `workspaces/`, `logs/`. Bac
 | Task `BLOCKED` | `task:show` → last error; budget/continuation/workspace problems need the owner |
 | `better-sqlite3` fails to install | needs a prebuilt binary or a C++ toolchain; use Node LTS x64 |
 | Nothing happens | is the supervisor live (`health`)? is `daily budget reached` in `logs --app`? |
+
+---
+
+# Phase 1.5 addendum - new commands and notes
+
+```bash
+npm run agent -- assignment:add --file examples/assignment.example.json   # validate + register (no tasks are created)
+npm run agent -- project:status <project>      # lifecycle, spend, delivery-readiness table
+npm run agent -- project:verify <project>      # independent checks + evidence
+npm run agent -- project:accept <project> [--acknowledge-unverified "why"]
+npm run agent -- project:deliver <project> --reason "..."     # records only; deploys nothing
+npm run agent -- provider:status               # SDK / credentials / API access / budget / live execution / live recovery
+npm run agent -- provider:verify --access      # non-billable key check
+```
+
+* New settings: `MAX_INTERRUPTIONS`, `MAX_PROVIDER_FAILURE_STREAK`, `EVENT_RETENTION_DAYS`, `VERIFY_COMMAND_TIMEOUT_MS` (see `.env.example`).
+* A `BLOCKED` task with a `task.escalated` event means the agent stopped retrying on purpose: read `task:show`, fix the cause, then `task:unblock`.
+* Windows: follow `docs/WINDOWS_DEPLOYMENT.md` (exact steps + verification checklist; **not live-tested**).
+* GitHub: `main` is the baseline branch; see `docs/GITHUB_SETUP.md` for the two settings only an admin can change (default branch, protection).

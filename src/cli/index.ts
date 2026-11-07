@@ -11,6 +11,17 @@ import { createApp, type App } from '../core/app.js';
 import { createIntegrations, EVENT_MAPPING } from '../integrations/index.js';
 import { MEMORY_SECTIONS } from '../memory/context.js';
 import { reconcileOrphans } from '../recovery/reconcile.js';
+import { registerAssignment, getAssignment } from '../assignments/register.js';
+import { AssignmentValidationError } from '../assignments/schema.js';
+import { buildProjectContext } from '../assignments/context.js';
+import {
+  acceptProject,
+  AcceptanceRefusedError,
+  deliveryReadiness,
+  verifyProject,
+} from '../verification/service.js';
+import { providerReadiness, verifyApiAccess } from '../providers/readiness.js';
+import { EnvCredentialSource } from '../providers/claude/credentials.js';
 import { Supervisor } from '../supervisor/supervisor.js';
 import { startHealthServer } from '../supervisor/health.js';
 import { buildStatus } from '../supervisor/status.js';
@@ -53,6 +64,9 @@ const OPTIONS = {
   app: { type: 'boolean' },
   run: { type: 'boolean' },
   by: { type: 'string' },
+  reason: { type: 'string' },
+  'acknowledge-unverified': { type: 'string' },
+  access: { type: 'boolean' },
 } as const;
 
 const HELP = `ELEVARIQ Personal Agent - Phase 1
@@ -78,6 +92,14 @@ Usage: npm run agent -- <command> [options]
   recovery [--run]            Show recovery state; --run reconciles orphaned tasks (only if no supervisor is live)
   integrations                ERP/CRM adapter health (mock adapters in Phase 1) and event-mapping spec
   memory:set <project> <section> <text> | memory:get <project> [section]
+  assignment:add --file assignment.json    Validate + register a project assignment (see examples/assignment.example.json)
+  assignment:show <project>                Persisted assignment contract
+  project:status <project>                 Lifecycle, task progress, spend and delivery readiness
+  project:verify <project>                 Run independent verification (changes/build/tests); records evidence
+  project:accept <project> [--acknowledge-unverified "why"]   Owner acceptance (never automatic)
+  project:deliver <project> --reason R     Mark a READY_FOR_DELIVERY project DELIVERED (records only; deploys nothing)
+  provider:status                          Provider readiness report (SDK / credentials / API access / budget / live execution / live recovery)
+  provider:verify --access                 Non-billable API key check (GET /v1/models); records API_ACCESS_VERIFIED
 `;
 
 function fail(msg: string, code = 1): never {
@@ -180,6 +202,14 @@ async function main(): Promise<void> {
         const sup = new Supervisor({ config, store, provider, registry, log: app.log });
         const onSignal = (sig: string) => sup.requestStop(`received ${sig}`);
         for (const s of ['SIGINT', 'SIGTERM', 'SIGBREAK'] as const) process.on(s, () => onSignal(s));
+        // A bug must never leave a zombie supervisor: log, shut down gracefully (checkpointing), exit non-zero for the service manager.
+        const onFatal = (kind: string) => (err: unknown) => {
+          app.log.error('supervisor.fatal', { kind, error: err });
+          process.exitCode = 1;
+          sup.requestStop(`fatal ${kind}`);
+        };
+        process.on('uncaughtException', onFatal('uncaughtException'));
+        process.on('unhandledRejection', onFatal('unhandledRejection'));
         let health: import('node:http').Server | null = null;
         if (config.healthPort > 0)
           health = await startHealthServer(config.healthPort, store, provider, config.leaseTtlMs);
@@ -486,7 +516,9 @@ async function main(): Promise<void> {
         const patch =
           cmd === 'task:retry'
             ? { resetAttempts: true, nextEligibleAt: null, lastErrorClass: null, lastErrorMessage: null }
-            : { nextEligibleAt: null };
+            : cmd === 'task:unblock'
+              ? { nextEligibleAt: null, resetInterruptions: true, providerFailureStreak: 0 }
+              : { nextEligibleAt: null };
         const r = store.transition(t.id, to, { reason, patch });
         out(`task ${r.id} -> ${r.status}`);
         break;
@@ -689,6 +721,143 @@ async function main(): Promise<void> {
         const p = resolveProject(rest[0]);
         for (const m of store.listMemory(p.id).filter((x) => !rest[1] || x.section === rest[1]))
           out(`## ${m.section}\n${m.content}\n`);
+        break;
+      }
+      case 'assignment:add': {
+        if (!values.file) fail('usage: assignment:add --file assignment.json');
+        let raw: unknown;
+        try {
+          raw = JSON.parse(readFileSync(values.file, 'utf8'));
+        } catch (e) {
+          fail(`cannot read ${values.file}: ${(e as Error).message}`);
+        }
+        try {
+          const r = await registerAssignment(store, registry, provider.name, raw);
+          out(
+            r.created
+              ? `registered project ${r.project.id} (${r.project.slug}) lifecycle=${r.project.lifecycle} at ${r.project.repoPath}`
+              : `already registered from the same source id: ${r.project.id} (${r.project.slug})`,
+          );
+          out(
+            'No tasks were created. Planning/decomposition is a Phase 2 capability; add tasks with task:add.',
+          );
+        } catch (e) {
+          if (e instanceof AssignmentValidationError) fail(e.message, 2);
+          throw e;
+        }
+        break;
+      }
+      case 'assignment:show': {
+        const p = resolveProject(rest[0]);
+        const a = getAssignment(store, p.id);
+        out(a ? JSON.stringify(a, null, 2) : '(no assignment registered for this project)');
+        break;
+      }
+      case 'project:status': {
+        const p = resolveProject(rest[0]);
+        const ctx = buildProjectContext(store, p.id);
+        const ready = deliveryReadiness(store, p.id);
+        if (values.json) {
+          out(
+            JSON.stringify(
+              { context: ctx, readiness: ready, transitions: store.listProjectTransitions(p.id) },
+              null,
+              2,
+            ),
+          );
+          break;
+        }
+        out(`${p.name} [${p.id}]  lifecycle=${p.lifecycle}  operational-status=${p.status}`);
+        out(
+          `tasks: ${ctx.tasks.total} total  ${Object.entries(ctx.tasks.byStatus)
+            .map(([k, v]) => `${k}=${v}`)
+            .join(' ')}   estimated spend: $${ctx.spendUsdEstimate.toFixed(4)}`,
+        );
+        out(`delivery ready: ${ready.ready ? 'YES' : 'NO'}`);
+        out(
+          table(
+            Object.entries(ready.levels).map(([level, status]) => ({ level, status })),
+            ['level', 'status'],
+          ),
+        );
+        out(
+          '\nLifecycle history:\n' +
+            table(
+              store
+                .listProjectTransitions(p.id)
+                .map((t) => ({ at: fmtTime(t.at), from: t.from, to: t.to, reason: t.reason })),
+              ['at', 'from', 'to', 'reason'],
+            ),
+        );
+        break;
+      }
+      case 'project:verify': {
+        const p = resolveProject(rest[0]);
+        const r = await verifyProject(
+          { store, timeoutMs: config.verifyCommandTimeoutMs },
+          p,
+          registry.assertApproved(p.repoPath),
+        );
+        out(
+          table(
+            r.evidence.map((e) => ({ level: e.level, status: e.status, summary: e.summary })),
+            ['level', 'status', 'summary'],
+          ),
+        );
+        out(
+          `\ndelivery ready: ${r.readiness.ready ? 'YES' : 'NO'}${r.readiness.blockers.length ? `\nunresolved: ${r.readiness.blockers.join(', ')}` : ''}`,
+        );
+        out(`project lifecycle is now ${store.getProject(p.id)!.lifecycle}`);
+        break;
+      }
+      case 'project:accept': {
+        const p = resolveProject(rest[0]);
+        try {
+          acceptProject(store, p.id, values.by ?? 'owner-cli', {
+            acknowledgeUnverified: values['acknowledge-unverified'],
+          });
+          out(`project ${p.slug} -> ${store.getProject(p.id)!.lifecycle}`);
+        } catch (e) {
+          if (e instanceof AcceptanceRefusedError) fail(e.message);
+          throw e;
+        }
+        break;
+      }
+      case 'project:deliver': {
+        const p = resolveProject(rest[0]);
+        if (!values.reason) fail('--reason is required (what was delivered, where)');
+        store.transitionProject(p.id, 'DELIVERED', `delivered by owner: ${values.reason}`);
+        out(`project ${p.slug} -> DELIVERED (recorded only; nothing was deployed)`);
+        break;
+      }
+      case 'provider:status': {
+        const rep = await providerReadiness(config, store, new EnvCredentialSource(config.envFile));
+        if (values.json) {
+          out(JSON.stringify(rep, null, 2));
+          break;
+        }
+        out(
+          `Provider readiness (claude)   configured provider: ${config.provider}   SDK: ${rep.sdkVersion ?? 'not installed'}`,
+        );
+        out(
+          table(
+            Object.entries(rep.levels).map(([level, e]) => ({ level, state: e.state, detail: e.detail })),
+            ['level', 'state', 'detail'],
+          ),
+        );
+        out(
+          `\noperational: ${rep.operational ? 'YES' : 'NO'}    unattended-ready (live recovery verified): ${rep.unattendedReady ? 'YES' : 'NO'}`,
+        );
+        break;
+      }
+      case 'provider:verify': {
+        if (!values.access)
+          fail(
+            'usage: provider:verify --access   (live execution/recovery are verified by: npm run smoke:live, npm run smoke:live-recovery)',
+          );
+        const r = await verifyApiAccess(store, new EnvCredentialSource(config.envFile));
+        out(`${r.ok ? 'OK' : 'FAILED'}: ${r.detail}`);
+        if (!r.ok) process.exitCode = 1;
         break;
       }
       default:

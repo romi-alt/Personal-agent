@@ -56,3 +56,25 @@ Paid API use needs `ALLOW_PAID_API=true` and a positive per-execution cap. Optio
 3. The live Claude adapter has never run against the real API; error mapping follows the SDK type definitions, not observed behaviour.
 4. SQLite file is not encrypted; protect the data directory with OS permissions.
 5. `npm audit`: one moderate dev-toolchain advisory (minimatch via ESLint); runtime dependencies are clean.
+
+---
+
+# Phase 1.5 addendum
+
+## Corrected: permission enforcement was bypassable (Critical)
+
+Phase 1 pre-approved `Bash/Write/Edit` via the SDK's `allowedTools`. Those tools are auto-approved and never reach `canUseTool`, so the approval policy did not run.
+Now: the toolset is restricted with `tools`, decisions are made by a **PreToolUse hook** (hooks run before allow rules; a hook deny wins) plus `canUseTool` as a second layer, and
+`settingSources: []` stops the workspace's own `.claude/settings.json` (writable by the model) from adding allow-rules, hooks or MCP servers. See `docs/AUDIT_PHASE_1_5.md`.
+This is DOC-VERIFIED (SDK docs + type definitions), **not yet exercised against the live SDK**.
+
+## Other additions
+
+* Assignment `approvalPolicy.preApproved` can never include production-facing categories; integrations cannot request write access; delivery always needs owner approval.
+* Verification commands never receive `ANTHROPIC_*`/`CLAUDE_CODE_*` variables. They do run model-written code unsandboxed (residual risk C2).
+* Evidence and activity payloads are redacted; evidence output is truncated.
+* Runtime dependency audit is part of CI (`npm audit --omit=dev`) along with a secret-pattern scan.
+
+## Residual risks (unchanged or newly documented)
+
+Regex command screening is not a sandbox; verification executes model-written code; abort/resume and rate-limit semantics unverified live; SQLite file unencrypted; session transcripts under `~/.claude` may contain prompts and file contents - protect the service user's home.

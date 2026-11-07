@@ -23,6 +23,12 @@ export interface Decision {
   clearSession: boolean;
   /** Present when the outcome says something about provider-wide availability. */
   provider: ProviderStateChange;
+  /** Provider-level failure streak to store on the task (0 resets it). */
+  providerFailureStreak: number;
+  /** True when the task made progress/finished, so the interruption counter resets. */
+  resetInterruptions: boolean;
+  /** True when a repeated-failure limit was hit and the task was BLOCKED for owner review. */
+  escalated: boolean;
   reason: string;
   /** Short human text stored as the execution's retry reason. */
   retryReason: string | null;
@@ -36,7 +42,7 @@ export interface DecideInput {
   resumed: boolean;
   providerState: ProviderState;
   now: number;
-  config: Pick<AppConfig, 'backoff' | 'maxContinuations'>;
+  config: Pick<AppConfig, 'backoff' | 'maxContinuations' | 'maxProviderFailureStreak'>;
   rng?: () => number;
 }
 
@@ -66,11 +72,15 @@ export function decide(input: DecideInput): Decision {
     countsContinuation: false,
     clearSession: false,
     provider: OK(),
+    providerFailureStreak: 0,
+    resetInterruptions: false,
+    escalated: false,
     reason: '',
     retryReason: null,
   };
 
-  if (input.kind === 'completed') return { ...base, next: 'COMPLETED', reason: 'provider reported success' };
+  if (input.kind === 'completed')
+    return { ...base, next: 'COMPLETED', resetInterruptions: true, reason: 'provider reported success' };
 
   if (input.kind === 'partial') {
     if (task.continuationCount + 1 > config.maxContinuations) {
@@ -95,9 +105,27 @@ export function decide(input: DecideInput): Decision {
   const f = input.failure ?? { errorClass: 'TASK_FAILURE' as const, message: 'unknown failure' };
   const failures = providerState.consecutiveFailures + 1;
   const withErr = { errorClass: f.errorClass, errorMessage: f.message };
+  const streak = input.task.providerFailureStreak + 1;
+  const escalate = (label: string): Decision => ({
+    ...base,
+    ...withErr,
+    next: 'BLOCKED',
+    escalated: true,
+    providerFailureStreak: streak,
+    provider: {
+      status: 'OUTAGE',
+      blockedUntil: null,
+      reason: f.message,
+      errorClass: f.errorClass,
+      consecutiveFailures: failures,
+    },
+    reason: `${label} repeated ${streak} times in a row (limit ${config.maxProviderFailureStreak}); escalated to owner instead of retrying forever`,
+    retryReason: null,
+  });
 
   switch (f.errorClass) {
     case 'RATE_LIMIT': {
+      if (streak > config.maxProviderFailureStreak) return escalate('rate limiting');
       const wait = f.retryAfterMs ?? computeBackoffMs(failures, config.backoff, rng);
       const until = now + wait;
       return {
@@ -105,6 +133,7 @@ export function decide(input: DecideInput): Decision {
         ...withErr,
         next: 'WAITING_FOR_CAPACITY',
         nextEligibleAt: until,
+        providerFailureStreak: streak,
         provider: {
           status: 'RATE_LIMITED',
           blockedUntil: until,
@@ -168,6 +197,8 @@ export function decide(input: DecideInput): Decision {
       };
     case 'NETWORK':
     case 'PROVIDER_OUTAGE': {
+      if (streak > config.maxProviderFailureStreak)
+        return escalate(f.errorClass === 'NETWORK' ? 'network failure' : 'provider outage');
       const wait = f.retryAfterMs ?? computeBackoffMs(failures, config.backoff, rng);
       const until = now + wait;
       return {
@@ -175,6 +206,7 @@ export function decide(input: DecideInput): Decision {
         ...withErr,
         next: 'RETRY_SCHEDULED',
         nextEligibleAt: until,
+        providerFailureStreak: streak,
         provider: {
           status: 'OUTAGE',
           blockedUntil: until,

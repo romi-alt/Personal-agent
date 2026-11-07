@@ -1,5 +1,12 @@
 import { hostname } from 'node:os';
 import { createHash } from 'node:crypto';
+import {
+  EXECUTABLE_LIFECYCLES,
+  InvalidProjectTransitionError,
+  canProjectTransition,
+  type ProjectLifecycle,
+} from '../projects/lifecycle.js';
+import type { EvidenceRecord, EvidenceStatus, VerificationLevel } from '../verification/types.js';
 import type { Db } from '../database/connection.js';
 import { newId } from '../core/ids.js';
 import type { Logger } from '../logging/logger.js';
@@ -44,6 +51,7 @@ function mapProject(r: Row): Project {
     repoPath: r['repo_path'] as string,
     priority: r['priority'] as number,
     status: r['status'] as ProjectStatus,
+    lifecycle: r['lifecycle'] as ProjectLifecycle,
     createdAt: r['created_at'] as number,
     updatedAt: r['updated_at'] as number,
     lastActivityAt: r['last_activity_at'] as number,
@@ -77,6 +85,10 @@ function mapTask(r: Row): Task {
     completionEvidence: (r['completion_evidence'] as string | null) ?? null,
     sessionId: (r['session_id'] as string | null) ?? null,
     dedupeKey: r['dedupe_key'] as string,
+    leaseExecutionId: (r['lease_execution_id'] as string | null) ?? null,
+    interruptionCount: r['interruption_count'] as number,
+    providerFailureStreak: r['provider_failure_streak'] as number,
+    verificationRequired: JSON.parse(r['verification_required'] as string) as string[],
     createdAt: r['created_at'] as number,
     updatedAt: r['updated_at'] as number,
     completedAt: (r['completed_at'] as number | null) ?? null,
@@ -103,7 +115,31 @@ function mapExecution(r: Row): ExecutionRecord {
     costUsdBilled: (r['cost_usd_billed'] as number | null) ?? null,
     logRef: (r['log_ref'] as string | null) ?? null,
     summary: (r['summary'] as string | null) ?? null,
+    startRef: (r['start_ref'] as string | null) ?? null,
+    startStatusHash: (r['start_status_hash'] as string | null) ?? null,
   };
+}
+
+/** Canonical hash over every semantic field of a checkpoint; detects tampering/corruption on read. */
+export function checkpointIntegrity(c: Omit<Checkpoint, 'integrity'>): string {
+  return createHash('sha256')
+    .update(
+      JSON.stringify([
+        c.id,
+        c.projectId,
+        c.taskId,
+        c.executionId,
+        c.sessionRef,
+        c.repoRef,
+        c.gitDirty,
+        c.completedSummary,
+        c.outstandingSummary,
+        c.testResults,
+        c.nextAction,
+        c.createdAt,
+      ]),
+    )
+    .digest('hex');
 }
 
 function mapCheckpoint(r: Row): Checkpoint {
@@ -120,6 +156,7 @@ function mapCheckpoint(r: Row): Checkpoint {
     testResults: (r['test_results'] as string | null) ?? null,
     nextAction: r['next_action'] as string,
     createdAt: r['created_at'] as number,
+    integrity: (r['integrity'] as string | null) ?? null,
   };
 }
 
@@ -176,6 +213,10 @@ export interface TaskPatch {
   incrementAttempt?: boolean;
   incrementContinuation?: boolean;
   resetAttempts?: boolean;
+  incrementInterruption?: boolean;
+  resetInterruptions?: boolean;
+  providerFailureStreak?: number;
+  verificationRequired?: string[];
 }
 
 export interface TransitionOptions {
@@ -184,6 +225,21 @@ export interface TransitionOptions {
   patch?: TaskPatch;
   /** Fail (instead of overwrite) if the task is not currently in this status. */
   expectedFrom?: TaskStatus;
+  /**
+   * Fencing token: the transition only applies if this execution still owns the task's lease.
+   * Prevents a stale worker (whose lease was reclaimed) from overwriting a newer execution's state.
+   */
+  fenceExecutionId?: string;
+}
+
+export class StaleLeaseError extends Error {
+  constructor(
+    readonly taskId: string,
+    readonly executionId: string,
+  ) {
+    super(`Execution ${executionId} no longer owns task ${taskId}`);
+    this.name = 'StaleLeaseError';
+  }
 }
 
 export interface SupervisorState {
@@ -379,62 +435,80 @@ export class Store {
     maxRetries: number;
     scheduledStart?: number | null;
     dedupeKey?: string;
+    verificationRequired?: string[];
   }): { task: Task; created: boolean } {
     const dedupeKey =
       input.dedupeKey ??
       createHash('sha256').update(`${input.title}\n${input.instructions}`).digest('hex').slice(0, 16);
-    return this.db.transaction(() => {
-      const existing = this.db
-        .prepare('SELECT * FROM tasks WHERE project_id = ? AND dedupe_key = ?')
-        .get(input.projectId, dedupeKey) as Row | undefined;
-      if (existing) {
+    return this.db
+      .transaction(() => {
+        const existing = this.db
+          .prepare('SELECT * FROM tasks WHERE project_id = ? AND dedupe_key = ?')
+          .get(input.projectId, dedupeKey) as Row | undefined;
+        if (existing) {
+          this.recordEvent({
+            type: 'task.enqueue_duplicate',
+            projectId: input.projectId,
+            taskId: existing['id'] as string,
+            severity: 'warn',
+          });
+          return { task: mapTask(existing), created: false };
+        }
+        if (!this.getProject(input.projectId)) throw new Error(`Unknown project ${input.projectId}`);
+        for (const dep of input.dependsOn ?? []) {
+          if (!this.getTask(dep)) throw new Error(`Unknown dependency task ${dep}`);
+        }
+        const now = this.clock.now();
+        const id = newId('tsk');
+        this.db
+          .prepare(
+            `INSERT INTO tasks(id,project_id,title,instructions,acceptance_criteria,depends_on,priority,status,max_retries,scheduled_start,dedupe_key,verification_required,created_at,updated_at)
+           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+          )
+          .run(
+            id,
+            input.projectId,
+            input.title,
+            input.instructions,
+            input.acceptanceCriteria ?? '',
+            JSON.stringify(input.dependsOn ?? []),
+            input.priority ?? 0,
+            'QUEUED',
+            input.maxRetries,
+            input.scheduledStart ?? null,
+            dedupeKey,
+            JSON.stringify(input.verificationRequired ?? []),
+            now,
+            now,
+          );
+        this.db
+          .prepare(
+            'INSERT INTO task_transitions(task_id,from_status,to_status,reason,execution_id,at) VALUES (?,?,?,?,?,?)',
+          )
+          .run(id, null, 'QUEUED', 'enqueued', null, now);
         this.recordEvent({
-          type: 'task.enqueue_duplicate',
+          type: 'task.enqueued',
           projectId: input.projectId,
-          taskId: existing['id'] as string,
-          severity: 'warn',
+          taskId: id,
+          payload: { title: input.title, dedupeKey },
         });
-        return { task: mapTask(existing), created: false };
-      }
-      if (!this.getProject(input.projectId)) throw new Error(`Unknown project ${input.projectId}`);
-      for (const dep of input.dependsOn ?? []) {
-        if (!this.getTask(dep)) throw new Error(`Unknown dependency task ${dep}`);
-      }
-      const now = this.clock.now();
-      const id = newId('tsk');
-      this.db
-        .prepare(
-          `INSERT INTO tasks(id,project_id,title,instructions,acceptance_criteria,depends_on,priority,status,max_retries,scheduled_start,dedupe_key,created_at,updated_at)
-           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-        )
-        .run(
-          id,
-          input.projectId,
-          input.title,
-          input.instructions,
-          input.acceptanceCriteria ?? '',
-          JSON.stringify(input.dependsOn ?? []),
-          input.priority ?? 0,
-          'QUEUED',
-          input.maxRetries,
-          input.scheduledStart ?? null,
-          dedupeKey,
-          now,
-          now,
-        );
-      this.db
-        .prepare(
-          'INSERT INTO task_transitions(task_id,from_status,to_status,reason,execution_id,at) VALUES (?,?,?,?,?,?)',
-        )
-        .run(id, null, 'QUEUED', 'enqueued', null, now);
-      this.recordEvent({
-        type: 'task.enqueued',
-        projectId: input.projectId,
-        taskId: id,
-        payload: { title: input.title, dedupeKey },
-      });
-      return { task: this.getTask(id)!, created: true };
-    })();
+        // New work re-opens a project that was waiting on verification/approval/delivery.
+        const lc = this.getProject(input.projectId)!.lifecycle;
+        if (
+          [
+            'REGISTERED',
+            'ANALYZING',
+            'PLANNING',
+            'VERIFYING',
+            'AWAITING_OWNER_APPROVAL',
+            'READY_FOR_DELIVERY',
+          ].includes(lc)
+        ) {
+          this.transitionProject(input.projectId, 'IN_DEVELOPMENT', `task added: ${input.title}`);
+        }
+        return { task: this.getTask(id)!, created: true };
+      })
+      .immediate();
   }
 
   getTask(id: string): Task | null {
@@ -479,13 +553,16 @@ export class Store {
 
   /** The only code path that changes tasks.status. Validates, persists history, and updates bookkeeping atomically. */
   transition(taskId: string, to: TaskStatus, opts: TransitionOptions): Task {
-    return this.db.transaction(() => this.applyTransition(taskId, to, opts))();
+    return this.db.transaction(() => this.applyTransition(taskId, to, opts)).immediate();
   }
 
   private applyTransition(taskId: string, to: TaskStatus, opts: TransitionOptions): Task {
     const current = this.requireTask(taskId);
     if (opts.expectedFrom && current.status !== opts.expectedFrom) {
       throw new Error(`Task ${taskId} is ${current.status}, expected ${opts.expectedFrom}`);
+    }
+    if (opts.fenceExecutionId && current.leaseExecutionId !== opts.fenceExecutionId) {
+      throw new StaleLeaseError(taskId, opts.fenceExecutionId);
     }
     if (!canTransition(current.status, to)) throw new InvalidTransitionError(taskId, current.status, to);
     const now = this.clock.now();
@@ -505,9 +582,21 @@ export class Store {
     if (p.sessionId !== undefined) set('session_id', 'sid', p.sessionId);
     if (p.incrementAttempt) sets.push('attempt_count = attempt_count + 1');
     if (p.incrementContinuation) sets.push('continuation_count = continuation_count + 1');
-    if (p.resetAttempts) sets.push('attempt_count = 0', 'continuation_count = 0');
+    if (p.resetAttempts)
+      sets.push(
+        'attempt_count = 0',
+        'continuation_count = 0',
+        'interruption_count = 0',
+        'provider_failure_streak = 0',
+      );
+    if (p.incrementInterruption) sets.push('interruption_count = interruption_count + 1');
+    if (p.resetInterruptions) sets.push('interruption_count = 0');
+    if (p.providerFailureStreak !== undefined) set('provider_failure_streak', 'pfs', p.providerFailureStreak);
+    if (p.verificationRequired !== undefined)
+      set('verification_required', 'vr', JSON.stringify(p.verificationRequired));
     // Leaving the active set releases the lease. RUNNING -> CHECKPOINTING keeps it.
-    if (!ACTIVE_STATUSES.includes(to)) sets.push('assigned_worker = NULL', 'lease_expires_at = NULL');
+    if (!ACTIVE_STATUSES.includes(to))
+      sets.push('assigned_worker = NULL', 'lease_expires_at = NULL', 'lease_execution_id = NULL');
     if (to === 'COMPLETED') sets.push('completed_at = @now');
     this.db.prepare(`UPDATE tasks SET ${sets.join(', ')} WHERE id = @id`).run(args);
     this.db
@@ -525,6 +614,7 @@ export class Store {
       executionId: opts.executionId ?? null,
       payload: { from: current.status, to, reason: opts.reason },
     });
+    if (to === 'COMPLETED' || to === 'CANCELLED') this.advanceProjectAfterTerminalTask(current.projectId);
     return this.requireTask(taskId);
   }
 
@@ -553,23 +643,28 @@ export class Store {
         ).n;
         if (active >= input.maxConcurrent) return null;
         const placeholders = CLAIMABLE_STATUSES.map(() => '?').join(',');
+        const lifecyclePlaceholders = EXECUTABLE_LIFECYCLES.map(() => '?').join(',');
         const candidates = (
           this.db
             .prepare(
               `SELECT t.* FROM tasks t JOIN projects p ON p.id = t.project_id
-               WHERE p.status = 'ACTIVE' AND t.status IN (${placeholders})
+               WHERE p.status = 'ACTIVE' AND p.lifecycle IN (${lifecyclePlaceholders}) AND t.status IN (${placeholders})
                  AND (t.scheduled_start IS NULL OR t.scheduled_start <= ?)
                  AND (t.next_eligible_at IS NULL OR t.next_eligible_at <= ?)
                ORDER BY p.priority DESC, t.priority DESC, t.rowid ASC LIMIT 100`,
             )
-            .all(...CLAIMABLE_STATUSES, now, now) as Row[]
+            .all(...EXECUTABLE_LIFECYCLES, ...CLAIMABLE_STATUSES, now, now) as Row[]
         ).map(mapTask);
         const statusOf = this.db.prepare('SELECT status FROM tasks WHERE id = ?');
-        const chosen = candidates.find((t) =>
-          t.dependsOn.every(
+        const overBudget = new Map<string, boolean>();
+        const chosen = candidates.find((t) => {
+          const depsDone = t.dependsOn.every(
             (d) => (statusOf.get(d) as { status: string } | undefined)?.status === 'COMPLETED',
-          ),
-        );
+          );
+          if (!depsDone) return false;
+          if (!overBudget.has(t.projectId)) overBudget.set(t.projectId, this.projectOverBudget(t.projectId));
+          return !overBudget.get(t.projectId);
+        });
         if (!chosen) return null;
         const executionId = newId('exe');
         this.db
@@ -594,8 +689,10 @@ export class Store {
           expectedFrom: chosen.status,
         });
         this.db
-          .prepare('UPDATE tasks SET assigned_worker = ?, lease_expires_at = ? WHERE id = ?')
-          .run(input.workerId, now + input.leaseTtlMs, chosen.id);
+          .prepare(
+            'UPDATE tasks SET assigned_worker = ?, lease_expires_at = ?, lease_execution_id = ? WHERE id = ?',
+          )
+          .run(input.workerId, now + input.leaseTtlMs, executionId, chosen.id);
         return { task: this.requireTask(chosen.id), execution: this.getExecution(executionId)! };
       })
       .immediate();
@@ -606,9 +703,9 @@ export class Store {
     const now = this.clock.now();
     const res = this.db
       .prepare(
-        `UPDATE tasks SET lease_expires_at = ? WHERE id = ? AND assigned_worker = ? AND status IN ('RUNNING','CHECKPOINTING')`,
+        `UPDATE tasks SET lease_expires_at = ? WHERE id = ? AND assigned_worker = ? AND lease_execution_id = ? AND status IN ('RUNNING','CHECKPOINTING')`,
       )
-      .run(now + leaseTtlMs, taskId, workerId);
+      .run(now + leaseTtlMs, taskId, workerId, executionId);
     if (res.changes === 0) return false;
     this.db.prepare('UPDATE executions SET heartbeat_at = ? WHERE id = ?').run(now, executionId);
     return true;
@@ -719,14 +816,14 @@ export class Store {
   }
 
   // ----------------------------------------------------------- checkpoints
-  addCheckpoint(input: Omit<Checkpoint, 'id' | 'createdAt'>): Checkpoint {
+  addCheckpoint(input: Omit<Checkpoint, 'id' | 'createdAt' | 'integrity'>): Checkpoint {
     const id = newId('chk');
     const now = this.clock.now();
     this.db.transaction(() => {
       this.db
         .prepare(
-          `INSERT INTO checkpoints(id,project_id,task_id,execution_id,session_ref,repo_ref,git_dirty,completed_summary,outstanding_summary,test_results,next_action,created_at)
-           VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
+          `INSERT INTO checkpoints(id,project_id,task_id,execution_id,session_ref,repo_ref,git_dirty,completed_summary,outstanding_summary,test_results,next_action,created_at,integrity)
+           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
         )
         .run(
           id,
@@ -741,6 +838,7 @@ export class Store {
           input.testResults,
           input.nextAction,
           now,
+          checkpointIntegrity({ ...input, id, createdAt: now }),
         );
       this.db
         .prepare('UPDATE tasks SET last_checkpoint_id = ?, updated_at = ? WHERE id = ?')
@@ -781,6 +879,33 @@ export class Store {
         .prepare('SELECT * FROM checkpoints WHERE task_id = ? ORDER BY created_at ASC, rowid ASC')
         .all(taskId) as Row[]
     ).map(mapCheckpoint);
+  }
+
+  /** True when the stored hash matches the content (legacy rows without a hash are accepted as unchecked). */
+  checkpointIsIntact(c: Checkpoint): boolean {
+    if (c.integrity === null) return true;
+    return c.integrity === checkpointIntegrity(c);
+  }
+
+  /**
+   * Newest checkpoint whose integrity hash verifies. Corrupted ones are skipped and reported as events,
+   * so recovery degrades to an older good checkpoint (or none) instead of trusting damaged data.
+   */
+  latestValidCheckpoint(taskId: string): { checkpoint: Checkpoint | null; skippedCorrupt: string[] } {
+    const skipped: string[] = [];
+    const all = this.listCheckpoints(taskId).reverse();
+    for (const c of all) {
+      if (this.checkpointIsIntact(c)) return { checkpoint: c, skippedCorrupt: skipped };
+      skipped.push(c.id);
+      this.recordEvent({
+        type: 'checkpoint.corrupt',
+        taskId,
+        projectId: c.projectId,
+        severity: 'error',
+        payload: { checkpointId: c.id },
+      });
+    }
+    return { checkpoint: null, skippedCorrupt: skipped };
   }
 
   // -------------------------------------------------------- provider state
@@ -974,5 +1099,262 @@ export class Store {
       content: r['content'] as string,
       updatedAt: r['updated_at'] as number,
     }));
+  }
+
+  // ------------------------------------------------- execution start state
+  recordExecutionStart(executionId: string, start: { head: string | null; statusHash: string | null }): void {
+    this.db
+      .prepare('UPDATE executions SET start_ref = ?, start_status_hash = ? WHERE id = ?')
+      .run(start.head, start.statusHash, executionId);
+  }
+
+  /** Baseline captured by the task's FIRST execution (used by CHANGES_EXIST). */
+  taskBaseline(taskId: string): { head: string | null; statusHash: string | null } | null {
+    const r = this.db
+      .prepare(
+        'SELECT start_ref, start_status_hash FROM executions WHERE task_id = ? ORDER BY started_at ASC, rowid ASC LIMIT 1',
+      )
+      .get(taskId) as Row | undefined;
+    if (!r || (r['start_ref'] === null && r['start_status_hash'] === null)) return null;
+    return {
+      head: (r['start_ref'] as string | null) ?? null,
+      statusHash: (r['start_status_hash'] as string | null) ?? null,
+    };
+  }
+
+  // --------------------------------------------------------- project spend
+  projectSpend(projectId: string): number {
+    const r = this.db
+      .prepare(
+        'SELECT COALESCE(SUM(e.cost_usd_estimate),0) AS s FROM executions e JOIN tasks t ON t.id = e.task_id WHERE t.project_id = ?',
+      )
+      .get(projectId) as { s: number };
+    return r.s;
+  }
+
+  /** True when the project's assignment sets maxUsdTotal and estimated spend has reached it. */
+  projectOverBudget(projectId: string): boolean {
+    const a = this.getAssignmentData(projectId);
+    const b = a?.['budget'] as { maxUsdTotal?: number; maxExecutions?: number } | undefined;
+    if (b?.maxUsdTotal !== undefined && b.maxUsdTotal > 0 && this.projectSpend(projectId) >= b.maxUsdTotal)
+      return true;
+    if (b?.maxExecutions !== undefined) {
+      const n = (
+        this.db
+          .prepare(
+            'SELECT COUNT(*) AS n FROM executions e JOIN tasks t ON t.id = e.task_id WHERE t.project_id = ?',
+          )
+          .get(projectId) as { n: number }
+      ).n;
+      if (n >= b.maxExecutions) return true;
+    }
+    return false;
+  }
+
+  // ------------------------------------------------------ project lifecycle
+  transitionProject(projectId: string, to: ProjectLifecycle, reason: string): Project {
+    return this.db
+      .transaction(() => {
+        const p = this.getProject(projectId);
+        if (!p) throw new Error(`Unknown project ${projectId}`);
+        if (p.lifecycle === to) return p;
+        if (!canProjectTransition(p.lifecycle, to))
+          throw new InvalidProjectTransitionError(projectId, p.lifecycle, to);
+        const now = this.clock.now();
+        this.db
+          .prepare('UPDATE projects SET lifecycle = ?, updated_at = ?, last_activity_at = ? WHERE id = ?')
+          .run(to, now, now, projectId);
+        this.db
+          .prepare(
+            'INSERT INTO project_transitions(project_id,from_lifecycle,to_lifecycle,reason,at) VALUES (?,?,?,?,?)',
+          )
+          .run(projectId, p.lifecycle, to, reason, now);
+        this.recordEvent({
+          type: 'project.lifecycle',
+          projectId,
+          payload: { from: p.lifecycle, to, reason },
+        });
+        return this.getProject(projectId)!;
+      })
+      .immediate();
+  }
+
+  listProjectTransitions(
+    projectId: string,
+  ): { from: ProjectLifecycle | null; to: ProjectLifecycle; reason: string; at: number }[] {
+    return (
+      this.db
+        .prepare('SELECT * FROM project_transitions WHERE project_id = ? ORDER BY id')
+        .all(projectId) as Row[]
+    ).map((r) => ({
+      from: (r['from_lifecycle'] as ProjectLifecycle | null) ?? null,
+      to: r['to_lifecycle'] as ProjectLifecycle,
+      reason: r['reason'] as string,
+      at: r['at'] as number,
+    }));
+  }
+
+  /**
+   * When every task is terminal (COMPLETED/CANCELLED) the project moves to VERIFYING - never to a
+   * delivery state. A single provider success cannot declare a project finished.
+   */
+  private advanceProjectAfterTerminalTask(projectId: string): void {
+    const p = this.getProject(projectId);
+    if (!p || p.lifecycle !== 'IN_DEVELOPMENT') return;
+    const counts = this.db
+      .prepare(
+        `SELECT SUM(CASE WHEN status NOT IN ('COMPLETED','CANCELLED') THEN 1 ELSE 0 END) AS open, SUM(CASE WHEN status = 'COMPLETED' THEN 1 ELSE 0 END) AS done FROM tasks WHERE project_id = ?`,
+      )
+      .get(projectId) as { open: number | null; done: number | null };
+    if ((counts.open ?? 0) === 0 && (counts.done ?? 0) > 0) {
+      this.transitionProject(
+        projectId,
+        'VERIFYING',
+        'all tasks terminal; independent verification and owner approval required',
+      );
+    }
+  }
+
+  // ----------------------------------------------------------- assignments
+  saveAssignment(projectId: string, schemaVersion: number, data: Record<string, unknown>): void {
+    const now = this.clock.now();
+    this.db
+      .prepare(
+        `INSERT INTO assignments(project_id,schema_version,data,created_at,updated_at) VALUES (?,?,?,?,?)
+         ON CONFLICT(project_id) DO UPDATE SET schema_version=excluded.schema_version, data=excluded.data, updated_at=excluded.updated_at`,
+      )
+      .run(projectId, schemaVersion, JSON.stringify(data), now, now);
+  }
+
+  getAssignmentData(projectId: string): Record<string, unknown> | null {
+    const r = this.db.prepare('SELECT data FROM assignments WHERE project_id = ?').get(projectId) as
+      { data: string } | undefined;
+    return r ? (JSON.parse(r.data) as Record<string, unknown>) : null;
+  }
+
+  // ------------------------------------------------- verification evidence
+  addEvidence(input: {
+    projectId: string;
+    taskId?: string | null;
+    level: VerificationLevel;
+    status: EvidenceStatus;
+    summary: string;
+    evidence?: Record<string, unknown>;
+  }): EvidenceRecord {
+    const id = newId('evd');
+    const now = this.clock.now();
+    this.db
+      .prepare(
+        'INSERT INTO verification_evidence(id,project_id,task_id,level,status,summary,evidence,created_at) VALUES (?,?,?,?,?,?,?,?)',
+      )
+      .run(
+        id,
+        input.projectId,
+        input.taskId ?? null,
+        input.level,
+        input.status,
+        input.summary.slice(0, 2000),
+        JSON.stringify(redactValue(input.evidence ?? {})),
+        now,
+      );
+    this.recordEvent({
+      type: 'verification.evidence',
+      projectId: input.projectId,
+      taskId: input.taskId ?? null,
+      severity: input.status === 'FAILED' ? 'warn' : 'info',
+      payload: { level: input.level, status: input.status, summary: input.summary.slice(0, 300) },
+    });
+    return {
+      id,
+      projectId: input.projectId,
+      taskId: input.taskId ?? null,
+      level: input.level,
+      status: input.status,
+      summary: input.summary,
+      evidence: input.evidence ?? {},
+      createdAt: now,
+    };
+  }
+
+  listEvidence(filter: { projectId?: string; taskId?: string; level?: VerificationLevel }): EvidenceRecord[] {
+    const where: string[] = [];
+    const args: unknown[] = [];
+    if (filter.projectId) {
+      where.push('project_id = ?');
+      args.push(filter.projectId);
+    }
+    if (filter.taskId) {
+      where.push('task_id = ?');
+      args.push(filter.taskId);
+    }
+    if (filter.level) {
+      where.push('level = ?');
+      args.push(filter.level);
+    }
+    const rows = this.db
+      .prepare(
+        `SELECT * FROM verification_evidence ${where.length ? 'WHERE ' + where.join(' AND ') : ''} ORDER BY created_at ASC, rowid ASC`,
+      )
+      .all(...args) as Row[];
+    return rows.map((r) => ({
+      id: r['id'] as string,
+      projectId: r['project_id'] as string,
+      taskId: (r['task_id'] as string | null) ?? null,
+      level: r['level'] as VerificationLevel,
+      status: r['status'] as EvidenceStatus,
+      summary: r['summary'] as string,
+      evidence: JSON.parse(r['evidence'] as string) as Record<string, unknown>,
+      createdAt: r['created_at'] as number,
+    }));
+  }
+
+  // ------------------------------------------------ provider verification
+  setProviderVerification(
+    provider: string,
+    level: string,
+    sdkVersion: string | null,
+    detail: Record<string, unknown>,
+  ): void {
+    this.db
+      .prepare(
+        `INSERT INTO provider_verification(provider,level,verified_at,sdk_version,detail) VALUES (?,?,?,?,?)
+         ON CONFLICT(provider,level) DO UPDATE SET verified_at=excluded.verified_at, sdk_version=excluded.sdk_version, detail=excluded.detail`,
+      )
+      .run(provider, level, this.clock.now(), sdkVersion, JSON.stringify(redactValue(detail)));
+    this.recordEvent({ type: 'provider.verified', payload: { provider, level, sdkVersion } });
+  }
+
+  getProviderVerifications(
+    provider: string,
+  ): Record<string, { verifiedAt: number; sdkVersion: string | null; detail: Record<string, unknown> }> {
+    const out: Record<
+      string,
+      { verifiedAt: number; sdkVersion: string | null; detail: Record<string, unknown> }
+    > = {};
+    for (const r of this.db
+      .prepare('SELECT * FROM provider_verification WHERE provider = ?')
+      .all(provider) as Row[]) {
+      out[r['level'] as string] = {
+        verifiedAt: r['verified_at'] as number,
+        sdkVersion: (r['sdk_version'] as string | null) ?? null,
+        detail: JSON.parse(r['detail'] as string) as Record<string, unknown>,
+      };
+    }
+    return out;
+  }
+
+  // ----------------------------------------------------------- maintenance
+  /** Delete old low-value activity events and checkpoint the WAL so it cannot grow without bound. */
+  runMaintenance(eventRetentionDays: number): { eventsDeleted: number } {
+    const cutoff = this.clock.now() - eventRetentionDays * 86_400_000;
+    const res = this.db
+      .prepare(`DELETE FROM activity_events WHERE at < ? AND severity IN ('debug','info')`)
+      .run(cutoff);
+    try {
+      this.db.pragma('wal_checkpoint(PASSIVE)');
+    } catch {
+      /* a concurrent reader may hold the WAL; PASSIVE is best effort */
+    }
+    return { eventsDeleted: res.changes };
   }
 }

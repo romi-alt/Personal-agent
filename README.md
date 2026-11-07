@@ -1,9 +1,9 @@
-# ELEVARIQ Personal Agent - Phase 1
+# ELEVARIQ Personal Agent - Phase 1.5
 
 A persistent, crash-safe **supervisor + durable task queue** that can run coding assignments through Claude (Claude Agent SDK) in isolated project workspaces,
 pause when the provider runs out of capacity, and resume unfinished work after interruptions - without relying on any single Claude conversation staying open.
 
-Phase 1 is the *operational foundation* only. It does **not** yet analyse requirements, plan projects, verify acceptance criteria, deploy anything, or talk to the live ELEVARIQ ERP/CRM.
+Phase 1.5 = Phase 1 foundation + an independent audit (14 defects fixed, two of them critical security issues), a project-assignment contract with its own lifecycle, completion-verification evidence, a provider-readiness report, and Windows/GitHub/ERP preparation. It is still the *operational foundation*. It does **not** yet analyse requirements, plan projects, verify acceptance criteria, deploy anything, or talk to the live ELEVARIQ ERP/CRM.
 
 > Location note: the task asked for a repository named `elevariq-personal-agent`. This code lives in the repository this session was given (`personal-agent`); the npm package
 > is named `elevariq-personal-agent`. It is a standalone runtime - it does not touch any ELEVARIQ product repository.
@@ -24,7 +24,14 @@ Phase 1 is the *operational foundation* only. It does **not** yet analyse requir
 | ERP / CRM adapter interfaces + mocks + event-mapping spec | **SCAFFOLDED** (mocks tested; no live adapter) |
 | Project memory storage + checkpoint reader/writer | **IMPLEMENTED** (basic; no retrieval) |
 | Requirement analysis, planning, independent verification, deployment, ERP write-back | **NOT IMPLEMENTED** (Phase 2, see `docs/PHASE_2_ROADMAP.md`) |
-| Live-provider smoke test | **BLOCKED** - needs `ANTHROPIC_API_KEY` + spending authorisation |
+| Fencing, escalation, checkpoint integrity, duplicate-completion safety, multi-process DB safety (Phase 1.5) | **IMPLEMENTED AND TESTED** (incl. 4 real processes on one DB file) |
+| Project assignments (validated contract, durable context) and project lifecycle that never auto-completes | **IMPLEMENTED AND TESTED** |
+| Verification evidence: `CHANGES_EXIST`, `BUILD_PASSES`, `TESTS_PASS`, owner acceptance | **IMPLEMENTED AND TESTED** |
+| Verification of requirements satisfied / security checks | **NOT IMPLEMENTED** (always `NOT_EVALUATED`; Phase 2) |
+| Provider readiness report (SDK / credentials / API access / budget / live execution / live recovery) | **IMPLEMENTED AND TESTED**; live levels are **NOT VERIFIED** |
+| Live-provider verification (`provider:verify --access`, `smoke:live`, `smoke:live-recovery`) | **BLOCKED** - needs `ANTHROPIC_API_KEY` + spending authorisation in the running environment |
+| Windows scripts | static review + string guards only; **never parsed or run by PowerShell**; checklist in `docs/WINDOWS_DEPLOYMENT.md` |
+| GitHub `main` created; default-branch switch and branch protection | `main` **DONE**; default branch + protection **BLOCKED** by the session proxy - owner steps in `docs/GITHUB_SETUP.md` |
 
 ## Requirements
 
@@ -53,7 +60,7 @@ Read `docs/AUTHENTICATION.md`. In short: Console API key in `.env`/environment, 
 
 ## Scripts
 
-`npm run check` (typecheck + lint + all tests) · `npm test` · `npm run test:unit|integration|e2e` · `npm run build` · `npm run format` · `npm run smoke:live` (optional, costs money).
+`npm run check` (typecheck + lint + all tests) · `npm run smoke:live-recovery` · `npm test` · `npm run test:unit|integration|e2e` · `npm run build` · `npm run format` · `npm run smoke:live` (optional, costs money).
 
 ## Configuration
 
@@ -72,3 +79,8 @@ All settings are environment variables validated at startup (`src/config/index.t
 | `docs/OPERATIONS.md` | Running as a service, monitoring, backups, troubleshooting |
 | `docs/PHASE_2_ROADMAP.md` | Next stage (not implemented) |
 | `docs/TEST_RESULTS.md` | Real commands and results |
+| `docs/AUDIT_PHASE_1_5.md` | Independent audit: defects, fixes, residual weaknesses |
+| `docs/PROJECT_ASSIGNMENTS.md` | Assignment schema, durable context, project lifecycle |
+| `docs/COMPLETION_VERIFICATION.md` | Verification ladder, interfaces, evidence |
+| `docs/WINDOWS_DEPLOYMENT.md` | Windows 11 install + verification checklist (not live-tested) |
+| `docs/GITHUB_SETUP.md` | Branch setup and the admin-only settings |

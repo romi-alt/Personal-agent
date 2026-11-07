@@ -105,6 +105,7 @@ export class Supervisor {
       runner: this.runner,
       registry: this.d.registry,
       providerName: this.d.provider.name,
+      isLocallyActive: (id) => this.workers.has(id),
     });
   }
 
@@ -262,6 +263,12 @@ export class Supervisor {
         if (now - this.lastRetentionRun > 6 * 3_600_000) {
           this.lastRetentionRun = now;
           pruneExecutionLogs(config.logDir, config.logRetentionDays);
+          try {
+            const m = store.runMaintenance(config.eventRetentionDays);
+            if (m.eventsDeleted) log.info('maintenance.events_pruned', { deleted: m.eventsDeleted });
+          } catch (err) {
+            log.warn('maintenance.error', { error: err });
+          }
         }
         try {
           await this.tick();

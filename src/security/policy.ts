@@ -96,6 +96,8 @@ export interface PolicyOptions {
   extraReadable?: string[];
   /** Approval categories the owner has explicitly granted for this task. */
   approvedTypes?: readonly string[];
+  /** Extra categories this project forces to need approval (e.g. 'web_access'). */
+  alsoRequire?: readonly string[];
 }
 
 export function evaluateToolUse(
@@ -134,8 +136,16 @@ export function evaluateToolUse(
     }
     return { allow: true, reason: 'command permitted by workspace policy' };
   }
-  if (toolName === 'WebFetch' || toolName === 'WebSearch')
+  if (toolName === 'WebFetch' || toolName === 'WebSearch') {
+    if (options.alsoRequire?.includes('web_access') && !options.approvedTypes?.includes('web_access')) {
+      return {
+        allow: false,
+        approvalType: 'web_access',
+        reason: "Web access must be approved under this project's approval policy",
+      };
+    }
     return { allow: true, reason: 'read-only web access' };
+  }
   if (
     toolName === 'TodoWrite' ||
     toolName === 'Task' ||
@@ -143,6 +153,9 @@ export function evaluateToolUse(
     toolName === 'ExitPlanMode'
   ) {
     return { allow: true, reason: 'internal tool' };
+  }
+  if (toolName.startsWith('mcp__') && options.approvedTypes?.includes('external_tool')) {
+    return { allow: true, reason: 'external tool pre-approved by owner' };
   }
   if (toolName.startsWith('mcp__'))
     return {

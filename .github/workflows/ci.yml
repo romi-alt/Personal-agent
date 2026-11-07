@@ -1,0 +1,53 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  # Required status check for branch protection: keep the job id/name "check".
+  check:
+    name: check
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm run format:check
+      - run: npm run build
+      - run: npm test
+      - name: Dependency vulnerabilities (runtime)
+        run: npm audit --omit=dev
+      - name: Secret scan (tracked files, excluding documented test fixtures)
+        run: |
+          if git grep -nIE "sk-ant-[A-Za-z0-9_-]{20,}|ghp_[A-Za-z0-9]{20,}|AKIA[0-9A-Z]{16}|BEGIN (RSA |OPENSSH )?PRIVATE KEY" -- . ':!tests'; then
+            echo "Possible secret committed"; exit 1
+          fi
+
+  # Experimental: real Windows evidence for the code (NOT for the Task Scheduler scripts, which need a user session).
+  # Non-blocking until the suite is confirmed green on Windows.
+  check-windows:
+    name: check-windows (experimental)
+    runs-on: windows-latest
+    continue-on-error: true
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - run: npm test

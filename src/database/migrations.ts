@@ -176,6 +176,66 @@ CREATE TABLE project_memory (
 );
 `,
   },
+  {
+    version: 2,
+    name: 'phase_1_5_fencing_lifecycle_assignments_verification',
+    sql: `
+-- Execution fencing + escalation counters
+ALTER TABLE tasks ADD COLUMN lease_execution_id TEXT;
+ALTER TABLE tasks ADD COLUMN interruption_count INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE tasks ADD COLUMN provider_failure_streak INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE tasks ADD COLUMN verification_required TEXT NOT NULL DEFAULT '[]';
+ALTER TABLE executions ADD COLUMN start_ref TEXT;
+ALTER TABLE executions ADD COLUMN start_status_hash TEXT;
+-- Checkpoint integrity (NULL = written before integrity hashing existed)
+ALTER TABLE checkpoints ADD COLUMN integrity TEXT;
+
+-- Project lifecycle, separate from the task lifecycle and from projects.status (operational switch)
+ALTER TABLE projects ADD COLUMN lifecycle TEXT NOT NULL DEFAULT 'REGISTERED';
+CREATE TABLE project_transitions (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  project_id TEXT NOT NULL REFERENCES projects(id),
+  from_lifecycle TEXT,
+  to_lifecycle TEXT NOT NULL,
+  reason TEXT NOT NULL,
+  at INTEGER NOT NULL
+);
+CREATE INDEX idx_ptrans_project ON project_transitions(project_id, id);
+
+-- Project assignment contract (validated JSON, schema_version tracked)
+CREATE TABLE assignments (
+  project_id TEXT PRIMARY KEY REFERENCES projects(id),
+  schema_version INTEGER NOT NULL,
+  data TEXT NOT NULL,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL
+);
+
+-- Independent completion-verification evidence (append-only)
+CREATE TABLE verification_evidence (
+  id TEXT PRIMARY KEY,
+  project_id TEXT NOT NULL REFERENCES projects(id),
+  task_id TEXT,
+  level TEXT NOT NULL,
+  status TEXT NOT NULL,
+  summary TEXT NOT NULL,
+  evidence TEXT NOT NULL DEFAULT '{}',
+  created_at INTEGER NOT NULL
+);
+CREATE INDEX idx_evidence_project ON verification_evidence(project_id, created_at);
+CREATE INDEX idx_evidence_task ON verification_evidence(task_id, created_at);
+
+-- Provider readiness evidence: levels only become VERIFIED through explicit verification commands
+CREATE TABLE provider_verification (
+  provider TEXT NOT NULL,
+  level TEXT NOT NULL,
+  verified_at INTEGER NOT NULL,
+  sdk_version TEXT,
+  detail TEXT NOT NULL DEFAULT '{}',
+  PRIMARY KEY (provider, level)
+);
+`,
+  },
 ];
 
 export function runMigrations(db: Database.Database, migrations: Migration[] = MIGRATIONS): number[] {

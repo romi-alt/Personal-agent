@@ -1,80 +1,69 @@
 # Test results
 
-Recorded 2026-11-06 in the Linux build sandbox (Ubuntu 24.04, Node v22.23.4, npm 10.9.9). **Not run on Windows.** All provider traffic was the deterministic mock: **no paid API request was made.**
+Recorded in the Linux build sandbox (Ubuntu 24.04, Node v22.23.4, npm 10.9.9). **Never run on Windows.**
+Phase 1: 2026-11-06. Phase 1.5 (this document's current numbers): 2026-11-07.
+All provider traffic was the deterministic mock or scripted SDK-shaped streams: **no paid or authenticated API request was made** (no API key was present in the session).
 
-## Commands and outcomes
+## Commands and outcomes (Phase 1.5, final run)
 
 | Command | Result |
 |---|---|
-| `npm run typecheck` (`tsc --noEmit`, strict + `noUncheckedIndexedAccess`) | pass, 0 errors |
+| `npm run typecheck` (`tsc --noEmit`, strict + `noUncheckedIndexedAccess`, covers src/tests/scripts) | pass, 0 errors |
 | `npm run lint` (ESLint 10 + typescript-eslint) | pass, 0 problems |
-| `npm run format:check` (Prettier) | pass |
-| `npm run build` (`tsc -p tsconfig.build.json`) | pass; `dist/cli/index.js` started/stopped a detached supervisor and answered `status`/`health`/`stop` |
-| `npm test` (`vitest run`) | **10 files, 102 tests, 102 passed, 0 failed** (~13 s) |
-| `npm run test:unit` | 65 passed (7 files) |
-| `npm run test:integration` | 25 passed (1 file) |
-| `npm run test:e2e` | 12 passed (2 files; spawn real `tsx` child processes, real SIGKILL) |
-| `npm audit --omit=dev` | 0 vulnerabilities |
-| `npm audit` (incl. dev) | 1 moderate (minimatch via ESLint toolchain); fix requires an ESLint downgrade - not applied |
-| `systemd-analyze verify scripts/linux/elevariq-agent.service` | parses; only complaint is `/usr/bin/node` absent in the sandbox |
-| `npm run smoke:live` | correctly **refuses** (provider not `claude`); not run live - no API key |
+| `npm run format:check` (Prettier on src + tests) | pass |
+| `npm run build` | pass; `node dist/cli/index.js provider:status` runs |
+| `npm test` (`vitest run`) | **15 files, 183 tests, 183 passed, 0 failed** (~29 s) |
+| `npm run test:unit` | 94 passed (9 files) |
+| `npm run test:integration` | 71 passed (3 files) |
+| `npm run test:e2e` | 18 passed (3 files: real `tsx` child processes, real SIGKILL, 4-process DB contention, every CLI command). **Run 3 times consecutively: 18/18 each time, no flakiness observed** |
+| `npm audit --omit=dev` | **0 vulnerabilities** |
+| `npm audit` (all) | 10 moderate - a single advisory (`minimatch` DoS) reached only through the ESLint/typescript-eslint dev toolchain; the suggested fix is a breaking ESLint downgrade, not applied; nothing ships at runtime |
+| Secret scan (`git grep` for key/token/private-key patterns outside `tests/`) | none; no `.env`/database tracked or left untracked |
+| `bash -n scripts/linux/install.sh scripts/github/protect-main.sh`, YAML parse of `ci.yml` | pass |
+| `systemd-analyze verify scripts/linux/elevariq-agent.service` | parses (only complaint: `/usr/bin/node` absent in the sandbox) |
+| PowerShell parse of `scripts/windows/*.ps1` | **NOT DONE** - no PowerShell in the sandbox; downloading one was refused by the sandbox execution policy and was not worked around. Only static string/structure guards ran (`tests/unit/windows-scripts.test.ts`) |
+| `provider:verify --access`, `smoke:live`, `smoke:live-recovery` | **BLOCKED** - no `ANTHROPIC_API_KEY`/spend authorisation in the session; `smoke:live` correctly refuses |
+| GitHub CI (`.github/workflows/ci.yml`) | **not yet run** (workflow added in this change) |
 
-The E2E recovery suite was run 3 times in a row with no failure/flakiness observed.
+## Phase 1.5 requirements -> evidence
 
-## Required test coverage map
-
-| # | Required | Test (file › name) |
+| Requirement | Test(s) | Strength |
 |---|---|---|
-| 1 | Configuration validation | `unit/config` (5 tests) |
-| 2 | DB init & migrations | `unit/database` (WAL, FK, idempotent, atomic rollback) |
-| 3 | Create project | `unit/store › creates an isolated, git-initialised project workspace` |
-| 4 | Add task | `unit/store › adds a task in QUEUED…` |
-| 5 | Queue ordering | `unit/store › orders the queue by project priority…`, dependencies, scheduled start |
-| 6 | State transitions | `unit/store › state machine` (3) + `integration` history assertions |
-| 7 | Worker locking | `unit/store › worker leasing` (race, concurrency cap, heartbeat ownership, singleton supervisor) |
-| 8 | Successful mock execution | `integration › claims, executes and completes a task…` |
-| 9 | Failed execution | `integration › failed execution: retries with backoff, then FAILS…`, crash test |
-| 10 | Rate-limit simulation | `integration › rate limit: honours retry-after…`, quota tests |
-| 11 | Retry scheduling | `integration › consecutive rate limits back off exponentially` (1000/2000/4000 ms), `unit/decide` |
-| 12 | Interrupted execution | `integration › restart recovery` (6) + `e2e › recovers a task whose supervisor was SIGKILLed…` |
-| 13 | Restart recovery | `e2e › resumes the partially-completed task after restart…`, `integration › waiting state survives a supervisor restart` |
-| 14 | Checkpoint persistence | `integration` (checkpoint pairs session + `agent/<slug>@<sha>`), `e2e` (2 checkpoints survive SIGKILL) |
-| 15 | Session ID persistence | `integration › …session id persistence`, `e2e` (resumed from stored session) |
-| 16 | Authentication failure | `integration › authentication…` (2), `unit/claude-provider` preflight/credential-source tests |
-| 17 | Permission-denied handling | `integration › permission denial creates an approval…`, `unit/claude-provider`, policy tests, `e2e/cli approve/deny` |
-| 18 | Budget-limit handling | `integration › budget exhaustion BLOCKS…`, `daily budget gate…`, `unit/config` |
-| 19 | Log redaction | `unit/redact-and-paths › log redaction` (4) |
-| 20 | Graceful shutdown | `integration › graceful shutdown…`, `stop requested through the database`, `e2e` (exit 0 + `graceful:true`) |
-| 21 | Duplicate-task protection | `unit/store › rejects duplicate tasks…`, `e2e/cli › duplicate protection`, singleton supervisor test |
-| 22 | CRM mock connectivity | `unit/integrations › CRM mock adapter` |
-| 23 | ERP mock connectivity | `unit/integrations › ERP mock adapter` |
-| 24 | Safe workspace path validation | `unit/redact-and-paths › workspace path safety` (traversal, sibling prefix, symlink escape), policy tests |
+| Restart recovery | `e2e/restart-recovery` (3: SIGKILL while waiting for capacity, SIGKILL mid-execution, singleton), `integration/supervisor › restart recovery` (6), `phase15-recovery › real-restart reconciliation` | real processes + SIGKILL, mock provider |
+| Incomplete tool execution | `phase15-recovery › incomplete tool execution` (crash after a partial write -> dirty checkpoint, prompt lists the file and warns; hard crash -> recovery checkpoint from the *current* tree) | mock |
+| Stale leases | `supervisor › sweep mode…`, `phase15-recovery › execution fencing` (lease reclaimed -> stale worker cannot heartbeat/transition/complete), live-in-process worker never reclaimed | unit/integration |
+| Corrupted checkpoints | `phase15-recovery › checkpoint integrity` (tampered row skipped -> older valid used; all corrupt -> prompt warns; dangling commit flagged), legacy checkpoint accepted after migration | integration |
+| Duplicated completion events | `phase15-recovery › a duplicated completion event is a no-op`, stale-worker late completion | integration |
+| Escalation instead of infinite retries | `decide.test` (streak), `phase15-recovery › escalation` (crash-looping task blocked after N; network failures blocked then `unblock` resumes) | unit + integration |
+| Database transactions | `e2e/concurrency` (4 processes x 60 tasks: 0 errors, 240 distinct claims, 240 executions, `integrity_check ok`), `unit/database` (atomic migration rollback), migration-from-Phase-1 test | real processes |
+| Session persistence | session id stored at first message; resumed across supervisor restart in e2e; `readiness-and-hooks` (local session pre-check, `options.resume`) | mock + SDK-shaped |
+| Permission enforcement vs real SDK semantics | `readiness-and-hooks › Claude adapter` (no `allowedTools`, `settingSources: []`, PreToolUse hook deny/allow, approvals, env sanitising) | SDK-shaped; **not live** |
+| Provider readiness levels | `readiness-and-hooks` (15 tests) and `e2e/cli-commands › provider:status` | unit/e2e |
+| Project assignment contract | `project-lifecycle › assignment contract` (rejections incl. production pre-approval, write integrations, duplicates, strictness), registration, durable context across a new `Store`, idempotent external id, workspace approval | integration |
+| Project lifecycle | `project-lifecycle › project lifecycle…` (never auto-delivered, re-opened by new work, illegal jumps rejected, paused projects not executed) | integration |
+| Independent verification | `phase15-recovery › verification gating` (claim with no changes fails; failing build blocks completion even though the provider said success; credentials not leaked to commands; unconfigured = unknown), `project-lifecycle › independent verification and owner acceptance` (7) | integration with real commands |
+| Budget constraints | `project-lifecycle › project budget constraints` (maxExecutions, maxUsdTotal, per-assignment policy reaching the provider) | integration |
+| CLI | `e2e/cli-commands` (14: every advertised command executed, including the new ones) | real processes |
+| Windows scripts | `unit/windows-scripts` (static guards only) | **weak: static** |
 
-## Mandatory end-to-end scenario (`tests/e2e/restart-recovery.test.ts`)
+Phase 1's 24-item coverage map (config, DB, queue ordering, transitions, locking, retries, auth/permission/budget handling, redaction, shutdown, duplicates, ERP/CRM mocks, path safety) is unchanged and still green.
 
-Real supervisor processes, real SQLite file, mock provider. Task 1 completes → Task 2 executes *partially* (writes `attendance/part1.txt`) → provider reports quota exhaustion with a reset 6 s ahead →
-state `WAITING_FOR_CAPACITY` persisted with checkpoint and session id → **supervisor A `SIGKILL`ed** → supervisor B started while the provider is still exhausted
-(verified idle: still 2 executions) → after the reset time Task 2 **resumes the saved session** and completes → Task 3 (depends on 2) completes.
-Asserted: every task has exactly **one** `completed` execution; Task 2 outcomes `[partial, failed, completed]`; exact persisted transition sequence
-`QUEUED→RUNNING→CHECKPOINTING→READY→RUNNING→CHECKPOINTING→WAITING_FOR_CAPACITY→RUNNING→CHECKPOINTING→COMPLETED`; marker log has no duplicate (task, attempt);
-earlier artifacts untouched; `status --json` live; `stop` exits 0 and records `graceful:true`.
-A second scenario `SIGKILL`s a supervisor *during* an execution and checks reconciliation (`interrupted` → resumed same session, retry budget untouched).
+## Defects found by the new tests while building Phase 1.5 (all fixed)
 
-## Failures encountered while building (all fixed)
+1. A failure-streak counter was computed by the decision logic but **never persisted** (two `return` objects lacked the field) - found by the escalation test.
+2. A permission-policy edit (web-access approval) had been silently not applied - found by the hook test.
+3. The secret redactor erased the key `credentialFingerprint` from readiness evidence (`credential` matches its key-name rule) - found by the readiness test.
+4. `renderProjectContext` exceeded its length limit by one character - found by the lifecycle test.
+5. Mock test double wrote a marker file even for "no change" steps, masking a failing `CHANGES_EXIST` - test-double bug.
 
-1. First integration run: quota test failed (`expected 5000 to be greater than 3590000`). Cause: the mock computed reset times from the real clock while the test used a fake clock.
-   Fix: the mock provider takes an injectable `now`. Product behaviour was correct.
-2. ESLint reported comma-expression statements in `store.ts` and `any` in tests - rewritten / test override added.
-3. `systemd-analyze` flagged `StartLimit*` keys in the wrong section - moved to `[Unit]`.
-4. CLI printed raw stacks for expected errors (illegal transition, unknown approval) - now a one-line `error:` message (`AGENT_DEBUG=1` restores stacks); covered by a test.
+(Plus the 14 audit findings in `docs/AUDIT_PHASE_1_5.md`, including the two critical SDK permission bypasses, which were found by code/doc review.)
 
-## Unresolved limitations (what these results do NOT prove)
+## Unresolved limitations - what these results do NOT prove
 
-* **No live Anthropic verification.** The Claude adapter is tested against scripted message streams shaped like the SDK's published type definitions. Real error strings, rate-limit events, `resetsAt` units
-  (treated as seconds if < 1e12, else ms) and `apiKeySource` behaviour are unconfirmed until `npm run smoke:live` and real limit events are observed.
-* **Windows is untested**: `install-task.ps1`, `run-supervisor.ps1`, `uninstall-task.ps1` were never run (no PowerShell in the sandbox); path/case handling for Windows is written but unexercised.
-* **systemd** unit never started under a real init; the installer script was only syntax-checked (`bash -n`).
-* Tests use short leases/timeouts; behaviour under multi-hour waits, sleep/resume of a laptop, or clock changes is not exercised (all scheduling uses epoch-ms comparisons against the wall clock).
-* `MAX_CONCURRENT_WORKERS > 1` is enforced by the claim transaction (unit-tested for the cap) but multi-worker execution in one repository is not supported/tested (needs worktrees - Phase 2).
-* Command screening in the permission policy is a guardrail, not a sandbox (see `docs/SECURITY.md`).
-* Completion is "provider reported success"; acceptance criteria are not independently verified (Phase 2).
+* **No live Anthropic verification of anything.** The adapter's handling of real messages, rate-limit events, abort/interrupt behaviour and session resume-after-abort is verified only against SDK type definitions and official docs (some doc sections were unreachable) and scripted streams.
+* **Windows is untested**, including all four PowerShell scripts (never parsed by PowerShell) and Windows path/symlink behaviour of the test suite.
+* **systemd** unit never started under real systemd.
+* Short leases/timeouts in tests; no soak test (hours/days), power-loss, clock-jump or sleep/resume test.
+* Verification commands run model-written code **unsandboxed**; command screening is a guardrail, not a sandbox.
+* Requirements-satisfied and security verification are **not implemented**; the delivery-readiness derivation can therefore never be fully `ready` without an explicit owner override.
+* GitHub: the default-branch switch and branch protection could not be applied from this session (proxy blocks settings writes); CI has not yet run on GitHub.

@@ -26,6 +26,7 @@ const baseReq = (over: Partial<RunRequest> = {}): RunRequest & { events: string[
     systemAppend: 's',
     cwd: '/tmp/ws',
     approvedActionTypes: [],
+    alsoRequireApproval: [],
     attemptIndex: 1,
     limits: { maxTurns: 5, maxBudgetUsd: 2, timeoutMs: 5000 },
     signal: new AbortController().signal,
@@ -121,6 +122,12 @@ describe('ClaudeProvider run mapping', () => {
     expect(req.sessions).toEqual(['sess-1']);
     expect(cap.options.resume).toBe('old-sess');
     expect(cap.options.permissionMode).toBe('default');
+    // Regression: allowedTools would auto-approve tools and bypass canUseTool, so it must not be set.
+    expect(cap.options.allowedTools).toBeUndefined();
+    // Regression: workspace .claude/settings.json (hooks/MCP/allow rules) must never be honoured.
+    expect(cap.options.settingSources).toEqual([]);
+    expect(cap.options.tools).toEqual(expect.arrayContaining(['Bash', 'Write']));
+    expect(cap.options.hooks.PreToolUse[0].hooks).toHaveLength(1);
     expect(cap.options.permissionMode).not.toBe('bypassPermissions');
     expect(cap.options.maxBudgetUsd).toBe(2);
     expect(cap.options.cwd).toBe('/tmp/ws');
@@ -317,5 +324,23 @@ describe('error helpers', () => {
     expect(mapAssistantError('billing_error', '').errorClass).toBe('QUOTA_EXHAUSTED');
     expect(mapAssistantError('server_error', '').errorClass).toBe('PROVIDER_OUTAGE');
     expect(mapAssistantError('model_not_found', 'x').errorClass).toBe('TASK_FAILURE');
+  });
+});
+
+describe('success claimed despite denied tool calls', () => {
+  it('surfaces denials on a completed outcome so the worker can flag possibly-incomplete work', async () => {
+    const provider = new ClaudeProvider({
+      config: cfg,
+      credentials: creds('sk-ant-api03-KEYKEYKEYKEYKEY'),
+      queryFn: stream([
+        init(),
+        {
+          ...okResult,
+          permission_denials: [{ tool_name: 'Write', tool_use_id: 'u', tool_input: { file_path: '/etc/x' } }],
+        },
+      ]),
+    });
+    const out = await provider.run(baseReq());
+    expect(out).toMatchObject({ kind: 'completed', denials: [{ tool: 'Write' }] });
   });
 });

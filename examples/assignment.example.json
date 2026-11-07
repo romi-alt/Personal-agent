@@ -1,0 +1,32 @@
+{
+  "title": "School Management ERP",
+  "description": "AI-powered school management ERP covering enrollment, attendance, examinations, fees, teachers, reporting and an administrative dashboard.",
+  "businessObjectives": [
+    "Replace spreadsheet-based administration for a mid-sized school",
+    "Give the principal a real-time dashboard of attendance and fee collection"
+  ],
+  "functionalRequirements": [
+    { "id": "FR-1", "text": "Student enrollment with guardian details and class assignment", "priority": "must" },
+    { "id": "FR-2", "text": "Daily attendance capture per class session with absence reports", "priority": "must" },
+    { "id": "FR-3", "text": "Fee schedules, invoices and payment status tracking", "priority": "must" },
+    { "id": "FR-4", "text": "Examination scheduling and result entry", "priority": "should" }
+  ],
+  "nonFunctionalRequirements": [
+    { "id": "NFR-1", "text": "Role-based access control for admin, teacher and parent roles", "priority": "must" },
+    { "id": "NFR-2", "text": "All state-changing endpoints covered by automated tests", "priority": "should" }
+  ],
+  "technicalConstraints": ["TypeScript + Node.js backend", "PostgreSQL-compatible SQL schema", "No third-party paid services"],
+  "workspace": { "type": "managed" },
+  "expectedDeliverables": ["Source code in the project repository", "README with setup instructions", "Database schema and migrations", "Test suite"],
+  "acceptanceCriteria": [
+    { "id": "AC-1", "text": "Project builds from a clean checkout", "verifiedBy": "build" },
+    { "id": "AC-2", "text": "Automated tests pass", "verifiedBy": "tests" },
+    { "id": "AC-3", "text": "Each functional requirement is demonstrably implemented", "verifiedBy": "review" }
+  ],
+  "priority": 5,
+  "budget": { "maxUsdTotal": 25, "maxUsdPerExecution": 2, "maxExecutions": 200 },
+  "approvalPolicy": { "preApproved": [], "alsoRequire": [] },
+  "requiredIntegrations": [{ "system": "erp", "access": "read", "purpose": "Read team assignments and deadlines for progress reporting" }],
+  "verification": { "buildCommand": "npm run build", "testCommand": "npm test" },
+  "source": { "system": "manual" }
+}
