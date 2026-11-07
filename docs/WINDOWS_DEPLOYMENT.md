@@ -110,4 +110,4 @@ Fixed:
 3. A test assumed a worker finishes within 150 ms (Windows is slower) - now waits for completion.
 4. A test compared a raw temp path with the registry's canonical path (Windows 8.3 short name `RUNNER~1` vs `runneradmin`); the product's canonicalisation was correct, the test now compares canonical paths.
 
-Whether all 226 pass on Windows after these fixes is confirmed by the next CI run (see PR #1), not assumed.
+**Confirmed:** on commit `a98aa95` the `check-windows` job passed `npm ci`, `npm run build` and `npm test` (all 226 tests) on `windows-latest`, and the Ubuntu `check` job passed every step. This verifies the TypeScript code and tests on Windows; it does **not** verify the PowerShell / Task Scheduler scripts, sleep/power behaviour, or the live Claude provider.
