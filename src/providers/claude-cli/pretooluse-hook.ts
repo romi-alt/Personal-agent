@@ -10,14 +10,23 @@
  *
  * The policy file is written by the provider per execution, outside the project workspace, and contains no secrets.
  */
-import { appendFileSync, readFileSync } from 'node:fs';
+import { appendFileSync, existsSync, readFileSync } from 'node:fs';
 import { evaluateToolUse } from '../../security/policy.js';
+
+/** Non-secret variables the provider injects into every worker; recorded once per execution as evidence. */
+export const WATCHDOG_VARS = [
+  'CLAUDE_CODE_RETRY_WATCHDOG',
+  'CLAUDE_CODE_RETRY_WATCHDOG_USAGE_LIMIT_RECHECK_MS',
+  'CLAUDE_CODE_RESUME_INTERRUPTED_TURN',
+  'CLAUDE_CODE_RESUME_PROMPT',
+];
 
 export interface HookPolicyFile {
   workspace: string;
   approvedTypes: string[];
   alsoRequire: string[];
   readOnly: boolean;
+  allowWeb?: boolean;
   /** JSONL file that receives one line per decision so the provider can report denials with their approval type. */
   decisionsFile: string;
 }
@@ -58,6 +67,7 @@ export function decide(
     approvedTypes: policy.approvedTypes,
     alsoRequire: policy.alsoRequire,
     readOnly: policy.readOnly,
+    allowWeb: policy.allowWeb,
   });
   const record: HookDecisionRecord = {
     at: Date.now(),
@@ -94,6 +104,11 @@ async function main(): Promise<void> {
   const { record, stdout } = decide(policy, payload);
   // Recording is best-effort evidence; the decision itself must still be enforced if it fails.
   try {
+    // Once per execution: the (non-secret) watchdog variables this hook inherited from the claude worker process.
+    if (!existsSync(policy.decisionsFile)) {
+      const watchdog = Object.fromEntries(WATCHDOG_VARS.map((k) => [k, process.env[k] ?? null]));
+      appendFileSync(policy.decisionsFile, JSON.stringify({ kind: 'env', at: Date.now(), watchdog }) + '\n');
+    }
     appendFileSync(policy.decisionsFile, JSON.stringify(record) + '\n');
   } catch {
     /* ignore */

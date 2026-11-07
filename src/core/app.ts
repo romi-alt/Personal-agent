@@ -9,6 +9,7 @@ import type { ExecutionProvider } from '../providers/types.js';
 import { Store } from '../queue/store.js';
 import { WorkspaceRegistry } from '../workspaces/registry.js';
 import { WorkflowEngine } from '../workflows/engine.js';
+import { QaEngine } from '../engineering/qa.js';
 
 export interface App {
   config: AppConfig;
@@ -18,6 +19,7 @@ export interface App {
   registry: WorkspaceRegistry;
   provider: ExecutionProvider;
   workflows: WorkflowEngine;
+  qa: QaEngine;
   close(): void;
 }
 
@@ -49,8 +51,21 @@ export function createApp(opts: LoadConfigOptions & { provider?: ExecutionProvid
       maxPlanTasks: config.maxPlanTasks,
       maxPlanRepairs: config.maxPlanRepairs,
       defaultMaxRetries: config.defaultMaxRetries,
+      researchWeb: config.researchWeb,
+      writeDocs: config.writePlanDocs,
+      independentReview: config.independentReview,
     },
     log,
   );
-  return { config, db, store, log, registry, provider, workflows, close: () => db.close() };
+  const qa = new QaEngine(
+    store,
+    {
+      enabled: config.independentReview,
+      maxCorrectionRounds: config.maxCorrectionRounds,
+      maxReviewRepairs: config.maxPlanRepairs,
+      defaultMaxRetries: config.defaultMaxRetries,
+    },
+    log,
+  );
+  return { config, db, store, log, registry, provider, workflows, qa, close: () => db.close() };
 }

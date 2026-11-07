@@ -16,13 +16,33 @@ import type {
 import { classifyText, mapAssistantError, resetsAtToMs, type RateInfoLike } from '../claude/errors.js';
 import { buildWorkerEnv, compareVersions } from './env.js';
 import { killTree } from '../../workers/process-tree.js';
-import type { HookDecisionRecord, HookPolicyFile } from './pretooluse-hook.js';
+import { WATCHDOG_VARS, type HookDecisionRecord, type HookPolicyFile } from './pretooluse-hook.js';
 
 const execFileP = promisify(execFile);
 
 /** Tools the worker may see. Permission decisions are made by the PreToolUse policy hook, which runs first. */
 export const CLI_TOOLS = ['Read', 'Glob', 'Grep', 'Edit', 'Write', 'Bash', 'TodoWrite'];
 export const CLI_READ_ONLY_TOOLS = ['Read', 'Glob', 'Grep'];
+/** Added to read-only research tasks only. */
+export const CLI_WEB_TOOLS = ['WebSearch', 'WebFetch'];
+
+/** http(s) URLs found in a tool_result payload (string, or array of {type:'text',text}). Bounded. */
+export function extractUrls(content: unknown): string[] {
+  const text =
+    typeof content === 'string'
+      ? content
+      : Array.isArray(content)
+        ? content
+            .map((c) => (c && typeof c === 'object' ? String((c as { text?: unknown }).text ?? '') : ''))
+            .join('\n')
+        : '';
+  const out = new Set<string>();
+  for (const m of text.matchAll(/https?:\/\/[^\s"'<>)\]]+/g)) {
+    out.add(m[0].replace(/[.,;:]+$/, '').slice(0, 500));
+    if (out.size >= 100) break;
+  }
+  return [...out];
+}
 
 /** Credential sources that mean "the owner's subscription login", as reported by `system/init.apiKeySource`. */
 const SUBSCRIPTION_SOURCES = new Set([
@@ -81,6 +101,7 @@ export function hookCommand(): string {
 
 export class ClaudeCliProvider implements ExecutionProvider {
   readonly name = 'claude-cli';
+  readonly workerImage = /^claude(\.exe)?$/i;
   private readonly now: () => number;
 
   constructor(private readonly d: CliDeps) {
@@ -184,6 +205,7 @@ export class ClaudeCliProvider implements ExecutionProvider {
       approvedTypes: req.approvedActionTypes,
       alsoRequire: req.alsoRequireApproval,
       readOnly: !!req.readOnly,
+      allowWeb: !!req.allowWeb,
       decisionsFile,
     };
     writeFileSync(policyFile, JSON.stringify(policy));
@@ -219,7 +241,7 @@ export class ClaudeCliProvider implements ExecutionProvider {
     req.onSession(sessionId);
     req.onEvent({ type: 'session', data: { sessionId, resumed: !!req.resumeSessionId } });
 
-    const tools = req.readOnly ? CLI_READ_ONLY_TOOLS : CLI_TOOLS;
+    const tools = req.readOnly ? [...CLI_READ_ONLY_TOOLS, ...(req.allowWeb ? CLI_WEB_TOOLS : [])] : CLI_TOOLS;
     const args = [
       '-p',
       '--output-format',
@@ -252,7 +274,16 @@ export class ClaudeCliProvider implements ExecutionProvider {
     const spawnFn =
       this.d.spawnFn ??
       ((cmd, a, o) =>
-        spawn(cmd, a, { cwd: o.cwd, env: o.env, stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true }));
+        spawn(cmd, a, {
+          cwd: o.cwd,
+          env: o.env,
+          stdio: ['pipe', 'pipe', 'pipe'],
+          windowsHide: true,
+          // POSIX: lead a process group so the worker and its tool subprocesses can be stopped together (a child
+          // outlives a killed supervisor there). Windows: stay in libuv's kill-on-close job object, which already
+          // ends the whole worker tree when the supervisor dies.
+          detached: process.platform !== 'win32',
+        }));
 
     let child: ChildProcess;
     try {
@@ -262,6 +293,14 @@ export class ClaudeCliProvider implements ExecutionProvider {
       return { kind: 'failed', sessionId, failure: { errorClass: 'PROCESS_CRASH', message: String(err) } };
     }
     if (child.pid) req.onProcess?.(child.pid);
+    // Evidence: the (non-secret) watchdog variables exactly as handed to the claude process.
+    req.onEvent({
+      type: 'worker_env',
+      data: {
+        observedIn: 'spawn environment of the claude worker',
+        vars: Object.fromEntries(WATCHDOG_VARS.map((k) => [k, env[k] ?? null])),
+      },
+    });
 
     // ---- state
     let rate: RateInfoLike | undefined;
@@ -270,6 +309,7 @@ export class ClaudeCliProvider implements ExecutionProvider {
     let initSource: string | undefined;
     let authRefusal: string | undefined;
     let lastText = '';
+    const webCalls = new Map<string, string>();
     let stderr = '';
     let killedFor: 'timeout' | 'stall' | 'shutdown' | 'capacity_ceiling' | 'auth' | undefined;
     let waiting: { since: number; resetsAtMs?: number } | undefined;
@@ -323,6 +363,8 @@ export class ClaudeCliProvider implements ExecutionProvider {
             subtype: 'init',
             model: msg['model'],
             apiKeySource: initSource,
+            // Non-secret evidence field (log redaction masks anything named like apiKey*/credential*).
+            billing: 'subscription',
             version: msg['claude_code_version'],
           },
         });
@@ -366,7 +408,16 @@ export class ClaudeCliProvider implements ExecutionProvider {
         endWait();
       if (type === 'assistant') {
         const m = msg['message'] as
-          { content?: { type: string; text?: string; name?: string; id?: string }[] } | undefined;
+          | {
+              content?: {
+                type: string;
+                text?: string;
+                name?: string;
+                id?: string;
+                input?: Record<string, unknown>;
+              }[];
+            }
+          | undefined;
         const err = typeof msg['error'] === 'string' ? msg['error'] : undefined;
         for (const block of m?.content ?? []) {
           if (block.type === 'text' && block.text) {
@@ -374,6 +425,12 @@ export class ClaudeCliProvider implements ExecutionProvider {
             req.onEvent({ type: 'assistant_text', data: { chars: block.text.length } });
           } else if (block.type === 'tool_use') {
             req.onEvent({ type: 'tool_use', data: { tool: block.name, id: block.id } });
+            if ((block.name === 'WebFetch' || block.name === 'WebSearch') && block.id) {
+              webCalls.set(block.id, block.name);
+              const url = block.input?.['url'];
+              if (typeof url === 'string')
+                req.onEvent({ type: 'web_evidence', data: { tool: block.name, urls: [url.slice(0, 500)] } });
+            }
           }
         }
         if (err) assistantError = { code: err, text: lastText };
@@ -381,6 +438,14 @@ export class ClaudeCliProvider implements ExecutionProvider {
       }
       if (type === 'user') {
         req.onEvent({ type: 'tool_result', data: {} });
+        // Research citation evidence: URLs that web tools actually returned (checked later against cited sources).
+        const m = msg['message'] as { content?: unknown } | undefined;
+        for (const block of Array.isArray(m?.content) ? (m.content as Record<string, unknown>[]) : []) {
+          const tool = webCalls.get(String(block['tool_use_id'] ?? ''));
+          if (block['type'] !== 'tool_result' || !tool) continue;
+          const urls = extractUrls(block['content']);
+          if (urls.length) req.onEvent({ type: 'web_evidence', data: { tool, urls } });
+        }
         return;
       }
       if (type === 'result') result = msg;
@@ -438,6 +503,8 @@ export class ClaudeCliProvider implements ExecutionProvider {
     req.signal.removeEventListener('abort', onAbort);
     req.onProcess?.(null);
     if (waiting) endWait();
+    const workerEnv = readWorkerEnv(decisionsFile);
+    if (workerEnv) req.onEvent({ type: 'worker_env', data: workerEnv });
     const denials = readDenials(decisionsFile, result);
     cleanup();
 
@@ -540,13 +607,29 @@ function pickAuth(j: Record<string, unknown>): AuthStatus {
   };
 }
 
+/** Watchdog variables as seen by the policy hook, a direct child process of `claude` (evidence of injection). */
+function readWorkerEnv(file: string): Record<string, unknown> | null {
+  if (!existsSync(file)) return null;
+  for (const line of readFileSync(file, 'utf8').split('\n')) {
+    try {
+      const r = JSON.parse(line) as { kind?: string; watchdog?: Record<string, string | null> };
+      if (r.kind === 'env' && r.watchdog)
+        return { observedIn: 'policy hook process (child of claude)', vars: r.watchdog };
+    } catch {
+      /* partial line */
+    }
+  }
+  return null;
+}
+
 function readDenials(file: string, result?: Record<string, unknown>): PermissionDenial[] {
   const out: PermissionDenial[] = [];
   if (existsSync(file)) {
     for (const line of readFileSync(file, 'utf8').split('\n')) {
       if (!line.trim()) continue;
       try {
-        const r = JSON.parse(line) as HookDecisionRecord;
+        const r = JSON.parse(line) as HookDecisionRecord & { kind?: string };
+        if (r.kind === 'env') continue;
         if (!r.allow)
           out.push({ tool: r.tool, reason: r.reason, approvalType: r.approvalType, input: r.input });
       } catch {
@@ -583,8 +666,16 @@ function terminate(child: ChildProcess): void {
   if (process.platform === 'win32') {
     void killTree(child.pid);
   } else {
-    child.kill('SIGINT'); // ends the turn cleanly (documented); escalate if it lingers
-    setTimeout(() => child.exitCode === null && child.kill('SIGKILL'), 10_000).unref();
+    const pid = child.pid;
+    const signalGroup = (sig: NodeJS.Signals) => {
+      try {
+        process.kill(-pid, sig); // the worker leads its own process group (spawned detached)
+      } catch {
+        child.kill(sig);
+      }
+    };
+    signalGroup('SIGINT'); // ends the turn cleanly (documented); escalate if it lingers
+    setTimeout(() => child.exitCode === null && signalGroup('SIGKILL'), 10_000).unref();
   }
 }
 

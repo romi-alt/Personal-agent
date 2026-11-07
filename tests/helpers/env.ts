@@ -10,6 +10,7 @@ import type { ExecutionProvider } from '../../src/providers/types.js';
 import { Store } from '../../src/queue/store.js';
 import { Supervisor } from '../../src/supervisor/supervisor.js';
 import { WorkflowEngine } from '../../src/workflows/engine.js';
+import { QaEngine } from '../../src/engineering/qa.js';
 import type { Clock, Project } from '../../src/types/index.js';
 import { WorkspaceRegistry } from '../../src/workspaces/registry.js';
 
@@ -34,6 +35,7 @@ export interface TestEnv {
   project: Project;
   supervisor: Supervisor;
   workflows: WorkflowEngine;
+  qa: QaEngine;
   lines: string[];
   log: Logger;
   cleanup(): Promise<void>;
@@ -60,6 +62,9 @@ export async function makeEnv(
       BACKOFF_BASE_MS: '1000',
       BACKOFF_MAX_MS: '60000',
       BACKOFF_JITTER: '0',
+      // Independent QA is opt-in per test (it adds a review task after every planned coding task).
+      INDEPENDENT_REVIEW: 'false',
+      BACKUP_INTERVAL_HOURS: '0', // scheduled backups are opt-in per test
       ...opts.env,
     },
   });
@@ -82,10 +87,32 @@ export async function makeEnv(
       maxPlanTasks: config.maxPlanTasks,
       maxPlanRepairs: config.maxPlanRepairs,
       defaultMaxRetries: config.defaultMaxRetries,
+      researchWeb: config.researchWeb,
+      writeDocs: config.writePlanDocs,
+      independentReview: config.independentReview,
     },
     log,
   );
-  const supervisor = new Supervisor({ config, store, provider, registry, log, rng: () => 0.5, workflows });
+  const qa = new QaEngine(
+    store,
+    {
+      enabled: config.independentReview,
+      maxCorrectionRounds: config.maxCorrectionRounds,
+      maxReviewRepairs: config.maxPlanRepairs,
+      defaultMaxRetries: config.defaultMaxRetries,
+    },
+    log,
+  );
+  const supervisor = new Supervisor({
+    config,
+    store,
+    provider,
+    registry,
+    log,
+    rng: () => 0.5,
+    workflows,
+    qa,
+  });
   return {
     dir,
     config,
@@ -96,6 +123,7 @@ export async function makeEnv(
     mock,
     project,
     supervisor,
+    qa,
     workflows,
     lines,
     log,

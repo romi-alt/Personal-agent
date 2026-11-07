@@ -76,6 +76,25 @@ const schema = z
     PLAN_APPROVAL: z.enum(['required', 'auto']).default('required'),
     MAX_PLAN_TASKS: int(60, 1),
     MAX_PLAN_REPAIRS: int(2, 0),
+    /** Research step may use read-only WebSearch/WebFetch (never when a project requires web_access approval). */
+    RESEARCH_WEB_ACCESS: bool(true),
+    /** Write ADRs / architecture / research / review documents into the project repository. */
+    WRITE_PLAN_DOCS: bool(true),
+    /** Phase 3: planned coding tasks need an independent review before dependants run. */
+    INDEPENDENT_REVIEW: bool(true),
+    /** Owner command center (Phase 5). Loopback only unless DASHBOARD_ALLOW_REMOTE=true. */
+    DASHBOARD_HOST: z.string().default('127.0.0.1'),
+    DASHBOARD_PORT: int(4317, 1),
+    DASHBOARD_ALLOW_REMOTE: bool(false),
+    DASHBOARD_ALLOWED_HOSTS: z.string().default(''),
+    DASHBOARD_SECURE_COOKIES: bool(false),
+    /** Phase 6: online database backups by the supervisor (0 = off), kept BACKUP_RETENTION deep. */
+    BACKUP_DIR: optStr,
+    BACKUP_INTERVAL_HOURS: int(24, 0),
+    BACKUP_RETENTION: int(14, 1),
+    /** Optional owner-configured webhook for error/approval notifications (off when empty). */
+    NOTIFY_WEBHOOK_URL: optStr,
+    MAX_CORRECTION_ROUNDS: int(2, 0),
 
     BACKOFF_BASE_MS: int(30_000, 1),
     BACKOFF_MAX_MS: int(3_600_000, 1),
@@ -172,6 +191,19 @@ export interface AppConfig {
   planApproval: 'required' | 'auto';
   maxPlanTasks: number;
   maxPlanRepairs: number;
+  researchWeb: boolean;
+  writePlanDocs: boolean;
+  independentReview: boolean;
+  dashboard: {
+    host: string;
+    port: number;
+    allowRemote: boolean;
+    allowedHosts: string[];
+    secureCookies: boolean;
+  };
+  backup: { dir: string; intervalHours: number; retention: number };
+  notifyWebhookUrl: string | undefined;
+  maxCorrectionRounds: number;
   backoff: { baseMs: number; maxMs: number; jitter: number; quotaMinWaitMs: number; resetMarginMs: number };
   workerTimeoutMs: number;
   heartbeatIntervalMs: number;
@@ -235,6 +267,12 @@ export function loadConfig(opts: LoadConfigOptions = {}): AppConfig {
     environment: c.ENVIRONMENT,
     agentHome: home,
     databasePath: path.resolve(c.DATABASE_PATH ?? path.join(home, 'agent.db')),
+    backup: {
+      dir: path.resolve(c.BACKUP_DIR ?? path.join(home, 'backups')),
+      intervalHours: c.BACKUP_INTERVAL_HOURS,
+      retention: c.BACKUP_RETENTION,
+    },
+    notifyWebhookUrl: c.NOTIFY_WEBHOOK_URL,
     workspaceRoot: path.resolve(c.WORKSPACE_ROOT ?? path.join(home, 'workspaces')),
     logDir: path.resolve(c.LOG_DIR ?? path.join(home, 'logs')),
     logLevel: c.LOG_LEVEL,
@@ -269,6 +307,19 @@ export function loadConfig(opts: LoadConfigOptions = {}): AppConfig {
     planApproval: c.PLAN_APPROVAL,
     maxPlanTasks: c.MAX_PLAN_TASKS,
     maxPlanRepairs: c.MAX_PLAN_REPAIRS,
+    researchWeb: c.RESEARCH_WEB_ACCESS,
+    writePlanDocs: c.WRITE_PLAN_DOCS,
+    independentReview: c.INDEPENDENT_REVIEW,
+    dashboard: {
+      host: c.DASHBOARD_HOST,
+      port: c.DASHBOARD_PORT,
+      allowRemote: c.DASHBOARD_ALLOW_REMOTE,
+      allowedHosts: c.DASHBOARD_ALLOWED_HOSTS.split(',')
+        .map((s) => s.trim())
+        .filter(Boolean),
+      secureCookies: c.DASHBOARD_SECURE_COOKIES,
+    },
+    maxCorrectionRounds: c.MAX_CORRECTION_ROUNDS,
     backoff: {
       baseMs: c.BACKOFF_BASE_MS,
       maxMs: c.BACKOFF_MAX_MS,

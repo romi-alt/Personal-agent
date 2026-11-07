@@ -98,6 +98,8 @@ export interface PolicyOptions {
   approvedTypes?: readonly string[];
   /** Planning mode: only Read/Glob/Grep/TodoWrite are allowed. */
   readOnly?: boolean;
+  /** Read-only research mode: WebSearch/WebFetch are allowed too (subject to web_access approval). */
+  allowWeb?: boolean;
   /** Extra categories this project forces to need approval (e.g. 'web_access'). */
   alsoRequire?: readonly string[];
 }
@@ -109,7 +111,14 @@ export function evaluateToolUse(
   options: PolicyOptions = {},
 ): PolicyDecision {
   const extraReadable = options.extraReadable ?? [];
-  if (options.readOnly && !['Read', 'Glob', 'Grep', 'TodoWrite'].includes(toolName)) {
+  const readOnlyTools = [
+    'Read',
+    'Glob',
+    'Grep',
+    'TodoWrite',
+    ...(options.allowWeb ? ['WebSearch', 'WebFetch'] : []),
+  ];
+  if (options.readOnly && !readOnlyTools.includes(toolName)) {
     return { allow: false, reason: `${toolName} is not permitted: this is a read-only planning task` };
   }
   const pathKeys = FILE_TOOLS[toolName];

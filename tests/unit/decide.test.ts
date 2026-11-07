@@ -38,6 +38,8 @@ const task = (o: Partial<Task> = {}): Task => ({
   verificationRequired: [],
   kind: 'CODING',
   readOnly: false,
+  allowWeb: false,
+  role: null,
   createdAt: 0,
   updatedAt: 0,
   completedAt: null,

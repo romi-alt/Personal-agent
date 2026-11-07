@@ -15,6 +15,12 @@ import { reconcileOrphans } from '../recovery/reconcile.js';
 import { registerAssignment, getAssignment } from '../assignments/register.js';
 import { AssignmentValidationError } from '../assignments/schema.js';
 import { buildProjectContext } from '../assignments/context.js';
+import { readAttachments, submitIntake } from '../assignments/intake.js';
+import { decideApproval, taskAction, type TaskAction } from '../control/owner-actions.js';
+import { ensureOwnerToken, tokenFile } from '../dashboard/auth.js';
+import { startDashboard } from '../dashboard/server.js';
+import { createBackup, listBackups, restoreBackup, verifyBackup } from '../ops/backup.js';
+import { projectRoadmap } from '../planning/roadmap-service.js';
 import {
   acceptProject,
   AcceptanceRefusedError,
@@ -74,9 +80,12 @@ const OPTIONS = {
   question: { type: 'string' },
   text: { type: 'string' },
   assume: { type: 'boolean' },
+  attach: { type: 'string', multiple: true },
+  port: { type: 'string' },
+  rotate: { type: 'boolean' },
 } as const;
 
-const HELP = `ELEVARIQ Personal Agent - Phase 1
+const HELP = `ELEVARIQ Personal Agent
 
 Usage: npm run agent -- <command> [options]
 
@@ -99,6 +108,19 @@ Usage: npm run agent -- <command> [options]
   recovery [--run]            Show recovery state; --run reconciles orphaned tasks (only if no supervisor is live)
   integrations                ERP/CRM adapter health (mock adapters in Phase 1) and event-mapping spec
   memory:set <project> <section> <text> | memory:get <project> [section]
+  intake "<assignment text>" [--name N] [--attach FILE]... [--path DIR [--allow-dirty]]
+                                           Natural-language project assignment -> structured contract -> planning
+  research:show <project> [--json]         Research findings: verified (citation retrieved) vs assumption, sources, dates
+  adr:list <project> [--json]              Architecture Decision Records (status, significance, files)
+  architecture:show <project> [--json]     Architecture specification per area (+ diagrams in docs/architecture)
+  roadmap <project> [--json]               Milestones, epics, tasks, dependencies, critical path, VERIFIED progress
+  review:show <project> [--json]           Planning review rounds (deterministic + independent model review)
+  qa [project] [--json]                    Independent QA reviews of completed tasks: rounds, corrections, escalations
+  dashboard [--port N]                     Owner command center (local-only web UI, owner-token login)
+  dashboard:token [--rotate]               Show (or rotate) the command-center owner token
+  backup [--path DIR]                      Online database backup + verification (the supervisor also backs up on BACKUP_INTERVAL_HOURS)
+  backup:list | backup:verify [file]       List backups / restore drill (checksum, integrity_check, row counts)
+  restore <file> --reason R                Restore a verified backup (supervisor must be stopped; old DB is kept)
   assignment:add --file assignment.json    Validate + register a project assignment (see examples/assignment.example.json)
   assignment:show <project>                Persisted assignment contract
   project:status <project>                 Lifecycle, task progress, spend and delivery readiness
@@ -219,6 +241,7 @@ async function main(): Promise<void> {
           registry,
           log: app.log,
           workflows: app.workflows,
+          qa: app.qa,
         });
         const onSignal = (sig: string) => sup.requestStop(`received ${sig}`);
         for (const s of ['SIGINT', 'SIGTERM', 'SIGBREAK'] as const) process.on(s, () => onSignal(s));
@@ -523,23 +546,11 @@ async function main(): Promise<void> {
       case 'task:cancel':
       case 'task:retry':
       case 'task:unblock': {
-        const t = store.getTask(rest[0] ?? '');
-        if (!t) fail(`unknown task ${rest[0] ?? ''}`);
-        const map: Record<string, [TaskStatus, string]> = {
-          'task:pause': ['PAUSED', 'paused by owner'],
-          'task:resume': ['READY', 'resumed by owner'],
-          'task:cancel': ['CANCELLED', 'cancelled by owner'],
-          'task:retry': ['QUEUED', 'manual retry by owner'],
-          'task:unblock': ['READY', 'unblocked by owner'],
-        };
-        const [to, reason] = map[cmd]!;
-        const patch =
-          cmd === 'task:retry'
-            ? { resetAttempts: true, nextEligibleAt: null, lastErrorClass: null, lastErrorMessage: null }
-            : cmd === 'task:unblock'
-              ? { nextEligibleAt: null, resetInterruptions: true, providerFailureStreak: 0 }
-              : { nextEligibleAt: null };
-        const r = store.transition(t.id, to, { reason, patch });
+        if (!store.getTask(rest[0] ?? '')) fail(`unknown task ${rest[0] ?? ''}`);
+        const r = taskAction(store, rest[0]!, cmd.slice('task:'.length) as TaskAction, {
+          by: values.by ?? 'owner',
+          channel: 'cli',
+        });
         out(`task ${r.id} -> ${r.status}`);
         break;
       }
@@ -560,22 +571,13 @@ async function main(): Promise<void> {
         break;
       case 'approve':
       case 'deny': {
-        const a = store.decideApproval(
+        const a = decideApproval(
+          store,
           rest[0] ?? '',
           cmd === 'approve' ? 'APPROVED' : 'DENIED',
-          values.by ?? 'owner-cli',
+          { by: values.by ?? 'owner-cli', channel: 'cli' },
+          values.reason,
         );
-        if (a.taskId) {
-          const open = store.listApprovals('PENDING').filter((x) => x.taskId === a.taskId);
-          const t = store.requireTask(a.taskId);
-          if (t.status === 'WAITING_FOR_APPROVAL' && open.length === 0) {
-            store.transition(t.id, cmd === 'approve' ? 'READY' : 'BLOCKED', {
-              reason:
-                cmd === 'approve' ? 'owner approved requested action(s)' : 'owner denied requested action',
-              patch: { nextEligibleAt: null },
-            });
-          }
-        }
         out(`${a.id} ${a.status}`);
         break;
       }
@@ -644,6 +646,7 @@ async function main(): Promise<void> {
             runner,
             registry,
             providerName: provider.name,
+            workerImage: provider.workerImage,
           });
           out(
             acts.length
@@ -884,6 +887,280 @@ async function main(): Promise<void> {
             `\nLatest plan: ${v.ok ? 'valid' : 'INVALID'}; uncovered requirements: ${v.coverage.uncovered.join(', ') || 'none'}`,
           );
         }
+        break;
+      }
+      case 'intake': {
+        // Natural-language assignment: `intake "Build a complete educational ERP ..." [--attach spec.md ...]`
+        const text = values.text ?? rest.join(' ');
+        if (!text.trim())
+          fail(
+            'usage: intake "<assignment in your own words>" [--name N] [--attach FILE ...] [--path DIR [--allow-dirty]]',
+          );
+        try {
+          const { project, run } = await submitIntake(store, registry, app.workflows, provider.name, {
+            text,
+            name: values.name,
+            attachments: readAttachments(values.attach ?? []),
+            existing: values.path ? { path: values.path, allowDirty: !!values['allow-dirty'] } : undefined,
+            priority: values.priority ? Number(values.priority) : undefined,
+          });
+          out(`project ${project.id} (${project.slug}) at ${project.repoPath}`);
+          out(`planning run ${run.id} started at the intake step; the running supervisor executes it.`);
+          out(`Follow it: npm run agent -- workflow:show ${run.id}`);
+        } catch (e) {
+          fail((e as Error).message);
+        }
+        break;
+      }
+      case 'research:show': {
+        const p = resolveProject(rest[0]);
+        const f = app.workflows.repo.listFindings(p.id);
+        if (values.json) {
+          out(JSON.stringify(f, null, 2));
+          break;
+        }
+        out(
+          table(
+            f.map((x) => ({
+              id: x.findingId,
+              area: x.area,
+              kind: x.kind + (x.claimedKind !== x.kind ? ` (claimed ${x.claimedKind})` : ''),
+              conf: x.confidence,
+              citation: x.citationCheck,
+              sources: x.sources.map((s) => s.url).join(' ') || '-',
+              statement: x.statement.slice(0, 70),
+            })),
+            ['id', 'area', 'kind', 'conf', 'citation', 'sources', 'statement'],
+          ),
+        );
+        break;
+      }
+      case 'adr:list': {
+        const p = resolveProject(rest[0]);
+        const adrs = app.workflows.repo.listAdrs(p.id);
+        if (values.json) {
+          out(JSON.stringify(adrs, null, 2));
+          break;
+        }
+        out(
+          table(
+            adrs.map((a) => ({
+              no: String(a.number).padStart(4, '0'),
+              id: a.adrId,
+              status: a.status,
+              significant: a.significant ? 'yes' : '',
+              date: fmtTime(a.decidedAt),
+              title: a.title,
+              file: a.filePath ?? '-',
+            })),
+            ['no', 'id', 'status', 'significant', 'date', 'title', 'file'],
+          ),
+        );
+        break;
+      }
+      case 'architecture:show': {
+        const p = resolveProject(rest[0]);
+        const spec = app.workflows.repo.latestSpec(p.id);
+        if (!spec) fail('no architecture has been produced for this project yet');
+        if (values.json) {
+          out(JSON.stringify(spec, null, 2));
+          break;
+        }
+        for (const [k, v] of Object.entries(spec.sections)) out(`## ${k}\n${v || '(not specified)'}\n`);
+        out(
+          `Diagrams: ${spec.diagrams.map((d) => d.title).join(', ') || 'none'}  (rendered in docs/architecture/ARCHITECTURE.md)`,
+        );
+        break;
+      }
+      case 'roadmap': {
+        const p = resolveProject(rest[0]);
+        const r = projectRoadmap(store, app.workflows.repo, p.id);
+        if (values.json) {
+          out(JSON.stringify(r, null, 2));
+          break;
+        }
+        const pct = (x: number) => `${Math.round(x * 100)}%`;
+        out(
+          `Verified progress: ${r.progress.overall.delivered}/${r.progress.overall.total} tasks delivered (${pct(r.progress.overall.ratio)} by size)`,
+        );
+        out(
+          `Critical path (remaining): ${r.criticalPath.path.join(' -> ') || '-'}  weight ${r.criticalPath.weight}`,
+        );
+        out(
+          '\nMilestones:\n' +
+            table(
+              r.milestones.map((m) => {
+                const g = r.progress.milestones.find((x) => x.key === m.key);
+                return {
+                  key: m.key,
+                  title: m.title,
+                  delivered: `${g?.delivered ?? 0}/${g?.total ?? 0}`,
+                  progress: pct(g?.ratio ?? 0),
+                };
+              }),
+              ['key', 'title', 'delivered', 'progress'],
+            ),
+        );
+        if (r.epics.length)
+          out(
+            '\nEpics:\n' +
+              table(
+                r.epics.map((e) => {
+                  const g = r.progress.epics.find((x) => x.key === e.key);
+                  return { key: e.key, title: e.title, delivered: `${g?.delivered ?? 0}/${g?.total ?? 0}` };
+                }),
+                ['key', 'title', 'delivered'],
+              ),
+          );
+        out(
+          '\nTasks:\n' +
+            table(
+              r.tasks.map((t) => ({
+                key: t.key,
+                milestone: t.milestone,
+                epic: t.epic ?? '-',
+                size: t.size,
+                status: t.status,
+                verified: t.delivered ? 'yes' : `${t.passed.length}/${t.required.length}`,
+                depends: t.dependsOn.join(',') || '-',
+                critical: r.criticalPath.path.includes(t.key) ? '*' : '',
+                title: t.title.slice(0, 50),
+              })),
+              ['key', 'milestone', 'epic', 'size', 'status', 'verified', 'depends', 'critical', 'title'],
+            ),
+        );
+        break;
+      }
+      case 'dashboard': {
+        const port = values.port ? Number(values.port) : config.dashboard.port;
+        const server = await startDashboard(app, { ...config.dashboard, port });
+        out(
+          `ELEVARIQ command center on http://${config.dashboard.host === '::1' ? '[::1]' : config.dashboard.host}:${port}/`,
+        );
+        out(
+          `Sign in with the owner token in ${tokenFile(config.agentHome)} (show it: npm run agent -- dashboard:token)`,
+        );
+        await new Promise<void>((resolve) => {
+          for (const s of ['SIGINT', 'SIGTERM', 'SIGBREAK'] as const)
+            process.on(s, () => server.close(() => resolve()));
+        });
+        break;
+      }
+      case 'backup': {
+        const m = await createBackup(app.db, values.path ?? config.backup.dir);
+        const v = verifyBackup(path.join(values.path ?? config.backup.dir, m.file));
+        out(
+          `backup ${m.file} (${m.bytes} bytes, schema v${m.schemaVersion}) ${v.ok ? 'verified' : 'VERIFY FAILED: ' + v.problems.join('; ')}`,
+        );
+        out(
+          `counts: ${Object.entries(m.counts)
+            .map(([k, n]) => `${k}=${n}`)
+            .join(' ')}`,
+        );
+        if (!v.ok) process.exitCode = 1;
+        break;
+      }
+      case 'backup:list': {
+        out(
+          table(
+            listBackups(config.backup.dir).map((m) => ({
+              file: m.file,
+              created: fmtTime(m.createdAt),
+              bytes: m.bytes,
+              schema: m.schemaVersion,
+              tasks: m.counts['tasks'] ?? '-',
+            })),
+            ['file', 'created', 'bytes', 'schema', 'tasks'],
+          ),
+        );
+        break;
+      }
+      case 'backup:verify': {
+        const f = rest[0]
+          ? path.resolve(rest[0])
+          : (() => {
+              const l = listBackups(config.backup.dir).at(-1);
+              return l ? path.join(config.backup.dir, l.file) : '';
+            })();
+        if (!f) fail('no backup found');
+        const v = verifyBackup(f);
+        out(v.ok ? `OK ${f}` : `FAILED ${f}\n  ${v.problems.join('\n  ')}`);
+        if (!v.ok) process.exitCode = 1;
+        break;
+      }
+      case 'restore': {
+        if (!rest[0]) fail('usage: restore <backup-file> --reason "why"   (supervisor must be stopped)');
+        const sup = store.getSupervisorState();
+        if (sup && store.supervisorIsLive(sup, config.leaseTtlMs))
+          fail('a supervisor is live: stop it first (npm run agent -- stop)');
+        if (!values.reason) fail('restore replaces the database: pass --reason "..." to confirm');
+        app.close();
+        const r = restoreBackup(path.resolve(rest[0]), config.databasePath);
+        out(`restored ${rest[0]} -> ${config.databasePath}`);
+        if (r.previous) out(`previous database kept at ${r.previous}`);
+        const after = createApp();
+        after.store.recordEvent({
+          type: 'backup.restored',
+          severity: 'warn',
+          payload: { file: path.basename(rest[0]), previous: r.previous, reason: values.reason },
+        });
+        after.close();
+        return;
+      }
+      case 'dashboard:token': {
+        const t = ensureOwnerToken(config.agentHome, !!values.rotate);
+        out(
+          values.rotate
+            ? 'owner token rotated (restart the dashboard to end existing sessions):'
+            : 'owner token:',
+        );
+        out(t);
+        out(`stored in ${tokenFile(config.agentHome)}`);
+        break;
+      }
+      case 'qa': {
+        const p = values.project ? resolveProject(values.project) : rest[0] ? resolveProject(rest[0]) : null;
+        const rows = app.qa.rows().filter((r) => !p || store.getTask(r.taskId)?.projectId === p.id);
+        if (values.json) {
+          out(
+            JSON.stringify(
+              rows.map((r) => ({ ...r, result: app.qa.result(r.taskId, r.round) })),
+              null,
+              2,
+            ),
+          );
+          break;
+        }
+        out(
+          table(
+            rows.map((r) => ({
+              task: r.taskId,
+              title: (store.getTask(r.taskId)?.title ?? '').slice(0, 40),
+              round: r.round,
+              status: r.status,
+              review: r.reviewTaskId ?? '-',
+              correction: r.correctionTaskId ?? '-',
+              approval: r.approvalId ?? '-',
+            })),
+            ['task', 'title', 'round', 'status', 'review', 'correction', 'approval'],
+          ),
+        );
+        break;
+      }
+      case 'review:show': {
+        const p = resolveProject(rest[0]);
+        const run = app.workflows.repo.listRuns({ projectId: p.id }).at(-1);
+        if (!run) fail('no planning run for this project');
+        const reviews = app.workflows.repo.listReviews(run.id);
+        if (values.json) {
+          out(JSON.stringify(reviews, null, 2));
+          break;
+        }
+        for (const r of reviews) {
+          out(`Round ${r.round} ${r.source}: ${r.verdict}`);
+          for (const i of r.issues) out(`  [${i.severity}] ${i.category} ${i.id}: ${i.description}`);
+        }
+        if (!reviews.length) out('(no review yet)');
         break;
       }
       case 'assignment:add': {

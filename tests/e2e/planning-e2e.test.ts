@@ -9,7 +9,14 @@ import { WorkflowRepository } from '../../src/workflows/repository.js';
 import { assignmentExample } from '../helpers/assignment.js';
 import { waitFor } from '../helpers/env.js';
 import { removeTempDir } from '../helpers/fs.js';
-import { analysisJson, architectureJson, planJson, reply } from '../helpers/plan-fixtures.js';
+import {
+  analysisJson,
+  architectureJson,
+  planJson,
+  reply,
+  researchJson,
+  reviewJson,
+} from '../helpers/plan-fixtures.js';
 
 /**
  * Phase 2 end to end with REAL processes and a real database file: assignment -> plan -> tasks -> execution -> VERIFYING,
@@ -58,6 +65,7 @@ beforeEach(() => {
     SHUTDOWN_GRACE_MS: '3000',
     BACKOFF_BASE_MS: '500',
     PLAN_APPROVAL: 'required',
+    INDEPENDENT_REVIEW: 'false', // QA has its own suite (tests/integration/independent-qa.test.ts)
     NODE_NO_WARNINGS: '1',
   };
 });
@@ -76,6 +84,8 @@ describe('E2E: assignment -> planned tasks -> executed -> VERIFYING, across a SI
       JSON.stringify({
         tasks: {
           'Plan: analyze': [reply(analysisJson())],
+          'Plan: research': [reply(researchJson())],
+          'Plan: review': [reply(reviewJson())],
           'Plan: architect': ['hang', reply(architectureJson())], // first attempt hangs: we kill the supervisor there
           'Plan: decompose': [reply(planJson())],
         },
@@ -125,7 +135,7 @@ describe('E2E: assignment -> planned tasks -> executed -> VERIFYING, across a SI
     const tasks = store.listTasks({ projectId: project.id });
     const coding = tasks.filter((t) => t.kind === 'CODING');
     const planning = tasks.filter((t) => t.kind === 'PLANNING');
-    expect(planning).toHaveLength(3);
+    expect(planning).toHaveLength(5); // analyze, research, architect, decompose, review
     expect(coding.map((t) => t.title)).toEqual([
       'Scaffold project and auth',
       'Enrollment module',

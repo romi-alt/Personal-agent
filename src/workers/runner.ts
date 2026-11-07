@@ -12,6 +12,8 @@ import type { ExecutionRecord, Task } from '../types/index.js';
 import { verifyTask } from '../verification/service.js';
 import { commitExists, gitState, treeFingerprint } from '../workspaces/git.js';
 import type { WorkspaceRegistry } from '../workspaces/registry.js';
+import { processIdentity } from './process-tree.js';
+import { type Role, roleBrief } from '../engineering/roles.js';
 
 export interface RunnerDeps {
   config: AppConfig;
@@ -188,8 +190,9 @@ export class TaskRunner {
         taskId: task.id,
         taskTitle: task.title,
         prompt,
-        systemAppend: task.readOnly ? PLANNING_APPEND : SYSTEM_APPEND,
+        systemAppend: task.readOnly ? PLANNING_APPEND : SYSTEM_APPEND + roleBrief(task.role as Role | null),
         readOnly: task.readOnly,
+        allowWeb: task.readOnly && task.allowWeb,
         cwd,
         resumeSessionId: task.sessionId ?? undefined,
         approvedActionTypes,
@@ -205,7 +208,16 @@ export class TaskRunner {
           store.recordSession(execution.id, task.id, id);
           execLog.append({ kind: 'session', sessionId: id });
         },
-        onProcess: (pid) => store.setExecutionWorkerPid(execution.id, pid),
+        onProcess: (pid) => {
+          store.setExecutionWorkerPid(execution.id, pid);
+          if (pid === null) return;
+          // Record the OS identity (image + creation time) so recovery can prove an orphan is this worker.
+          void processIdentity(pid)
+            .then((id) => {
+              if (id) store.setExecutionWorkerIdentity(execution.id, id);
+            })
+            .catch(() => undefined);
+        },
         onEvent: (ev) => {
           execLog.append({ kind: ev.type, ...ev.data });
           const t = store.clock.now();

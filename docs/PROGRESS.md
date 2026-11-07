@@ -1,54 +1,79 @@
 # Build progress and checkpoint
 
-Durable checkpoint for the full-build mandate (owner brief of 2026-11-07). Any new session or context continues
-from here: read this file, `git log`, then pick the first unchecked item.
+Durable checkpoint for the full-build mandate (owner briefs of 2026-11-07). Any new session or context continues
+from here: read this file, `git log`, `git status`, then pick the first unchecked item in **Next**.
 
 ## Environment (owner machine)
 
 - Windows 11 Pro, PowerShell 5.1, Node 26.13 (winget `OpenJS.NodeJS.LTS`), Git 2.56 (winget `Git.Git`).
 - Claude Code 2.1.319 at `C:\Users\<owner>\.local\bin\claude.exe`; subscription login (`authMethod: claude.ai`, Max).
 - Repository branch for this work: `feat/windows-compat` (based on `claude/dreamy-edison-hiyq3n`). Never force-push.
+- Old shells need `$env:PATH = "C:\Program Files\nodejs;C:\Program Files\Git\cmd;" + $env:PATH`.
 
 ## Done (verified)
 
-| Item                                                                                                                                | Evidence                                                                                                                                                                                                                                                                                                                                                                                              |
-| ----------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Suite runs on Windows                                                                                                               | 248/248 tests on Windows 11 (`npm test`, 2026-11-07); typecheck, lint, format clean                                                                                                                                                                                                                                                                                                                   |
-| Windows fixes: CRLF/BOM input, `.gitattributes`, single-spawn `gitState`, test cleanup on file locks                                | commit `2b3975d`                                                                                                                                                                                                                                                                                                                                                                                      |
-| PowerShell scripts parse under real Windows PowerShell 5.1                                                                          | parser check: 0 errors in all 4 scripts, ASCII only                                                                                                                                                                                                                                                                                                                                                   |
-| B1 native Claude Code CLI provider (`EXECUTION_PROVIDER=claude-cli`)                                                                | `src/providers/claude-cli/*`, `tests/unit/cli-provider.test.ts` (15)                                                                                                                                                                                                                                                                                                                                  |
-| Watchdog env verified present in 2.1.319 and injected per worker; parent `CLAUDE_CODE_*`/`ANTHROPIC_*` stripped                     | `provider:status` output; unit test asserts worker env                                                                                                                                                                                                                                                                                                                                                |
-| Policy enforced by fail-closed PreToolUse hook command                                                                              | `tests/unit/cli-provider.test.ts › policy hook command` (exit 2 on failure)                                                                                                                                                                                                                                                                                                                           |
-| **Acceptance test 5 (real CLI smoke)**: 8/8 live checks PASS                                                                        | `npx tsx scripts/cli-smoke.ts`: apiKeySource=none (subscription), write allowed, `git push` denied as `protected_branch_push`, session persisted before launch, `--resume` continued the same conversation                                                                                                                                                                                            |
-| **Acceptance test 4 (simulated usage limit)**                                                                                       | `tests/integration/capacity-watchdog.test.ts`: task stays RUNNING / `WAITING_FOR_USAGE_RESET`, lease kept by heartbeats, 1 execution + 1 request, resumes when capacity returns                                                                                                                                                                                                                       |
-| B2: capacity wait suspends execution timeout; stall detection outside waits; orphan CLI worker stopped on recovery (pid-reuse safe) | `cli-provider.test.ts`, `tests/unit/process-tree.test.ts` (real processes)                                                                                                                                                                                                                                                                                                                            |
-| Worker state for command center (`RUNNING`, `WAITING_FOR_USAGE_RESET`, ...)                                                         | `deriveWorkerState` in `src/supervisor/status.ts`                                                                                                                                                                                                                                                                                                                                                     |
-| **Acceptance test 6 on the real CLI**: supervisor SIGKILLed mid-task, restarted: 7/7 PASS (run twice)                               | `npx tsx scripts/cli-recovery-smoke.ts`: session persisted before kill, first execution `interrupted`, exactly one replacement, **same session resumed**, step 2 produced, task COMPLETED. Observed on Windows: the `claude` worker had already exited ~1.5 s after its supervisor was killed, so the orphan-stop path was not exercised live (covered by `process-tree.test.ts` with real processes) |
-| Compiled build uses the plain-node hook and fails closed                                                                            | `npm run build`; `dist/.../pretooluse-hook.js` with a missing policy file exits 2                                                                                                                                                                                                                                                                                                                     |
+| Item | Evidence |
+| --- | --- |
+| Suite runs on Windows; Windows fixes (CRLF/BOM, `.gitattributes`, single-spawn `gitState`, file-lock cleanup) | commit `2b3975d` |
+| B1 native Claude Code CLI provider; watchdog env per worker; ANTHROPIC_*/parent CLAUDE_CODE_* stripped; fail-closed policy hook | `src/providers/claude-cli/*`, `tests/unit/cli-provider.test.ts` |
+| Acceptance test 5 (real CLI smoke) 8/8, test 6 (real CLI recovery) 7/7, test 4 (usage-limit, mock) | `scripts/cli-smoke.ts`, `scripts/cli-recovery-smoke.ts`, `tests/integration/capacity-watchdog.test.ts` |
+| **Stage 1 Windows Task Scheduler, run live on this PC** | `scripts/windows/scheduler-acceptance.ps1 -RealCli`: 39 PASS in the first run (details below) |
+| PS 5.1 bug fixed: `$PSScriptRoot` empty in `param()` defaults broke all 4 scripts before they did anything | scripts now resolve it in the body; static guard in `tests/unit/windows-scripts.test.ts` |
+| Wrapper: logs to `<AGENT_HOME>\logs\wrapper.log`; on exit 3 it monitors the live supervisor and takes over when it dies | live checks "new wrapper monitors ..." and "monitoring wrapper takes over ..." PASS |
+| Orphan worker handling by OS identity (image + creation time), pid-reuse safe; replacement deferred while a matching worker lives | `src/workers/process-tree.ts`; `tests/unit/process-tree.test.ts` (real processes); `tests/e2e/orphan-worker.test.ts` (3: stop exact worker + resume from checkpoint, pid reuse left alone, Windows job-object behaviour) |
+| Phase 2: intake, research (citation-checked), architecture sections + Mermaid, ADR rows+files, epics/subtasks/testing, critical path, verified progress, planning review (deterministic + model, bounded revise loop to architect/decompose), owner review of significant ADRs | `tests/integration/project-intelligence.test.ts` (9), `tests/unit/project-intelligence.test.ts` (12), planning suites updated |
+| Phase 3: repository scan before planning, 10 bounded roles, independent QA (fresh read-only session, citation-checked verdicts, corrections, escalation, dependants gated on review) | `tests/integration/independent-qa.test.ts` (3) |
+| Phase 5: command center (`dashboard`), owner-token login, sessions, CSRF, Host allow-list, strict CSP, owner controls + audit trail, approval inbox | `tests/integration/dashboard.test.ts` (7) |
 
-## Facts established (do not re-derive)
+### Stage 1 live results (2026-11-07, this PC, task `ElevariqPersonalAgent-Acceptance`, isolated agent home)
+
+PASS: task definition (logon trigger for the owner, absolute working dir, embedded node path, Interactive/Limited
+principal, IgnoreNew, no time limit, restart 999x1min, no secrets in arguments); inside the task context: owner user,
+session 4, repo cwd, node path, `claude` 2.1.319 found, **subscription login readable (loggedIn, claude.ai, max)**,
+claude-cli provider ready; supervisor started by the task (node from the embedded path, child of the wrapper, owner);
+database + wrapper/app logs written; mock task COMPLETED; second `Start-ScheduledTask` ignored; manual second
+supervisor refused (exit 3); killed supervisor restarted by the wrapper and the interrupted task recovered
+(`interrupted,completed`); supervisor survives loss of its wrapper; new wrapper monitors, then takes over; graceful
+stop ends supervisor/wrapper/task; **real CLI task under the task COMPLETED** (haiku, artifact written).
+
+Observed facts (do not re-derive):
+- Task Scheduler did NOT restart a force-killed wrapper by itself (RestartCount does not cover that case); the
+  monitoring wrapper design covers it.
+- On Windows a non-detached child is in libuv's kill-on-close job object: the whole `claude` worker tree dies with a
+  killed supervisor (explains the earlier live observation). Orphans matter on Linux (children are reparented).
+- Inside the worker, the Bash tool and the policy hook (children of `claude`) see `CLAUDE_CODE_RETRY_WATCHDOG=1` and
+  `..._USAGE_LIMIT_RECHECK_MS=300000` but NOT `CLAUDE_CODE_RESUME_INTERRUPTED_TURN` / `..._RESUME_PROMPT`: Claude Code
+  does not pass those two on to its children. The spawn environment of `claude` itself is now recorded per execution
+  (`worker_env` event) as evidence that all four are handed to the worker.
+- The log redactor masks keys named like `apiKey*`/`credential*`: the init credential source is recorded as
+  `billing: "subscription"` for evidence.
+
+## Facts established earlier (do not re-derive)
 
 - Docs: `CLAUDE_CODE_RETRY_WATCHDOG` (>=2.1.186) retries 429/529 indefinitely, waits until reset when the response
   has a reset time; spend-limit 429s fail immediately (>=2.1.239). `..._USAGE_LIMIT_RECHECK_MS` valid 60000..10800000
-  (>=2.1.305). `..._MAX_USAGE_LIMIT_WAIT_MS` and `..._SCOPE` exist in the binary but are **undocumented**: not used.
+  (>=2.1.305). `..._MAX_USAGE_LIMIT_WAIT_MS` and `..._SCOPE` are **undocumented**: not used.
 - In `-p` mode an exported `ANTHROPIC_API_KEY` always wins over the subscription: it must be stripped (done).
-- `system/init.apiKeySource` is `none` for the subscription login (observed live).
 - Hook exit code 2 blocks; other non-zero codes do NOT block, so the hook maps every error to 2.
 - Process spawns cost ~150 ms on this machine; keep git/process calls per task low.
 
 ## Not yet verified / open
 
-- Real usage-limit wait output of the CLI (shape of messages during a watchdog wait) is inferred from docs
-  (`api_retry` error `rate_limit`, `rate_limit_event` status `rejected`); not observed live (deliberately: the real
-  subscription is not exhausted for testing).
-- `claude-cli` under Windows Task Scheduler (non-interactive logon) not yet run (G1).
+- Re-run `scheduler-acceptance.ps1 -RealCli` after the evidence-field fixes (`worker_env` spawn record, `billing`):
+  the two remaining FAILs of run 2 were evidence-recording problems, not behaviour (see facts above).
+- Windows restart / sign-in trigger: cannot be automated safely here. Manual check in `docs/WINDOWS_DEPLOYMENT.md`.
+- Real usage-limit wait output of the CLI: inferred from docs, never observed live (deliberately).
+- Command-center UI has not been rendered in a real browser in this environment (API, auth and script syntax are
+  tested); Playwright is not installed.
+- Research with real WebSearch/WebFetch and the QA reviewer against the real CLI: only mock-tested so far.
 
 ## Next (in order)
 
-1. Phase 1.5 wrap-up: run the supervisor with `claude-cli` from Windows Task Scheduler (non-interactive logon) and
-   confirm the subscription login is readable there (G1 overlaps).
-2. Phase 2 remainder: intake of free-text assignments into the existing assignment contract; research step; ADR files.
-3. Phase 3: dispatch with roles, inspect/build/test runners, independent review, corrective loop, Playwright UI QA.
-4. Phase 4: ERP/CRM read adapters (needs the ERP repository / API docs from the owner: **external blocker**).
-5. Phase 5: command center web app (local-only, authenticated) on top of `buildStatus` + store.
-6. Phase 6: Task Scheduler verification on this PC; VPS packaging (no public deployment without approval).
+1. Commit Stage 1 + Phase 2 + Phase 3 + Phase 5 (this checkpoint), re-run the scheduler acceptance.
+2. Phase 6: backups + restore test, `systemd` unit + non-root install script, health/error notifications, operations docs.
+3. Phase 4 preparation: typed adapter contracts, auth interfaces, sync designs, idempotency, pagination, audit, mock tests,
+   integration checklist (real integration stays blocked until the ERP repo/API docs and read-only credentials arrive).
+4. Phase 3 remainder: Playwright UI QA runner (needs `@playwright/test` + browser download: owner network decision),
+   security verifier (secret scan) for `SECURITY_CHECKS_PASS`, project-level `REQUIREMENTS_SATISFIED` aggregation.
+5. Live run of the full pipeline on the real CLI with a tiny assignment (intake -> plan -> approve -> code -> QA).
+6. Final acceptance report (Stage 8) with exact evidence and the list of real-world tests not performed.

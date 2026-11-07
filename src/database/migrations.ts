@@ -328,6 +328,126 @@ ALTER TABLE executions ADD COLUMN worker_pid INTEGER;
 ALTER TABLE executions ADD COLUMN last_activity_at INTEGER;
 `,
   },
+  {
+    version: 5,
+    name: 'worker_process_identity',
+    sql: `
+-- JSON {pid,image,startedAtMs}: OS identity of the provider child recorded at spawn; recovery stops an orphan only
+-- if the live process still has this identity (pid reuse safe)
+ALTER TABLE executions ADD COLUMN worker_identity TEXT;
+`,
+  },
+  {
+    version: 6,
+    name: 'phase_2_project_intelligence',
+    sql: `
+-- Research tasks may use read-only web tools (still subject to the project's web_access approval policy)
+ALTER TABLE tasks ADD COLUMN allow_web INTEGER NOT NULL DEFAULT 0;
+
+-- Original owner input: free-text assignment and attached specifications, kept verbatim
+CREATE TABLE project_documents (
+  id TEXT PRIMARY KEY,
+  project_id TEXT NOT NULL,
+  kind TEXT NOT NULL,            -- assignment_text | attachment
+  name TEXT NOT NULL,
+  content TEXT NOT NULL,
+  sha256 TEXT NOT NULL,
+  bytes INTEGER NOT NULL,
+  created_at INTEGER NOT NULL,
+  UNIQUE(project_id, sha256)
+);
+
+CREATE TABLE research_findings (
+  run_id TEXT NOT NULL,
+  finding_id TEXT NOT NULL,
+  project_id TEXT NOT NULL,
+  area TEXT NOT NULL,
+  statement TEXT NOT NULL,
+  kind TEXT NOT NULL,            -- verified | assumption (after the citation check)
+  claimed_kind TEXT NOT NULL,    -- what the model claimed
+  confidence TEXT NOT NULL,
+  sources TEXT NOT NULL,         -- JSON [{title,url}]
+  citation_check TEXT NOT NULL,  -- observed | not_observed | no_web_access | none
+  researched_at INTEGER NOT NULL,
+  PRIMARY KEY(run_id, finding_id)
+);
+CREATE INDEX idx_research_project ON research_findings(project_id);
+
+CREATE TABLE adrs (
+  project_id TEXT NOT NULL,
+  adr_id TEXT NOT NULL,
+  number INTEGER NOT NULL,
+  title TEXT NOT NULL,
+  status TEXT NOT NULL,          -- proposed | accepted | rejected | superseded
+  context TEXT NOT NULL,
+  decision TEXT NOT NULL,
+  alternatives TEXT NOT NULL,    -- JSON string[]
+  rationale TEXT NOT NULL,
+  consequences TEXT NOT NULL,
+  significant INTEGER NOT NULL,
+  decided_at INTEGER NOT NULL,
+  run_id TEXT NOT NULL,
+  file_path TEXT,
+  PRIMARY KEY(project_id, adr_id)
+);
+
+CREATE TABLE architecture_specs (
+  run_id TEXT PRIMARY KEY,
+  project_id TEXT NOT NULL,
+  sections TEXT NOT NULL,        -- JSON {system,database,...}
+  diagrams TEXT NOT NULL,        -- JSON [{title,mermaid}]
+  created_at INTEGER NOT NULL
+);
+
+CREATE TABLE plan_reviews (
+  id TEXT PRIMARY KEY,
+  run_id TEXT NOT NULL,
+  project_id TEXT NOT NULL,
+  round INTEGER NOT NULL,
+  source TEXT NOT NULL,          -- deterministic | model
+  verdict TEXT NOT NULL,         -- approve | revise
+  issues TEXT NOT NULL,          -- JSON [{id,category,severity,description,recommendation}]
+  created_at INTEGER NOT NULL
+);
+CREATE INDEX idx_plan_reviews_run ON plan_reviews(run_id);
+
+CREATE TABLE epics (
+  project_id TEXT NOT NULL,
+  key TEXT NOT NULL,
+  title TEXT NOT NULL,
+  goal TEXT NOT NULL,
+  position INTEGER NOT NULL,
+  PRIMARY KEY(project_id, key)
+);
+ALTER TABLE plan_tasks ADD COLUMN epic_key TEXT;
+ALTER TABLE plan_tasks ADD COLUMN subtasks TEXT NOT NULL DEFAULT '[]';
+ALTER TABLE plan_tasks ADD COLUMN testing TEXT NOT NULL DEFAULT '';
+`,
+  },
+  {
+    version: 7,
+    name: 'phase_3_engineering',
+    sql: `
+-- Bounded specialist role a coding task runs under (adds a brief; never adds permissions)
+ALTER TABLE tasks ADD COLUMN role TEXT;
+
+-- Independent QA per coding task: review rounds, correction tasks, escalation
+CREATE TABLE qa_reviews (
+  task_id TEXT NOT NULL,           -- the reviewed (original) coding task
+  round INTEGER NOT NULL,
+  review_task_id TEXT,
+  correction_task_id TEXT,
+  status TEXT NOT NULL,            -- REVIEWING | PASSED | FAILED | CORRECTING | ESCALATED | OWNER_ACCEPTED | OWNER_REJECTED
+  repairs INTEGER NOT NULL DEFAULT 0,
+  result TEXT,                     -- JSON: criteria verdicts, defects, citation check
+  approval_id TEXT,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL,
+  PRIMARY KEY(task_id, round)
+);
+CREATE INDEX idx_qa_status ON qa_reviews(status);
+`,
+  },
 ];
 
 export function runMigrations(db: Database.Database, migrations: Migration[] = MIGRATIONS): number[] {

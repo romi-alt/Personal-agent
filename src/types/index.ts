@@ -94,6 +94,10 @@ export interface Task {
   kind: 'CODING' | 'PLANNING';
   /** Provider must expose read-only tools only. */
   readOnly: boolean;
+  /** Read-only research task that may use web tools (WebSearch/WebFetch). */
+  allowWeb: boolean;
+  /** Specialist role (src/engineering/roles.ts); null = none. */
+  role: string | null;
   createdAt: number;
   updatedAt: number;
   completedAt: number | null;
@@ -124,7 +128,16 @@ export interface ExecutionRecord {
   capacityWait: CapacityWait | null;
   /** OS pid of the provider child process (native CLI provider), if any. */
   workerPid: number | null;
+  /** OS identity (image + creation time) of `workerPid`, recorded shortly after spawn. */
+  workerIdentity: WorkerIdentity | null;
   lastActivityAt: number | null;
+}
+
+/** See src/workers/process-tree.ts ProcessIdentity. */
+export interface WorkerIdentity {
+  pid: number;
+  image: string;
+  startedAtMs: number;
 }
 
 export interface CapacityWait {

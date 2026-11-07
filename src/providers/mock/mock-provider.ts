@@ -1,3 +1,4 @@
+import { spawn } from 'node:child_process';
 import { appendFileSync, existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { readTextFile } from '../../core/text.js';
@@ -33,7 +34,14 @@ export type MockStepType =
    * limit is in force (at least `delayMs`, and while the capacity file says unavailable), then continues the same
    * request and succeeds. No new request is made during the wait.
    */
-  | 'watchdog_wait';
+  | 'watchdog_wait'
+  /**
+   * Spawns a REAL long-running child process (node) as the "worker", reports its pid like the CLI provider does, and
+   * waits for it to exit (`delayMs`, default 60 s). The child appends `<pid> <ms>` lines to `.mock-worker.beat` in the
+   * workspace while alive. `writes` are applied BEFORE the worker starts (completed earlier step). Used to test orphan
+   * worker detection and identity-verified termination without the real Claude CLI.
+   */
+  | 'spawn_worker';
 
 export interface MockStep {
   type: MockStepType;
@@ -50,6 +58,10 @@ export interface MockStep {
   costUsd?: number;
   /** For 'watchdog_wait': capacity "returns" once this file exists. */
   untilFile?: string;
+  /** For 'spawn_worker': start the worker detached so it survives the supervisor being killed. */
+  detached?: boolean;
+  /** URLs the simulated web tools "returned" (emitted as web_evidence events; research citation tests). */
+  webEvidence?: string[];
 }
 
 export interface MockScenario {
@@ -77,8 +89,14 @@ const sleep = (ms: number, signal: AbortSignal) =>
     signal.addEventListener('abort', () => (clearTimeout(t), resolve()), { once: true });
   });
 
+const MOCK_WORKER_SRC =
+  "const fs=require('fs');const [f,ms]=process.argv.slice(1);const end=Date.now()+Number(ms);" +
+  "const beat=()=>fs.appendFileSync(f,process.pid+' '+Date.now()+'\\n');beat();" +
+  'const t=setInterval(()=>{beat();if(Date.now()>=end){clearInterval(t);}},250);';
+
 export class MockProvider implements ExecutionProvider {
   readonly name = 'mock';
+  readonly workerImage = /^node(\.exe)?$/i;
   /** Execution log kept in-memory for assertions. */
   readonly runs: {
     taskTitle: string;
@@ -88,6 +106,7 @@ export class MockProvider implements ExecutionProvider {
     /** The exact prompt the worker sent (lets tests assert recovery context). */
     prompt: string;
     readOnly: boolean;
+    allowWeb: boolean;
   }[] = [];
 
   /** Number of model requests that entered a watchdog wait (each wait is ONE request, however long it lasts). */
@@ -182,6 +201,8 @@ export class MockProvider implements ExecutionProvider {
     }
 
     req.onEvent({ type: 'tool_use', data: { tool: 'mock_work', step: step.type } });
+    if (step.webEvidence?.length && req.allowWeb)
+      req.onEvent({ type: 'web_evidence', data: { tool: 'WebSearch', urls: step.webEvidence } });
     if (step.type === 'watchdog_wait') {
       const started = Date.now();
       req.onEvent({
@@ -209,6 +230,45 @@ export class MockProvider implements ExecutionProvider {
       return {
         kind: 'completed',
         summary: step.summary ?? 'completed after capacity returned',
+        sessionId,
+        usage: { turns: 1 },
+      };
+    }
+    if (step.type === 'spawn_worker') {
+      for (const w of step.writes ?? []) {
+        const target = path.join(req.cwd, w.file);
+        mkdirSync(path.dirname(target), { recursive: true });
+        writeFileSync(target, w.content);
+      }
+      const child = spawn(
+        process.execPath,
+        ['-e', MOCK_WORKER_SRC, path.join(req.cwd, '.mock-worker.beat'), String(step.delayMs ?? 60_000)],
+        // detached: on Windows a non-detached child sits in libuv's kill-on-close job object and dies with its parent;
+        // detached simulates a worker that escaped it (the normal case on Linux, where children are reparented).
+        { stdio: 'ignore', windowsHide: true, detached: !!step.detached },
+      );
+      if (child.pid) req.onProcess?.(child.pid);
+      const onAbort = () => child.kill();
+      req.signal.addEventListener('abort', onAbort, { once: true });
+      const code = await new Promise<number | null>((resolve) => {
+        child.once('exit', (c) => resolve(c));
+        child.once('error', () => resolve(-1));
+      });
+      req.signal.removeEventListener('abort', onAbort);
+      req.onProcess?.(null);
+      if (req.signal.aborted)
+        return { kind: 'failed', failure: { errorClass: 'INTERRUPTED', message: 'aborted' }, sessionId };
+      if (code !== 0)
+        return {
+          kind: 'failed',
+          sessionId,
+          failure: { errorClass: 'PROCESS_CRASH', message: `mock worker exited with code ${String(code)}` },
+        };
+      if (!step.noArtifact && !req.readOnly)
+        writeFileSync(path.join(req.cwd, `${req.taskId}.done`), 'done\n');
+      return {
+        kind: 'completed',
+        summary: step.summary ?? 'mock worker finished',
         sessionId,
         usage: { turns: 1 },
       };
@@ -334,6 +394,7 @@ export class MockProvider implements ExecutionProvider {
       step,
       prompt: req.prompt,
       readOnly: !!req.readOnly,
+      allowWeb: !!req.allowWeb,
     });
   }
 }
