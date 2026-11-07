@@ -128,7 +128,7 @@ Regex command screening is not a sandbox; verification executes model-written co
 
 - Regex screening is bypassable by a worker that writes a script and runs it (documented since Phase 1). For real
   unattended use: dedicated low-privilege Windows account or VM, no production credentials on the host.
-- The SDK (paid API) provider applies the agent-control pattern but not the protected-path check (it is disabled by
-  default: `ALLOW_PAID_API=false`).
+- (Fixed 2026-11-07, later the same day) the SDK (paid API) provider now applies the same protected-path check as the
+  CLI provider, in both its PreToolUse hook and `canUseTool` (`tests/unit/claude-provider.test.ts`).
 - Scratch cleanup is offered only for workspaces inside the managed WORKSPACE_ROOT; projects in separately approved
   directories fall back to an owner approval.

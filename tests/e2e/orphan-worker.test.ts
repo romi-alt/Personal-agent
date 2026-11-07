@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { openDatabase } from '../../src/database/connection.js';
 import { Store } from '../../src/queue/store.js';
-import { pidExists } from '../../src/workers/process-tree.js';
+import { pidExists, processIdentity } from '../../src/workers/process-tree.js';
 import { waitFor } from '../helpers/env.js';
 import { removeTempDir } from '../helpers/fs.js';
 
@@ -140,7 +140,15 @@ const lastBeat = (repo: string) =>
 
 describe('E2E: orphaned worker process after supervisor SIGKILL', () => {
   it('stops exactly the recorded worker, then resumes the task from its checkpoint', async () => {
-    const claudeBefore = claudePids();
+    // Long-lived claude processes only (e.g. the owner's interactive session): an installed agent's readiness probe
+    // starts short-lived `claude auth status` processes that end on their own and must not be counted.
+    // Counted: claude processes that were already running a minute before this test (probes live < 1-5 s, even
+    // under the load of a parallel suite).
+    const testStart = Date.now();
+    const ids = await Promise.all(claudePids().map((p) => processIdentity(p)));
+    const claudeBefore = ids
+      .filter((i): i is NonNullable<typeof i> => !!i && i.startedAtMs < testStart - 60_000)
+      .map((i) => i.pid);
     const decoy = spawn(process.execPath, ['-e', 'setTimeout(() => {}, 120000)'], { stdio: 'ignore' });
     strays.push(decoy.pid!);
     const { t, store, repo, exec, workerPid } = await killSupervisorMidTask();

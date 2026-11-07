@@ -42,6 +42,9 @@ describe('Phase 6: backups and restore', () => {
     const m = await createBackup(env.store.db, dir);
     expect(m.counts['tasks']).toBe(1);
     expect(verifyBackup(path.join(dir, m.file))).toMatchObject({ ok: true, problems: [] });
+    // A backup is one self-contained file: no WAL sidecars left by creating or verifying it, checksum stable.
+    expect(readdirSync(dir).sort()).toEqual([m.file, `${m.file}.json`]);
+    expect(verifyBackup(path.join(dir, m.file)).ok).toBe(true);
 
     // live database moves on after the backup
     env.store.enqueueTask({

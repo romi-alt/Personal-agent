@@ -87,7 +87,11 @@ export interface CliDeps {
   terminateFn?: (child: ChildProcess) => void;
   /** Supervision tick interval (ms). */
   tickMs?: number;
+  /** Cache lifetime of a healthy version/auth probe (default 60 s; 0 for an injected probe unless set). */
+  probeTtlMs?: number;
 }
+
+type ProbeResult = { version: string | null; auth: AuthStatus | null; error?: string };
 
 /** How to run the policy hook: compiled JS with plain node, or the TypeScript source through tsx in development. */
 export function hookCommand(): string {
@@ -153,7 +157,26 @@ export class ClaudeCliProvider implements ExecutionProvider {
     return this.d.config.claudeCliPath ?? 'claude';
   }
 
-  private async probe(): Promise<{ version: string | null; auth: AuthStatus | null; error?: string }> {
+  private probeCache?: { at: number; value: ProbeResult };
+
+  /**
+   * The supervisor calls preflight() on every scheduling tick; launching `claude` twice per tick (a 300+ MB
+   * executable) kept an idle PC busy (~45 launches per 90 s observed). Results are cached: healthy for
+   * `probeTtlMs` (default 60 s), failing for a quarter of that so a fresh login is noticed quickly.
+   */
+  private async probe(): Promise<ProbeResult> {
+    const ttl = this.d.probeTtlMs ?? (this.d.probe ? 0 : 60_000);
+    const c = this.probeCache;
+    if (c && ttl > 0) {
+      const ok = !c.value.error && !!c.value.auth?.loggedIn;
+      if (this.now() - c.at < (ok ? ttl : ttl / 4)) return c.value;
+    }
+    const value = await this.probeOnce();
+    this.probeCache = { at: this.now(), value };
+    return value;
+  }
+
+  private async probeOnce(): Promise<ProbeResult> {
     if (this.d.probe) return this.d.probe();
     const env = buildWorkerEnv(this.d.parentEnv ?? process.env, {});
     let version: string | null;

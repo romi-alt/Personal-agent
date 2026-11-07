@@ -7,6 +7,7 @@ import {
 } from '@anthropic-ai/claude-agent-sdk';
 import type { AppConfig } from '../../config/index.js';
 import { evaluateToolUse } from '../../security/policy.js';
+import { agentRepoRoot } from '../claude-cli/cli-provider.js';
 import type {
   AuthReadiness,
   ExecutionProvider,
@@ -34,7 +35,8 @@ export interface ClaudeProviderDeps {
   config: Pick<
     AppConfig,
     'allowPaidApi' | 'maxBudgetUsdPerExecution' | 'claudeModel' | 'claudeCliPath' | 'maxTurnsPerExecution'
-  >;
+  > &
+    Partial<Pick<AppConfig, 'agentHome'>>;
   credentials: CredentialSource;
   /** Injectable for tests; defaults to the official SDK query(). */
   queryFn?: QueryFn;
@@ -142,6 +144,11 @@ export class ClaudeProvider implements ExecutionProvider {
 
     const denials: PermissionDenial[] = [];
     const workspace = req.cwd;
+    // Same agent-path protection as the CLI provider's policy hook (AGENT_HOME, this agent's repository).
+    const protectedPaths = [
+      ...(this.deps.config.agentHome ? [this.deps.config.agentHome] : []),
+      agentRepoRoot(),
+    ];
 
     const preToolUseHook: HookCallback = async (hookInput) => {
       if (hookInput.hook_event_name !== 'PreToolUse') return {};
@@ -150,6 +157,7 @@ export class ClaudeProvider implements ExecutionProvider {
         approvedTypes: req.approvedActionTypes,
         alsoRequire: req.alsoRequireApproval,
         readOnly: req.readOnly,
+        protectedPaths,
       });
       if (decision.allow) return {}; // defer to the normal permission flow (canUseTool is the second layer)
       denials.push({
@@ -198,6 +206,7 @@ export class ClaudeProvider implements ExecutionProvider {
           approvedTypes: req.approvedActionTypes,
           alsoRequire: req.alsoRequireApproval,
           readOnly: req.readOnly,
+          protectedPaths,
         });
         if (decision.allow) return { behavior: 'allow', updatedInput: input };
         denials.push({ tool: toolName, reason: decision.reason, approvalType: decision.approvalType, input });

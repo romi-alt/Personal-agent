@@ -389,6 +389,35 @@ describe('ClaudeCliProvider: authentication and failures', () => {
       ).missing.join(),
     ).toMatch(/expired/);
   });
+
+  it('preflight caches the probe: 60 s while healthy, a quarter of that while failing', async () => {
+    let t = 1_000_000;
+    let calls = 0;
+    let loggedIn = true;
+    const { provider } = setup(() => undefined, {
+      now: () => t,
+      probeTtlMs: 60_000,
+      probe: async () => {
+        calls++;
+        return { version: '2.1.319', auth: { loggedIn, authMethod: 'claude.ai' } as never };
+      },
+    });
+    for (let i = 0; i < 30; i++) await provider.preflight(); // one scheduling tick each
+    expect(calls).toBe(1);
+    t += 59_000;
+    await provider.preflight();
+    expect(calls).toBe(1);
+    t += 2_000;
+    loggedIn = false;
+    expect((await provider.preflight()).ready).toBe(false);
+    expect(calls).toBe(2);
+    loggedIn = true;
+    t += 14_000; // failing results are kept for only 15 s
+    expect((await provider.preflight()).ready).toBe(false);
+    t += 2_000;
+    expect((await provider.preflight()).ready).toBe(true);
+    expect(calls).toBe(3);
+  });
 });
 
 describe('policy hook command', () => {

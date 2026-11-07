@@ -63,6 +63,14 @@ export async function createBackup(db: Db, dir: string, now = Date.now()): Promi
   const file = path.join(dir, `agent-${stamp}.db`);
   const tmp = `${file}.partial`;
   await db.backup(tmp);
+  // The copy inherits WAL mode; read-only opens of a WAL file create -wal/-shm sidecars that a read-only connection
+  // cannot remove. Make the backup a self-contained single file before it is checksummed.
+  const rw = new Database(tmp, { fileMustExist: true });
+  try {
+    rw.pragma('journal_mode = DELETE');
+  } finally {
+    rw.close();
+  }
   renameSync(tmp, file); // a half-written backup is never mistaken for a complete one
   const copy = new Database(file, { readonly: true, fileMustExist: true });
   try {
