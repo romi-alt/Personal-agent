@@ -59,8 +59,7 @@ A dependency is labelled **Verified** only when a command succeeded; otherwise i
   for unattended work; the SDK adapter strips `CLAUDE_CODE_OAUTH_TOKEN`/`ANTHROPIC_AUTH_TOKEN` from the child environment and
   aborts if the CLI reports any credential source other than `ANTHROPIC_API_KEY`.
 * `node:sqlite` exists in this Node but is still experimental, so `better-sqlite3` was chosen (stable, synchronous, WAL).
-  `better-sqlite3` ships prebuilt binaries for Windows x64 and Linux x64; on exotic platforms it compiles from source and needs
-  a C++ toolchain (Visual Studio Build Tools on Windows).
+  `better-sqlite3` ships prebuilt binaries for Windows x64 and Linux x64, **but `npm ci` still ran `node-gyp rebuild` for it** (Phase 1.5 CI evidence: it failed on a Windows runner for lack of a compatible Visual Studio). Fixed by a committed `.npmrc` (`ignore-scripts=true`) so the prebuilt binary is used.
 * `npm audit`: **0 vulnerabilities in production dependencies**; 1 moderate advisory (minimatch DoS) reachable only through the
   ESLint dev-toolchain. The suggested fix downgrades ESLint (breaking), so it was not applied. It does not ship in the runtime.
 * TypeScript 5.9 was chosen over TypeScript 7 because `typescript-eslint` 8.x targets the 5.x API.
@@ -89,3 +88,12 @@ Only project-local npm packages were installed (nothing global, no system packag
 * **Windows 11 PC:** Suitable *in principle* - the code is platform-neutral (path handling, no POSIX signals required for stop, detached launch uses `windowsHide`) -
   but **Not verified on Windows**. It will only run while the PC is on, awake, and online.
 * **Ubuntu VPS:** Intended long-term target; the systemd unit passes `systemd-analyze verify` apart from the sandbox's missing `/usr/bin/node`, but was never started under a real systemd.
+
+---
+
+# Phase 1.5 re-check (2026-11-07)
+
+* Same Linux sandbox class (Ubuntu 24.04, Node v22.23.4). `ANTHROPIC_API_KEY`, `EXECUTION_PROVIDER`, `ALLOW_PAID_API` and `MAX_BUDGET_USD_PER_EXECUTION` were **still absent from the session environment** after you added them to the cloud environment settings (those only reach *new* sessions). Live-provider verification therefore remains **BLOCKED**; no paid or API request was made.
+* The sandbox's credential form refuses `api.anthropic.com` (Anthropic hosts are authenticated by the session), so the key has to be supplied as an environment variable at session start or used on your own machine.
+* PowerShell is **not installed**; an attempt to obtain it was refused by the sandbox's execution policy and was not worked around. Windows scripts remain statically reviewed only.
+* GitHub: repository admin permission is available, but the session proxy blocks repository-settings and branch-protection writes. `main` was created through a normal ref push.

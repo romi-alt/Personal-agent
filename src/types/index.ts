@@ -39,6 +39,8 @@ export type ErrorClass = (typeof ERROR_CLASSES)[number];
 
 export type Severity = 'debug' | 'info' | 'warn' | 'error';
 
+import type { ProjectLifecycle } from '../projects/lifecycle.js';
+
 export interface Project {
   id: string;
   name: string;
@@ -47,6 +49,8 @@ export interface Project {
   repoPath: string;
   priority: number;
   status: ProjectStatus;
+  /** Project-level lifecycle (separate from the operational `status` switch and from task statuses). */
+  lifecycle: ProjectLifecycle;
   createdAt: number;
   updatedAt: number;
   lastActivityAt: number;
@@ -78,6 +82,18 @@ export interface Task {
   completionEvidence: string | null;
   sessionId: string | null;
   dedupeKey: string;
+  /** Execution that currently owns the lease (fencing token). */
+  leaseExecutionId: string | null;
+  /** Consecutive interruptions (crash/restart) without a completed execution in between. */
+  interruptionCount: number;
+  /** Consecutive provider-level failures (network/outage) for this task. */
+  providerFailureStreak: number;
+  /** Verification levels that must not FAIL before the task may become COMPLETED. */
+  verificationRequired: string[];
+  /** CODING tasks change the repository; PLANNING tasks are read-only model calls feeding a workflow. */
+  kind: 'CODING' | 'PLANNING';
+  /** Provider must expose read-only tools only. */
+  readOnly: boolean;
   createdAt: number;
   updatedAt: number;
   completedAt: number | null;
@@ -102,6 +118,8 @@ export interface ExecutionRecord {
   costUsdBilled: number | null;
   logRef: string | null;
   summary: string | null;
+  startRef: string | null;
+  startStatusHash: string | null;
 }
 
 export interface Checkpoint {
@@ -117,6 +135,8 @@ export interface Checkpoint {
   testResults: string | null;
   nextAction: string;
   createdAt: number;
+  /** SHA-256 over all fields; null for checkpoints written before integrity hashing. */
+  integrity: string | null;
 }
 
 export interface ActivityEvent {

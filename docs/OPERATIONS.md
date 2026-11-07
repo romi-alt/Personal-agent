@@ -84,3 +84,39 @@ State = `AGENT_HOME`: `agent.db` (+ `-wal`, `-shm`), `workspaces/`, `logs/`. Bac
 | Task `BLOCKED` | `task:show` → last error; budget/continuation/workspace problems need the owner |
 | `better-sqlite3` fails to install | needs a prebuilt binary or a C++ toolchain; use Node LTS x64 |
 | Nothing happens | is the supervisor live (`health`)? is `daily budget reached` in `logs --app`? |
+
+---
+
+# Phase 1.5 addendum - new commands and notes
+
+```bash
+npm run agent -- assignment:add --file examples/assignment.example.json   # validate + register (no tasks are created)
+npm run agent -- project:status <project>      # lifecycle, spend, delivery-readiness table
+npm run agent -- project:verify <project>      # independent checks + evidence
+npm run agent -- project:accept <project> [--acknowledge-unverified "why"]
+npm run agent -- project:deliver <project> --reason "..."     # records only; deploys nothing
+npm run agent -- provider:status               # SDK / credentials / API access / budget / live execution / live recovery
+npm run agent -- provider:verify --access      # non-billable key check
+```
+
+* New settings: `MAX_INTERRUPTIONS`, `MAX_PROVIDER_FAILURE_STREAK`, `EVENT_RETENTION_DAYS`, `VERIFY_COMMAND_TIMEOUT_MS` (see `.env.example`).
+* A `BLOCKED` task with a `task.escalated` event means the agent stopped retrying on purpose: read `task:show`, fix the cause, then `task:unblock`.
+* Windows: follow `docs/WINDOWS_DEPLOYMENT.md` (exact steps + verification checklist; **not live-tested**).
+* GitHub: `main` is the baseline branch; see `docs/GITHUB_SETUP.md` for the two settings only an admin can change (default branch, protection).
+
+---
+
+# Phase 2 addendum - planning commands
+
+```bash
+npm run agent -- plan:start <project>        # start analyse -> architect -> decompose (read-only planning tasks)
+npm run agent -- workflow:list | workflow:show <run>
+npm run agent -- workflow:answer <run> --question Q-1 --text "..."    # blocking clarification questions
+npm run agent -- workflow:resume <run> --assume                       # continue using the analysis' assumptions
+npm run agent -- workflow:cancel <run>
+npm run agent -- approve <approval-id>       # approve the generated plan (PLAN_APPROVAL=required)
+npm run agent -- plan:show <project>         # requirements <-> tasks coverage, milestones
+```
+
+New settings: `PLAN_APPROVAL` (`required`|`auto`), `MAX_PLAN_TASKS`, `MAX_PLAN_REPAIRS`. A run that `FAILED` (invalid output after the repairs, or a failed planning task) leaves the project `BLOCKED`;
+read `workflow:show`, fix the cause (assignment wording, budget, provider), then `plan:start` again. Planning uses the same budgets/caps as coding tasks, so check `provider:status` first.

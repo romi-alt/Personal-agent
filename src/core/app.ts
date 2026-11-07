@@ -7,6 +7,7 @@ import { EnvCredentialSource } from '../providers/claude/credentials.js';
 import type { ExecutionProvider } from '../providers/types.js';
 import { Store } from '../queue/store.js';
 import { WorkspaceRegistry } from '../workspaces/registry.js';
+import { WorkflowEngine } from '../workflows/engine.js';
 
 export interface App {
   config: AppConfig;
@@ -15,6 +16,7 @@ export interface App {
   log: Logger;
   registry: WorkspaceRegistry;
   provider: ExecutionProvider;
+  workflows: WorkflowEngine;
   close(): void;
 }
 
@@ -37,5 +39,15 @@ export function createApp(opts: LoadConfigOptions & { provider?: ExecutionProvid
   const store = new Store(db, undefined, log);
   const registry = new WorkspaceRegistry(db, config.workspaceRoot);
   const provider = opts.provider ?? createProvider(config);
-  return { config, db, store, log, registry, provider, close: () => db.close() };
+  const workflows = new WorkflowEngine(
+    store,
+    {
+      planApproval: config.planApproval,
+      maxPlanTasks: config.maxPlanTasks,
+      maxPlanRepairs: config.maxPlanRepairs,
+      defaultMaxRetries: config.defaultMaxRetries,
+    },
+    log,
+  );
+  return { config, db, store, log, registry, provider, workflows, close: () => db.close() };
 }

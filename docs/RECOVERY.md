@@ -70,3 +70,24 @@ During operation a periodic sweep reclaims only tasks whose lease has expired. E
 Limits of recovery: SQLite runs in WAL mode with `synchronous=NORMAL`. This is durable across process crashes and `kill -9` (tested), and the database stays consistent after a power
 loss, but the most recent transactions *may be rolled back* by an OS crash or power failure - recovery then simply sees the slightly older state and re-does that step. Work the model
 did but never committed to git is only as durable as the working tree on disk.
+
+---
+
+# Phase 1.5 addendum - production-oriented recovery
+
+| Requirement | Mechanism |
+|---|---|
+| Save state before and after execution boundaries | claim writes `RUNNING` + execution row (before); the finish transaction writes execution outcome + `CHECKPOINTING` + checkpoint atomically, then a second transaction writes the final state (after). A crash between them is repaired from the recorded outcome. |
+| Preserve session ids and checkpoint refs | session id persisted on first SDK message; checkpoint = session ref + `branch@HEAD` + dirty flag + summaries + integrity hash. |
+| Rate limits vs usage exhaustion | distinct classes (table above). Server retry guidance/reset times honoured exactly. |
+| Wait without sending requests | provider-wide block in `provider_state`; the loop only reads local SQLite; credential preflight is local; nothing calls the API while idle. |
+| Resume only with legitimate capacity | claims are gated by `blocked_until`, auth readiness (credential fingerprint must change after a rejection), the daily budget and per-project budgets. |
+| Inspect repository changes before replaying | every resume/recovery prompt contains `git status` + changed files + last checkpoint + warnings ("files may be partially written"); checkpoint commit existence is verified; corrupt checkpoints are skipped. |
+| Avoid duplicating completed steps | fenced leases (execution-id token), duplicate completions are no-ops, evidence-based completion recovery (transcript), session resume, prompt instructs to inspect before acting. |
+| Stop safely without auth/budget | `WAITING_FOR_AUTHENTICATION` / provider gate closed; `BLOCKED` on budget exhaustion. |
+| Escalate instead of looping | `MAX_INTERRUPTIONS` (crash loop) and `MAX_PROVIDER_FAILURE_STREAK` (network/outage/rate-limit) -> `BLOCKED` + `task.escalated` event; retries/continuations are capped; `task:unblock` resets counters. |
+
+Tested scenarios (Linux; mock provider; real supervisor processes where noted): restart recovery with SIGKILL (real), incomplete tool execution (crash after a partial file write),
+stale leases and sweep, a live in-process worker that missed heartbeats, corrupted checkpoint (tampered row), dangling checkpoint commit, duplicated completion event, stale-worker late completion,
+poison task (crash loop), repeated network failures, schema migration from a Phase 1 database, 4-process database contention.
+**Not tested:** real provider limits/abort behaviour, multi-hour waits, power loss, clock jumps, Windows.

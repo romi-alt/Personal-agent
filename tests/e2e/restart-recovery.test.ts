@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { type ChildProcess, spawn, spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { removeDir } from '../helpers/fs.js';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { openDatabase } from '../../src/database/connection.js';
@@ -33,7 +34,12 @@ const startSupervisor = (): ChildProcess => {
 };
 const exited = (p: ChildProcess) =>
   new Promise<number | null>((r) => (p.exitCode !== null ? r(p.exitCode) : p.once('exit', (c) => r(c))));
-const openStore = () => new Store(openDatabase(path.join(home, 'agent.db')));
+const opened: Store[] = [];
+const openStore = () => {
+  const s = new Store(openDatabase(path.join(home, 'agent.db')));
+  opened.push(s);
+  return s;
+};
 const taskId = (out: string) => out.match(/tsk_[a-z0-9]+/)![0];
 
 beforeEach(() => {
@@ -57,7 +63,8 @@ beforeEach(() => {
 afterEach(() => {
   for (const p of procs) if (p.exitCode === null) p.kill('SIGKILL');
   procs.length = 0;
-  rmSync(home, { recursive: true, force: true });
+  for (const s of opened.splice(0)) s.db.close(); // Windows cannot delete a database file that is still open
+  removeDir(home);
 });
 
 describe('E2E: three tasks, capacity exhaustion, supervisor killed and restarted', () => {

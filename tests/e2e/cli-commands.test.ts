@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, mkdirSync, rmSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync } from 'node:fs';
+import { removeDir } from '../helpers/fs.js';
 import { tmpdir, hostname } from 'node:os';
 import path from 'node:path';
 import { openDatabase } from '../../src/database/connection.js';
@@ -21,7 +22,12 @@ const ok = (...args: string[]) => {
   expect(r.status, `${args.join(' ')} => ${r.stderr}`).toBe(0);
   return r.stdout;
 };
-const store = () => new Store(openDatabase(path.join(home, 'agent.db')));
+const opened: Store[] = [];
+const store = () => {
+  const s = new Store(openDatabase(path.join(home, 'agent.db')));
+  opened.push(s);
+  return s;
+};
 
 beforeAll(() => {
   home = mkdtempSync(path.join(tmpdir(), 'elevariq-cli-'));
@@ -34,7 +40,10 @@ beforeAll(() => {
     NODE_NO_WARNINGS: '1',
   };
 });
-afterAll(() => rmSync(home, { recursive: true, force: true }));
+afterAll(() => {
+  for (const s of opened.splice(0)) s.db.close(); // Windows cannot delete a database file that is still open
+  removeDir(home);
+});
 
 describe('CLI commands', () => {
   let taskId = '';
@@ -80,6 +89,10 @@ describe('CLI commands', () => {
     expect(ok('task:add', '--project', 'cli-demo', '--file', 'examples/task-example.md')).toContain(
       'Add attendance tracking',
     );
+    // Regression (found on a real Windows runner): CRLF line endings must not break the markdown title parse.
+    const crlf = path.join(home, 'crlf-task.md');
+    writeFileSync(crlf, '# CRLF titled task\r\n\r\nDo the thing carefully.\r\n');
+    expect(ok('task:add', '--project', 'cli-demo', '--file', crlf)).toContain('CRLF titled task');
     expect(ok('tasks', '--project', 'cli-demo')).toMatch(/First\s+QUEUED\s+3/);
     expect(ok('tasks', '--status', 'queued')).toContain('First');
     expect(run('tasks', '--status', 'nonsense').status).toBe(1);
@@ -190,5 +203,53 @@ describe('CLI commands', () => {
     });
     expect(bad.status).toBe(2);
     expect(bad.stderr).toMatch(/MAX_CONCURRENT_WORKERS/);
+  });
+});
+
+describe('CLI: Phase 1.5 commands (assignments, project lifecycle, verification, provider readiness)', () => {
+  it('assignment:add validates, registers and creates no tasks; invalid input exits 2 with every problem listed', () => {
+    const bad = run('assignment:add', '--file', 'package.json');
+    expect(bad.status).toBe(2);
+    expect(bad.stderr).toMatch(/Invalid project assignment/);
+    const out = ok('assignment:add', '--file', 'examples/assignment.example.json');
+    expect(out).toMatch(/registered project .*school-management-erp.*lifecycle=REGISTERED/);
+    expect(out).toContain('No tasks were created');
+    const shown = JSON.parse(ok('assignment:show', 'school-management-erp'));
+    expect(shown.functionalRequirements).toHaveLength(4);
+    expect(shown.approvalPolicy.deliveryRequiresOwnerApproval).toBe(true);
+  });
+  it('project:status shows lifecycle and a strict delivery-readiness table', () => {
+    ok('task:add', '--project', 'school-management-erp', '--title', 'Only task', '--instructions', 'do');
+    const status = ok('project:status', 'school-management-erp');
+    expect(status).toMatch(/lifecycle=IN_DEVELOPMENT/);
+    expect(status).toMatch(/delivery ready: NO/);
+    expect(status).toMatch(/OWNER_APPROVAL\s+MISSING/);
+    const json = JSON.parse(ok('project:status', 'school-management-erp', '--json'));
+    expect(json.readiness.ready).toBe(false);
+    expect(json.context.assignment.title).toBe('School Management ERP');
+  });
+  it('project:accept and project:deliver are refused before verification', () => {
+    const accept = run('project:accept', 'school-management-erp');
+    expect(accept.status).toBe(1);
+    expect(accept.stderr).toMatch(/AWAITING_OWNER_APPROVAL/);
+    expect(run('project:deliver', 'school-management-erp', '--reason', 'x').status).toBe(1);
+    expect(run('project:deliver', 'school-management-erp').stderr).toMatch(/--reason is required/);
+  });
+  it('project:verify records per-level evidence (unknowns stay unknown)', () => {
+    const out = ok('project:verify', 'school-management-erp');
+    expect(out).toMatch(/REQUIREMENTS_SATISFIED\s+NOT_EVALUATED/);
+    expect(out).toMatch(/SECURITY_CHECKS_PASS\s+NOT_EVALUATED/);
+    expect(out).toMatch(/delivery ready: NO/);
+  });
+  it('provider:status reports each readiness level without claiming operational; provider:verify demands an explicit flag', () => {
+    const rep = JSON.parse(ok('provider:status', '--json'));
+    expect(rep.levels.SDK_INSTALLED.state).toBe('YES');
+    expect(rep.levels.CREDENTIALS_CONFIGURED.state).toBe('NO');
+    expect(rep.levels.LIVE_EXECUTION_VERIFIED.state).toBe('NOT_VERIFIED');
+    expect(rep.operational).toBe(false);
+    expect(run('provider:verify').status).toBe(1);
+    const noKey = run('provider:verify', '--access');
+    expect(noKey.status).toBe(1);
+    expect(noKey.stdout).toMatch(/ANTHROPIC_API_KEY not configured/);
   });
 });

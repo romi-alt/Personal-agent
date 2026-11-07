@@ -33,6 +33,14 @@ Rules you must follow:
 - Run the relevant tests before finishing. End with a short report: what is done, what remains, test results.
 `.trim();
 
+/** System instructions for read-only planning workers (Phase 2 workflows). */
+export const PLANNING_APPEND = `
+You are a read-only planning worker in the ELEVARIQ Personal Agent pipeline.
+- You may only read files in the current working directory. Do NOT create, edit or delete anything and do not run commands.
+- Your ENTIRE final reply must be one JSON object that matches the schema in the task, with no prose before or after it.
+- Use only the identifiers given in the task (requirement ids etc.). Do not invent requirements; record uncertainty as questions or risks.
+`.trim();
+
 export interface PromptInput {
   task: Task;
   project: Project;
@@ -42,6 +50,10 @@ export interface PromptInput {
   mode: 'fresh' | 'resume' | 'recovery';
   /** Why the stored session could not be used (recovery mode). */
   sessionLossReason?: string | null;
+  /** Rendered structured project context (assignment contract + progress). */
+  projectContext?: string;
+  /** Integrity problems found while restoring state (corrupt checkpoint, missing commit...). */
+  integrityNotes?: string[];
 }
 
 function fmtGit(git: GitState): string {
@@ -66,7 +78,9 @@ function taskBlock(task: Task): string {
 export function buildPrompt(input: PromptInput): string {
   const { task, project, checkpoint, git, memory, mode } = input;
   if (mode === 'fresh') {
-    return [`Project: ${project.name}`, project.description, taskBlock(task)].filter(Boolean).join('\n\n');
+    return [input.projectContext ?? `Project: ${project.name}\n${project.description}`, taskBlock(task)]
+      .filter(Boolean)
+      .join('\n\n');
   }
   const cp = checkpoint
     ? [
@@ -89,11 +103,15 @@ export function buildPrompt(input: PromptInput): string {
       : `A previous session for this task could not be restored${input.sessionLossReason ? ` (${input.sessionLossReason})` : ''}. This is a NEW session reconstructed from persisted records.`;
   return [
     head,
-    `Project: ${project.name}`,
+    input.projectContext ?? `Project: ${project.name}`,
     taskBlock(task),
     cp,
     `## Current working-tree state\n${fmtGit(git)}`,
+    input.integrityNotes?.length
+      ? `## Recovery warnings\n${input.integrityNotes.map((n) => `- ${n}`).join('\n')}`
+      : '',
     mem,
+    'Files may be partially written if the previous run was interrupted mid-tool-call: verify them before building on them.',
     'First inspect the existing files, `git status` and `git log` to confirm what already exists, then continue only the unfinished work. Avoid duplicating completed steps.',
   ]
     .filter(Boolean)

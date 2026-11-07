@@ -15,6 +15,7 @@ export interface ReconcileAction {
   title: string;
   previousStatus: string;
   action:
+    | 'escalated_repeated_interruption'
     | 'completed_from_evidence'
     | 'reapplied_outcome'
     | 'requeued_interrupted'
@@ -35,6 +36,8 @@ export interface ReconcileOptions {
   runner: TaskRunner;
   registry: WorkspaceRegistry;
   providerName: string;
+  /** Executions currently running inside THIS process; the lease sweep must never reclaim these. */
+  isLocallyActive?: (executionId: string) => boolean;
 }
 
 /** Last terminal `result` record in an execution transcript, if the process died after the provider returned. */
@@ -62,6 +65,11 @@ export async function reconcileOrphans(o: ReconcileOptions): Promise<ReconcileAc
     const live = task.leaseExpiresAt !== null && task.leaseExpiresAt > now;
     if (o.mode === 'sweep' && live) continue;
     const exec = store.latestExecution(task.id);
+    // A worker in this very process that merely missed heartbeats (e.g. a long event-loop stall) is not orphaned.
+    if (o.mode === 'sweep' && exec && o.isLocallyActive?.(exec.id)) {
+      log.warn('recovery.lease_expired_but_worker_alive', { taskId: task.id, executionId: exec.id });
+      continue;
+    }
     const project = store.getProject(task.projectId)!;
     const staleWorkerAlive =
       !!exec?.pid && exec.host === hostname() && exec.pid !== process.pid && pidAlive(exec.pid);
@@ -100,6 +108,7 @@ export async function reconcileOrphans(o: ReconcileOptions): Promise<ReconcileAc
             lastErrorClass: null,
             lastErrorMessage: null,
             nextEligibleAt: null,
+            resetInterruptions: true,
           },
         });
       })();
@@ -138,7 +147,7 @@ export async function reconcileOrphans(o: ReconcileOptions): Promise<ReconcileAc
           executionId: exec?.id ?? null,
           sessionRef: task.sessionId,
           completedSummary:
-            store.latestCheckpoint(task.id)?.completedSummary ??
+            store.latestValidCheckpoint(task.id).checkpoint?.completedSummary ??
             'No completed-work summary was recorded before interruption.',
           outstandingSummary:
             'Execution was interrupted by a crash or restart; inspect the working tree (git status/diff) and continue the unfinished work.',
@@ -168,6 +177,42 @@ export async function reconcileOrphans(o: ReconcileOptions): Promise<ReconcileAc
       actions.push(a);
       continue;
     }
+    // Poison-task guard: a task that keeps killing its worker is escalated, not retried forever.
+    if (task.interruptionCount + 1 > o.config.maxInterruptions) {
+      store.transition(task.id, 'READY', {
+        reason: 'recovery: interrupted',
+        executionId: exec?.id ?? null,
+        patch: { incrementInterruption: true, lastCheckpointId: cp?.id },
+      });
+      store.transition(task.id, 'BLOCKED', {
+        reason: `interrupted ${task.interruptionCount + 1} times in a row (limit ${o.config.maxInterruptions}); escalated to owner`,
+        patch: { lastErrorClass: 'INTERRUPTED', lastErrorMessage: 'repeated crash/restart during execution' },
+      });
+      store.recordEvent({
+        type: 'task.escalated',
+        projectId: project.id,
+        taskId: task.id,
+        executionId: exec?.id ?? null,
+        severity: 'error',
+        payload: { reason: 'repeated interruptions', count: task.interruptionCount + 1 },
+      });
+      const esc: ReconcileAction = {
+        taskId: task.id,
+        title: task.title,
+        previousStatus: task.status,
+        action: 'escalated_repeated_interruption',
+        detail: `${task.interruptionCount + 1} consecutive interruptions`,
+      };
+      store.recordEvent({
+        type: 'recovery.task_reconciled',
+        projectId: project.id,
+        taskId: task.id,
+        severity: 'error',
+        payload: { ...esc },
+      });
+      actions.push(esc);
+      continue;
+    }
     store.transition(task.id, 'READY', {
       reason:
         o.mode === 'startup'
@@ -179,6 +224,7 @@ export async function reconcileOrphans(o: ReconcileOptions): Promise<ReconcileAc
         lastErrorClass: 'INTERRUPTED',
         lastErrorMessage: 'interrupted by crash/restart',
         lastCheckpointId: cp?.id,
+        incrementInterruption: true,
       },
     });
     const a: ReconcileAction = {

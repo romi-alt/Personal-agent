@@ -46,3 +46,28 @@ start, so on a long-lived supervisor use the `.env` file (re-read) or restart th
 * OS secret stores (Windows Credential Manager, libsecret) are **not** integrated in Phase 1 - protected environment injection is used instead.
 * Logs, events and execution transcripts are redacted (key names and `sk-ant-…`/Bearer patterns), but redaction is best-effort: do not put secrets in task instructions.
 * The Agent SDK launches the Claude Code binary as a subprocess; that subprocess inherits the supervisor's environment (so keep unrelated secrets out of it), minus the competing credential variables the adapter removes.
+
+---
+
+# Phase 1.5 addendum - provider readiness report
+
+`npm run agent -- provider:status` reports **six separate levels**; nothing is inferred from another:
+
+| Level | Meaning | How it becomes `YES` |
+|---|---|---|
+| `SDK_INSTALLED` | `@anthropic-ai/claude-agent-sdk` resolves, reports a version and exports `query()` | automatic (and explicitly *not* a sign the provider works) |
+| `CREDENTIALS_CONFIGURED` | a Console API key is present and is not a subscription OAuth token | automatic; format only, shown as a fingerprint |
+| `API_ACCESS_VERIFIED` | the API accepted the key | `provider:verify --access` (a **non-billable** `GET /v1/models?limit=1`; never run automatically); evidence is bound to the key fingerprint |
+| `BUDGET_AUTHORIZED` | `ALLOW_PAID_API=true` and `MAX_BUDGET_USD_PER_EXECUTION > 0` | configuration |
+| `LIVE_EXECUTION_VERIFIED` | a real SDK execution wrote a file, captured a session id and finished | `npm run smoke:live` (spends <= $0.50) |
+| `LIVE_RECOVERY_VERIFIED` | a session was resumed from a **different process** and remembered its context | `npm run smoke:live-recovery` (spends a few cents). Verifies session persistence/resume only, *not* rate-limit recovery |
+
+`operational` = first five levels `YES`. `unattended-ready` additionally needs `LIVE_RECOVERY_VERIFIED`. Evidence goes **`STALE`** when the installed SDK version or the
+credential fingerprint changes. In this repository's current state the evidence table is empty, so the provider is reported **not operational**.
+
+## SDK facts used (checked against the installed 0.3.319 type definitions; official docs for permissions/sessions/cost)
+
+* Authentication: API key through `ANTHROPIC_API_KEY`. The SDK docs state that third-party developers may not offer claude.ai login or its rate limits in their products without prior approval and should use API-key authentication - which is how this runtime is built; subscription OAuth credentials are never extracted or reused, and the native Claude Code login is untouched.
+* `system/init` reports `apiKeySource`; the adapter aborts unless it is `ANTHROPIC_API_KEY`.
+* Sessions persist under `~/.claude/projects/<encoded-cwd>/*.jsonl` (`persistSession` defaults to true); `resume` needs that file on the same machine. `getSessionInfo` is used for a free local existence check.
+* `total_cost_usd`/`modelUsage` are client-side **estimates**, stored as estimates only.

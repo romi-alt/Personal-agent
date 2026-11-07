@@ -91,3 +91,22 @@ a `canUseTool` callback enforcing the workspace/approval policy, `maxTurns`, `ma
 2. `CHECKPOINTING` writes a checkpoint (session id + git HEAD/dirty + summaries).
 3. On restart `reconcileOrphans('startup')` repairs anything left `RUNNING`/`CHECKPOINTING`; during operation a sweep reclaims expired leases.
 4. The next claim resumes the stored session, or builds a recovery prompt from the last checkpoint, project memory and `git status`.
+
+---
+
+# Phase 1.5 addendum
+
+* **Fencing:** `tasks.lease_execution_id` is the authoritative owner of a lease. Heartbeats, transitions (`fenceExecutionId`) and `applyDecision` all check it; stale/duplicate completions are recorded no-ops. The periodic sweep never reclaims an execution alive in the current process.
+* **Write transactions** use `BEGIN IMMEDIATE` (multi-process safe, tested with 4 OS processes).
+* **Project lifecycle** (`src/projects`) is independent of task statuses; **assignments** (`src/assignments`) persist the owner's contract; **verification** (`src/verification`) records append-only evidence and derives delivery readiness. See `docs/PROJECT_ASSIGNMENTS.md` and `docs/COMPLETION_VERIFICATION.md`.
+* **Worker pipeline:** claim -> baseline fingerprint -> integrity-checked checkpoint + project context -> provider run -> (if success) evidence `CLAIMED_COMPLETE` + task verification -> finish transaction -> decision transaction. The heartbeat runs through verification.
+* **Escalation counters** (`interruption_count`, `provider_failure_streak`) bound retries; `MAX_INTERRUPTIONS`, `MAX_PROVIDER_FAILURE_STREAK`.
+* **Provider readiness** (`src/providers/readiness.ts`) with persisted, staleness-aware live-verification evidence.
+* Schema migration 2 upgrades Phase 1 databases in place (tested).
+
+---
+
+# Phase 2 addendum
+
+`src/planning/*` (schemas, JSON extraction, prompts, deterministic validators) and `src/workflows/*` (`WorkflowEngine`, `WorkflowRepository`) implement the planning pipeline on top of the existing queue:
+planning steps are read-only `PLANNING` tasks, the engine advances on every supervisor tick, and plan materialisation creates ordinary coding tasks. See `docs/PLANNING.md`.

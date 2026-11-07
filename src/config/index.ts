@@ -41,6 +41,13 @@ const schema = z
     DEFAULT_MAX_RETRIES: int(3, 0),
     MAX_CONTINUATIONS: int(25, 1),
     MAX_TURNS_PER_EXECUTION: int(40, 1),
+    MAX_INTERRUPTIONS: int(3, 1),
+    MAX_PROVIDER_FAILURE_STREAK: int(20, 1),
+    EVENT_RETENTION_DAYS: int(30, 1),
+    VERIFY_COMMAND_TIMEOUT_MS: int(600_000, 1000),
+    PLAN_APPROVAL: z.enum(['required', 'auto']).default('required'),
+    MAX_PLAN_TASKS: int(60, 1),
+    MAX_PLAN_REPAIRS: int(2, 0),
 
     BACKOFF_BASE_MS: int(30_000, 1),
     BACKOFF_MAX_MS: int(3_600_000, 1),
@@ -120,6 +127,16 @@ export interface AppConfig {
   defaultMaxRetries: number;
   maxContinuations: number;
   maxTurnsPerExecution: number;
+  /** Escalate (BLOCK) a task after this many consecutive crash/restart interruptions. */
+  maxInterruptions: number;
+  /** Escalate a task after this many consecutive network/outage/rate-limit failures. */
+  maxProviderFailureStreak: number;
+  eventRetentionDays: number;
+  verifyCommandTimeoutMs: number;
+  /** 'required': the owner must approve a generated plan before coding tasks are created. */
+  planApproval: 'required' | 'auto';
+  maxPlanTasks: number;
+  maxPlanRepairs: number;
   backoff: { baseMs: number; maxMs: number; jitter: number; quotaMinWaitMs: number; resetMarginMs: number };
   workerTimeoutMs: number;
   heartbeatIntervalMs: number;
@@ -197,6 +214,13 @@ export function loadConfig(opts: LoadConfigOptions = {}): AppConfig {
     defaultMaxRetries: c.DEFAULT_MAX_RETRIES,
     maxContinuations: c.MAX_CONTINUATIONS,
     maxTurnsPerExecution: c.MAX_TURNS_PER_EXECUTION,
+    maxInterruptions: c.MAX_INTERRUPTIONS,
+    maxProviderFailureStreak: c.MAX_PROVIDER_FAILURE_STREAK,
+    eventRetentionDays: c.EVENT_RETENTION_DAYS,
+    verifyCommandTimeoutMs: c.VERIFY_COMMAND_TIMEOUT_MS,
+    planApproval: c.PLAN_APPROVAL,
+    maxPlanTasks: c.MAX_PLAN_TASKS,
+    maxPlanRepairs: c.MAX_PLAN_REPAIRS,
     backoff: {
       baseMs: c.BACKOFF_BASE_MS,
       maxMs: c.BACKOFF_MAX_MS,
