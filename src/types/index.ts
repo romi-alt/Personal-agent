@@ -120,6 +120,18 @@ export interface ExecutionRecord {
   summary: string | null;
   startRef: string | null;
   startStatusHash: string | null;
+  /** Set while the live provider process is waiting for subscription capacity (official retry watchdog). */
+  capacityWait: CapacityWait | null;
+  /** OS pid of the provider child process (native CLI provider), if any. */
+  workerPid: number | null;
+  lastActivityAt: number | null;
+}
+
+export interface CapacityWait {
+  since: number;
+  reason: string;
+  resetsAt: number | null;
+  recheckAt: number | null;
 }
 
 export interface Checkpoint {

@@ -165,8 +165,22 @@ export class TaskRunner {
     ].filter((x): x is number => x !== undefined);
     const attemptIndex = store.listExecutions(task.id).length; // includes this execution => 1-based
 
-    const hardTimer = setTimeout(() => abort.abort(), config.workerTimeoutMs + 10_000);
+    // Hard ceiling on one execution. Suspended while the provider reports an official capacity wait (the worker is
+    // alive and waiting for a usage reset, which can take hours); re-armed with a fresh budget when the wait ends.
+    let hardTimer: NodeJS.Timeout | undefined = setTimeout(
+      () => abort.abort(),
+      config.workerTimeoutMs + 10_000,
+    );
+    const suspendHardTimer = () => {
+      if (hardTimer) clearTimeout(hardTimer);
+      hardTimer = undefined;
+    };
+    const rearmHardTimer = () => {
+      suspendHardTimer();
+      hardTimer = setTimeout(() => abort.abort(), config.workerTimeoutMs + 10_000);
+    };
     execLog.append({ kind: 'start', mode, attemptIndex, resumeSessionId: task.sessionId, integrityNotes });
+    let lastActivityWrite = 0;
     let outcome: RunOutcome;
     try {
       outcome = await provider.run({
@@ -191,8 +205,39 @@ export class TaskRunner {
           store.recordSession(execution.id, task.id, id);
           execLog.append({ kind: 'session', sessionId: id });
         },
+        onProcess: (pid) => store.setExecutionWorkerPid(execution.id, pid),
         onEvent: (ev) => {
           execLog.append({ kind: ev.type, ...ev.data });
+          const t = store.clock.now();
+          if (t - lastActivityWrite > 5_000) {
+            lastActivityWrite = t;
+            store.touchExecutionActivity(execution.id);
+          }
+          if (ev.type === 'capacity_wait') {
+            const waiting = ev.data['waiting'] === true;
+            if (waiting) suspendHardTimer();
+            else rearmHardTimer();
+            store.setExecutionCapacityWait(
+              execution.id,
+              waiting
+                ? {
+                    since: store.clock.now(),
+                    reason: String(ev.data['reason'] ?? 'usage limit'),
+                    resetsAt: typeof ev.data['resetsAtMs'] === 'number' ? ev.data['resetsAtMs'] : null,
+                    recheckAt: typeof ev.data['recheckAtMs'] === 'number' ? ev.data['recheckAtMs'] : null,
+                  }
+                : null,
+            );
+            store.recordEvent({
+              type: waiting ? 'provider.capacity_wait_started' : 'provider.capacity_wait_ended',
+              projectId,
+              taskId: task.id,
+              executionId: execution.id,
+              severity: waiting ? 'warn' : 'info',
+              payload: ev.data,
+            });
+            return;
+          }
           if (ev.type === 'permission_denied' || ev.type === 'rate_limit' || ev.type === 'retry') {
             store.recordEvent({
               type: `provider.${ev.type}`,
@@ -208,7 +253,8 @@ export class TaskRunner {
     } catch (err) {
       outcome = { kind: 'failed', failure: toFailure(err) };
     } finally {
-      clearTimeout(hardTimer);
+      suspendHardTimer();
+      store.setExecutionCapacityWait(execution.id, null);
     }
 
     if (isLeaseLost() && outcome.kind === 'failed' && outcome.failure.errorClass === 'INTERRUPTED') {

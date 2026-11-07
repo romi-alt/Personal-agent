@@ -14,7 +14,9 @@ describe('normalizeText (owner files saved on Windows)', () => {
     expect(JSON.parse(normalizeText('﻿{"title":"x"}'))).toEqual({ title: 'x' });
   });
   it('lets the task:add markdown title regex match a CRLF file', () => {
-    const m = normalizeText('# Add attendance tracking\r\n\r\nImplement it.\r\n').match(/^#\s+(.+)\n([\s\S]*)$/);
+    const m = normalizeText('# Add attendance tracking\r\n\r\nImplement it.\r\n').match(
+      /^#\s+(.+)\n([\s\S]*)$/,
+    );
     expect(m?.[1]).toBe('Add attendance tracking');
   });
 });
@@ -23,7 +25,9 @@ describe('shortStatusLine (git status --porcelain=v2)', () => {
   it('renders ordinary, renamed, unmerged and untracked entries', () => {
     expect(shortStatusLine('1 .M N... 100644 100644 100644 abc abc src/a file.ts')).toBe(' M src/a file.ts');
     expect(shortStatusLine('1 A. N... 000000 100644 100644 000 abc new.ts')).toBe('A  new.ts');
-    expect(shortStatusLine('2 R. N... 100644 100644 100644 abc abc R100 to.ts\tfrom.ts')).toBe('R  from.ts -> to.ts');
+    expect(shortStatusLine('2 R. N... 100644 100644 100644 abc abc R100 to.ts\tfrom.ts')).toBe(
+      'R  from.ts -> to.ts',
+    );
     expect(shortStatusLine('u UU N... 100644 100644 100644 100644 a b c conflict.ts')).toBe('UU conflict.ts');
     expect(shortStatusLine('? untracked dir/x.txt')).toBe('?? untracked dir/x.txt');
     expect(shortStatusLine('# branch.oid abc')).toBeNull();

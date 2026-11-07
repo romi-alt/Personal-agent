@@ -10,7 +10,8 @@ export function removeTempDir(dir: string): void {
     rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
   } catch (err) {
     const code = (err as NodeJS.ErrnoException).code;
-    if (process.platform === 'win32' && (code === 'EPERM' || code === 'EBUSY' || code === 'ENOTEMPTY')) return;
+    if (process.platform === 'win32' && (code === 'EPERM' || code === 'EBUSY' || code === 'ENOTEMPTY'))
+      return;
     throw err;
   }
 }

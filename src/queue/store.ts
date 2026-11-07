@@ -14,6 +14,7 @@ import { redactValue } from '../security/redact.js';
 import {
   type ActivityEvent,
   type Approval,
+  type CapacityWait,
   type Checkpoint,
   type Clock,
   type ErrorClass,
@@ -119,6 +120,17 @@ function mapExecution(r: Row): ExecutionRecord {
     summary: (r['summary'] as string | null) ?? null,
     startRef: (r['start_ref'] as string | null) ?? null,
     startStatusHash: (r['start_status_hash'] as string | null) ?? null,
+    capacityWait:
+      r['capacity_wait_since'] != null
+        ? {
+            since: r['capacity_wait_since'] as number,
+            reason: (r['capacity_wait_reason'] as string | null) ?? 'usage limit',
+            resetsAt: (r['capacity_wait_resets_at'] as number | null) ?? null,
+            recheckAt: (r['capacity_wait_recheck_at'] as number | null) ?? null,
+          }
+        : null,
+    workerPid: (r['worker_pid'] as number | null) ?? null,
+    lastActivityAt: (r['last_activity_at'] as number | null) ?? null,
   };
 }
 
@@ -770,6 +782,35 @@ export class Store {
       .prepare('SELECT * FROM executions WHERE task_id = ? ORDER BY started_at DESC, rowid DESC LIMIT 1')
       .get(taskId) as Row | undefined;
     return r ? mapExecution(r) : null;
+  }
+
+  /** Record (or clear, with null) an official capacity wait inside the live provider process. */
+  setExecutionCapacityWait(executionId: string, wait: CapacityWait | null): void {
+    this.db
+      .prepare(
+        `UPDATE executions SET capacity_wait_since = ?, capacity_wait_reason = ?, capacity_wait_resets_at = ?,
+           capacity_wait_recheck_at = ?, last_activity_at = ? WHERE id = ?`,
+      )
+      .run(
+        wait?.since ?? null,
+        wait?.reason ?? null,
+        wait?.resetsAt ?? null,
+        wait?.recheckAt ?? null,
+        this.clock.now(),
+        executionId,
+      );
+  }
+
+  /** Record the OS pid of the provider child process (null once it has exited). */
+  setExecutionWorkerPid(executionId: string, pid: number | null): void {
+    this.db.prepare('UPDATE executions SET worker_pid = ? WHERE id = ?').run(pid, executionId);
+  }
+
+  /** Cheap liveness marker for provider output; used for stall detection and the command center. */
+  touchExecutionActivity(executionId: string): void {
+    this.db
+      .prepare('UPDATE executions SET last_activity_at = ? WHERE id = ?')
+      .run(this.clock.now(), executionId);
   }
 
   /** Persist the provider session id immediately so a crash still leaves a resumable reference. */

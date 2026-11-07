@@ -313,6 +313,21 @@ CREATE TABLE plan_tasks (
 );
 `,
   },
+  {
+    version: 4,
+    name: 'phase_1_5_cli_worker_supervision',
+    sql: `
+-- Official retry-watchdog capacity wait observed inside a live provider process (NULL = not waiting)
+ALTER TABLE executions ADD COLUMN capacity_wait_since INTEGER;
+ALTER TABLE executions ADD COLUMN capacity_wait_reason TEXT;
+ALTER TABLE executions ADD COLUMN capacity_wait_resets_at INTEGER;
+ALTER TABLE executions ADD COLUMN capacity_wait_recheck_at INTEGER;
+-- OS process id of the provider child (native CLI worker) so recovery can stop an orphan before replacing it
+ALTER TABLE executions ADD COLUMN worker_pid INTEGER;
+-- Last time the provider produced any output (model text, tool event, retry/wait notice)
+ALTER TABLE executions ADD COLUMN last_activity_at INTEGER;
+`,
+  },
 ];
 
 export function runMigrations(db: Database.Database, migrations: Migration[] = MIGRATIONS): number[] {

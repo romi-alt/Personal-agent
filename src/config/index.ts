@@ -33,10 +33,37 @@ const schema = z
     LOG_MAX_FILE_MB: int(20, 1),
     LOG_TO_CONSOLE: bool(true),
 
-    EXECUTION_PROVIDER: z.enum(['mock', 'claude']).default('mock'),
+    EXECUTION_PROVIDER: z.enum(['mock', 'claude', 'claude-cli']).default('mock'),
     MOCK_SCENARIO_FILE: optStr,
     CLAUDE_MODEL: optStr,
     CLAUDE_CLI_PATH: optStr,
+
+    // --- native Claude Code CLI provider (subscription login) ---
+    /** Oldest Claude Code version on which the retry-watchdog variables below were verified to exist. */
+    CLAUDE_CLI_MIN_VERSION: z
+      .string()
+      .regex(/^\d+\.\d+\.\d+$/)
+      .default('2.1.319'),
+    /** Injected into every CLI worker (never into the supervisor's own environment). */
+    CLAUDE_CODE_RETRY_WATCHDOG: bool(true),
+    // Documented range 60000..10800000; outside it Claude Code silently disables the recheck.
+    CLAUDE_CODE_RETRY_WATCHDOG_USAGE_LIMIT_RECHECK_MS: z.coerce
+      .number()
+      .int()
+      .min(60_000)
+      .max(10_800_000)
+      .default(300_000),
+    CLAUDE_CODE_RESUME_INTERRUPTED_TURN: bool(true),
+    CLAUDE_CODE_RESUME_PROMPT: z
+      .string()
+      .min(1)
+      .default(
+        'Resume from the latest durable checkpoint. Inspect existing work, determine the next incomplete task, and continue implementation without repeating completed work.',
+      ),
+    /** Optional ceiling on how long the supervisor lets a CLI worker sit in a usage-limit wait (0 = no ceiling). */
+    CLAUDE_CLI_MAX_CAPACITY_WAIT_MS: int(0, 0),
+    /** Without model output or a known capacity wait for this long, a CLI worker is treated as stalled. */
+    CLAUDE_CLI_STALL_TIMEOUT_MS: int(900_000, 10_000),
 
     MAX_CONCURRENT_WORKERS: int(1, 1),
     DEFAULT_MAX_RETRIES: int(3, 0),
@@ -120,10 +147,17 @@ export interface AppConfig {
   logRetentionDays: number;
   logMaxFileBytes: number;
   logToConsole: boolean;
-  provider: 'mock' | 'claude';
+  provider: 'mock' | 'claude' | 'claude-cli';
   mockScenarioFile?: string;
   claudeModel?: string;
   claudeCliPath?: string;
+  claudeCli: {
+    minVersion: string;
+    /** Exact variables injected into each worker process. */
+    watchdogEnv: Record<string, string>;
+    maxCapacityWaitMs: number;
+    stallTimeoutMs: number;
+  };
   maxConcurrentWorkers: number;
   defaultMaxRetries: number;
   maxContinuations: number;
@@ -211,6 +245,19 @@ export function loadConfig(opts: LoadConfigOptions = {}): AppConfig {
     mockScenarioFile: c.MOCK_SCENARIO_FILE ? path.resolve(c.MOCK_SCENARIO_FILE) : undefined,
     claudeModel: c.CLAUDE_MODEL,
     claudeCliPath: c.CLAUDE_CLI_PATH,
+    claudeCli: {
+      minVersion: c.CLAUDE_CLI_MIN_VERSION,
+      watchdogEnv: {
+        CLAUDE_CODE_RETRY_WATCHDOG: c.CLAUDE_CODE_RETRY_WATCHDOG ? '1' : '0',
+        CLAUDE_CODE_RETRY_WATCHDOG_USAGE_LIMIT_RECHECK_MS: String(
+          c.CLAUDE_CODE_RETRY_WATCHDOG_USAGE_LIMIT_RECHECK_MS,
+        ),
+        CLAUDE_CODE_RESUME_INTERRUPTED_TURN: c.CLAUDE_CODE_RESUME_INTERRUPTED_TURN ? '1' : '0',
+        CLAUDE_CODE_RESUME_PROMPT: c.CLAUDE_CODE_RESUME_PROMPT,
+      },
+      maxCapacityWaitMs: c.CLAUDE_CLI_MAX_CAPACITY_WAIT_MS,
+      stallTimeoutMs: c.CLAUDE_CLI_STALL_TIMEOUT_MS,
+    },
     maxConcurrentWorkers: c.MAX_CONCURRENT_WORKERS,
     defaultMaxRetries: c.DEFAULT_MAX_RETRIES,
     maxContinuations: c.MAX_CONTINUATIONS,

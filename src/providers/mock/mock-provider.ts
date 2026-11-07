@@ -27,7 +27,13 @@ export type MockStepType =
   | 'invalid_session'
   | 'network'
   | 'outage'
-  | 'hang';
+  | 'hang'
+  /**
+   * Simulates the official Claude Code retry watchdog: the provider process stays alive and silent while the usage
+   * limit is in force (at least `delayMs`, and while the capacity file says unavailable), then continues the same
+   * request and succeeds. No new request is made during the wait.
+   */
+  | 'watchdog_wait';
 
 export interface MockStep {
   type: MockStepType;
@@ -42,6 +48,8 @@ export interface MockStep {
   noArtifact?: boolean;
   /** Estimated cost reported in usage (for budget tests). */
   costUsd?: number;
+  /** For 'watchdog_wait': capacity "returns" once this file exists. */
+  untilFile?: string;
 }
 
 export interface MockScenario {
@@ -81,6 +89,9 @@ export class MockProvider implements ExecutionProvider {
     prompt: string;
     readOnly: boolean;
   }[] = [];
+
+  /** Number of model requests that entered a watchdog wait (each wait is ONE request, however long it lasts). */
+  watchdogRequests = 0;
 
   constructor(private readonly opts: MockProviderOptions = {}) {}
 
@@ -171,6 +182,37 @@ export class MockProvider implements ExecutionProvider {
     }
 
     req.onEvent({ type: 'tool_use', data: { tool: 'mock_work', step: step.type } });
+    if (step.type === 'watchdog_wait') {
+      const started = Date.now();
+      req.onEvent({
+        type: 'capacity_wait',
+        data: {
+          waiting: true,
+          reason: 'mock five_hour limit reached',
+          resetsAtMs: step.resetsInMs !== undefined ? this.now() + step.resetsInMs : undefined,
+        },
+      });
+      this.watchdogRequests++;
+      const released = () => !step.untilFile || existsSync(step.untilFile);
+      while (!req.signal.aborted && (Date.now() - started < (step.delayMs ?? 0) || !released())) {
+        await sleep(25, req.signal);
+      }
+      if (req.signal.aborted)
+        return {
+          kind: 'failed',
+          failure: { errorClass: 'INTERRUPTED', message: 'aborted during capacity wait' },
+          sessionId,
+        };
+      req.onEvent({ type: 'capacity_wait', data: { waiting: false, waitedMs: Date.now() - started } });
+      if (!step.noArtifact && !req.readOnly)
+        writeFileSync(path.join(req.cwd, `${req.taskId}.done`), 'done\n');
+      return {
+        kind: 'completed',
+        summary: step.summary ?? 'completed after capacity returned',
+        sessionId,
+        usage: { turns: 1 },
+      };
+    }
     await sleep(step.delayMs ?? 0, req.signal);
     if (req.signal.aborted)
       return { kind: 'failed', failure: { errorClass: 'INTERRUPTED', message: 'aborted' }, sessionId };

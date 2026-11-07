@@ -6,6 +6,7 @@ import type { Logger } from '../logging/logger.js';
 import type { RunOutcome } from '../providers/types.js';
 import { pidAlive, type Store } from '../queue/store.js';
 import type { TaskRunner } from '../workers/runner.js';
+import { stopOrphanWorker } from '../workers/process-tree.js';
 import type { ExecutionRecord, Task } from '../types/index.js';
 import { decide } from './decide.js';
 import type { WorkspaceRegistry } from '../workspaces/registry.js';
@@ -79,6 +80,24 @@ export async function reconcileOrphans(o: ReconcileOptions): Promise<ReconcileAc
         pid: exec!.pid,
         note: 'previous worker pid still exists; lease reclaimed after expiry/startup lock',
       });
+    }
+
+    // A provider child process (native CLI worker) outlives a killed supervisor on Windows. Stop it before anything is
+    // re-dispatched: a replacement execution must never run alongside the old session in the same workspace.
+    if (exec?.workerPid && exec.host === hostname()) {
+      const r = await stopOrphanWorker(exec.workerPid);
+      store.setExecutionWorkerPid(exec.id, null);
+      if (r === 'terminated') {
+        log.warn('recovery.orphan_worker_terminated', { taskId: task.id, pid: exec.workerPid });
+        store.recordEvent({
+          type: 'recovery.orphan_worker_terminated',
+          projectId: project.id,
+          taskId: task.id,
+          executionId: exec.id,
+          severity: 'warn',
+          payload: { pid: exec.workerPid },
+        });
+      }
     }
 
     // Case 1: the provider outcome was already persisted (crash between the two durable steps).

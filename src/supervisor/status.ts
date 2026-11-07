@@ -1,6 +1,51 @@
 import type { ExecutionProvider } from '../providers/types.js';
 import type { Store } from '../queue/store.js';
-import type { Task } from '../types/index.js';
+import type { CapacityWait, Task } from '../types/index.js';
+
+export type WorkerState =
+  | 'RUNNING'
+  | 'WAITING_FOR_USAGE_RESET'
+  | 'WAITING_FOR_AUTHENTICATION'
+  | 'WAITING_FOR_APPROVAL'
+  | 'BLOCKED'
+  | 'COMPLETED'
+  | 'IDLE'
+  | 'SUPERVISOR_DOWN';
+
+/**
+ * Precedence: what the live worker is doing beats queue state. A worker kept alive by the official retry watchdog
+ * is WAITING_FOR_USAGE_RESET (not RUNNING, not stalled); a task parked by the queue for capacity is too.
+ */
+export function deriveWorkerState(input: {
+  supervisorLive: boolean;
+  running: boolean;
+  capacityWait: CapacityWait | null;
+  byStatus: Record<string, number>;
+  total: number;
+}): { state: WorkerState; reason: string | null } {
+  const n = (s: string) => input.byStatus[s] ?? 0;
+  if (input.running && input.capacityWait)
+    return { state: 'WAITING_FOR_USAGE_RESET', reason: input.capacityWait.reason };
+  if (input.running) return { state: 'RUNNING', reason: null };
+  if (!input.supervisorLive && input.total > n('COMPLETED') + n('CANCELLED') + n('FAILED'))
+    return { state: 'SUPERVISOR_DOWN', reason: 'no live supervisor heartbeat' };
+  if (n('WAITING_FOR_CAPACITY'))
+    return {
+      state: 'WAITING_FOR_USAGE_RESET',
+      reason: `${n('WAITING_FOR_CAPACITY')} task(s) waiting for capacity`,
+    };
+  if (n('WAITING_FOR_AUTHENTICATION'))
+    return { state: 'WAITING_FOR_AUTHENTICATION', reason: 'provider login required' };
+  if (n('WAITING_FOR_APPROVAL'))
+    return {
+      state: 'WAITING_FOR_APPROVAL',
+      reason: `${n('WAITING_FOR_APPROVAL')} task(s) need owner approval`,
+    };
+  if (n('BLOCKED')) return { state: 'BLOCKED', reason: `${n('BLOCKED')} task(s) blocked` };
+  const open = ['QUEUED', 'READY', 'RETRY_SCHEDULED', 'PAUSED'].some((s) => n(s) > 0);
+  if (!open && input.total > 0 && n('COMPLETED') > 0) return { state: 'COMPLETED', reason: null };
+  return { state: 'IDLE', reason: null };
+}
 
 export interface StatusReport {
   supervisor: {
@@ -17,6 +62,19 @@ export interface StatusReport {
   currentWorker: string | null;
   currentProject: string | null;
   currentTask: { id: string; title: string } | null;
+  /** Single headline state for the owner (command center / `status`). */
+  workerState: WorkerState;
+  workerStateReason: string | null;
+  currentExecution: {
+    id: string;
+    provider: string;
+    sessionId: string | null;
+    startedAt: number;
+    heartbeatAt: number;
+    lastActivityAt: number | null;
+    workerPid: number | null;
+    capacityWait: CapacityWait | null;
+  } | null;
   queue: { length: number; waiting: number; byStatus: Record<string, number> };
   waitingTasks: {
     id: string;
@@ -61,7 +119,29 @@ export async function buildStatus(
   const pre = await provider.preflight();
   const ps = store.getProviderState(provider.name);
   const retries = waiting.map((t) => t.nextEligibleAt).filter((x): x is number => x !== null);
+  const exec = running ? store.latestExecution(running.id) : null;
+  const ws = deriveWorkerState({
+    supervisorLive: live,
+    running: !!running,
+    capacityWait: exec?.capacityWait ?? null,
+    byStatus,
+    total: tasks.length,
+  });
   return {
+    workerState: ws.state,
+    workerStateReason: ws.reason,
+    currentExecution: exec
+      ? {
+          id: exec.id,
+          provider: exec.provider,
+          sessionId: exec.providerSessionId,
+          startedAt: exec.startedAt,
+          heartbeatAt: exec.heartbeatAt,
+          lastActivityAt: exec.lastActivityAt,
+          workerPid: exec.workerPid,
+          capacityWait: exec.capacityWait,
+        }
+      : null,
     supervisor: {
       live,
       status: sup

@@ -3,6 +3,7 @@ import { openDatabase, type Db } from '../database/connection.js';
 import { createLogger, type Logger } from '../logging/logger.js';
 import { MockProvider } from '../providers/mock/mock-provider.js';
 import { ClaudeProvider } from '../providers/claude/claude-provider.js';
+import { ClaudeCliProvider } from '../providers/claude-cli/cli-provider.js';
 import { EnvCredentialSource } from '../providers/claude/credentials.js';
 import type { ExecutionProvider } from '../providers/types.js';
 import { Store } from '../queue/store.js';
@@ -21,9 +22,11 @@ export interface App {
 }
 
 export function createProvider(config: AppConfig): ExecutionProvider {
+  // The provider is an explicit owner choice; there is never an automatic fallback between them.
   if (config.provider === 'claude') {
     return new ClaudeProvider({ config, credentials: new EnvCredentialSource(config.envFile) });
   }
+  if (config.provider === 'claude-cli') return new ClaudeCliProvider({ config });
   return new MockProvider({
     scenarioFile: config.mockScenarioFile,
     capacityFile: config.mockScenarioFile

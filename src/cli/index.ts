@@ -25,6 +25,7 @@ import { providerReadiness, verifyApiAccess } from '../providers/readiness.js';
 import { validatePlan } from '../planning/validate-plan.js';
 import type { Plan } from '../planning/schemas.js';
 import { EnvCredentialSource } from '../providers/claude/credentials.js';
+import { strippedVariableNames } from '../providers/claude-cli/env.js';
 import { Supervisor } from '../supervisor/supervisor.js';
 import { startHealthServer } from '../supervisor/health.js';
 import { buildStatus } from '../supervisor/status.js';
@@ -993,6 +994,32 @@ async function main(): Promise<void> {
         break;
       }
       case 'provider:status': {
+        if (config.provider === 'claude-cli') {
+          // Native CLI: local checks only (version, stored login state); no model request is made.
+          const pre = await app.provider.preflight();
+          const rep = {
+            provider: 'claude-cli',
+            ready: pre.ready,
+            detail: pre.detail,
+            missing: pre.missing,
+            minVersion: config.claudeCli.minVersion,
+            injectedEnv: config.claudeCli.watchdogEnv,
+            strippedFromWorkerEnv: strippedVariableNames(process.env),
+          };
+          if (values.json) out(JSON.stringify(rep, null, 2));
+          else {
+            out(
+              `Provider: claude-cli (native Claude Code, subscription login)   ready: ${pre.ready ? 'YES' : 'NO'}`,
+            );
+            out(`  ${pre.detail}`);
+            for (const m of pre.missing) out(`  missing: ${m}`);
+            out('  injected into every worker:');
+            for (const [k, v] of Object.entries(config.claudeCli.watchdogEnv)) out(`    ${k}=${v}`);
+            out(`  removed from worker env (names only): ${rep.strippedFromWorkerEnv.join(', ') || 'none'}`);
+          }
+          if (!pre.ready) process.exitCode = 1;
+          break;
+        }
         const rep = await providerReadiness(config, store, new EnvCredentialSource(config.envFile));
         if (values.json) {
           out(JSON.stringify(rep, null, 2));

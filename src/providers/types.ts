@@ -79,7 +79,13 @@ export interface ExecutionEvent {
     | 'rate_limit'
     | 'retry'
     | 'status'
-    | 'result';
+    | 'result'
+    /**
+     * The provider process is alive and deliberately waiting for subscription capacity (official retry watchdog).
+     * `data.waiting` true/false marks the start/end; `data.resetsAtMs` / `data.recheckAtMs` when known.
+     * The runner suspends its execution timeout while waiting: a capacity wait is not a stall.
+     */
+    | 'capacity_wait';
   data: Record<string, unknown>;
 }
 
@@ -108,6 +114,8 @@ export interface RunRequest {
   onEvent(event: ExecutionEvent): void;
   /** Called as soon as a provider session id is known so it can be persisted immediately. */
   onSession(sessionId: string): void;
+  /** Child-process providers report the worker pid when spawned and null when it has exited. */
+  onProcess?(pid: number | null): void;
 }
 
 export interface ExecutionProvider {
