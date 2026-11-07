@@ -87,3 +87,48 @@ Regex command screening is not a sandbox; verification executes model-written co
 * Model-produced plans are untrusted input: validated by schema and deterministic rules, bounded in size (`MAX_PLAN_TASKS`), never executed as code, and by default need the owner's explicit approval before any coding task is created (`PLAN_APPROVAL=required`).
 * A plan cannot raise privileges: planned tasks inherit the assignment's approval policy and budgets; verification levels come from a fixed enum.
 * Unverified: behaviour of the read-only toolset against the live SDK (DOC-VERIFIED only).
+
+---
+
+# Final stabilization addendum (2026-11-07)
+
+## Fixed in this pass (confirmed defects)
+
+1. **Self-approval through the shell (High).** A worker's Bash/PowerShell command could call the agent's own CLI
+   (`npm run agent -- approve apr_...`), read `dashboard.token`, edit `agent.db`, rewrite its per-execution
+   `*.policy.json`, or remove `STOP-HOLD`; only the system prompt discouraged it. Now `AGENT_CONTROL_PATTERN` denies
+   such commands outright - **not approvable**, no granted category unlocks them - and the CLI provider passes
+   AGENT_HOME and the agent repository as protected paths: a command naming either (backslash, slash or Git Bash
+   `/c/...` spelling) outside the project workspace is denied. The policy file is written read-only and its path is not
+   exposed to the worker. Tests: `tests/unit/agent-control-policy.test.ts`, `tests/unit/cli-provider.test.ts`; checked
+   with the compiled hook against the real pending payload.
+2. **Over-broad destructive approval (Medium, design).** Approving a `destructive_delete` request grants the
+   category for the rest of that task, not the one command. Routine scratch cleanup no longer needs it: scoped tool
+   `src/workspaces/scratch-cleanup.ts` (see OPERATIONS). Tests: `tests/unit/scratch-cleanup.test.ts` (valid dir,
+   parent, workspace root, outside dir, link escapes incl. junctions, missing dir, repeated cleanup, AGENT_HOME
+   validation, dry run, size limit, worker entry).
+
+## Audit results (2026-11-07)
+
+| Area | Result |
+| --- | --- |
+| Workspace isolation | canonical paths, approved roots, file tools confined; unchanged, tests pass |
+| Command policy / approvals | categories + per-task grants; agent-control hard deny added (above) |
+| Self-approval prevention | store refuses re-deciding (`status = 'PENDING'` guard); worker shell path closed (above). A worker can still write and run its own program that does anything the OS user may do - guardrail, not a sandbox |
+| Credential redaction | unchanged; tests pass. No secret in git history of this branch (pattern scan of the diff: only test fixtures) |
+| `.env` | git-ignored, never committed; holds configuration only (no keys set) |
+| Dashboard auth / sessions | 256-bit owner token, constant-time compare, server-side sessions 12 h, HttpOnly + SameSite=Strict cookie, CSRF header, Host allow-list, strict CSP, loopback bind (remote bind refused unless `DASHBOARD_ALLOW_REMOTE=true`) |
+| Token file on Windows | `mode 0o600` has no effect on NTFS; the file inherits the profile ACL (owner, SYSTEM, Administrators) - acceptable under `%LOCALAPPDATA%`, do not move AGENT_HOME to a shared folder |
+| Local network exposure | no listener by default; HEALTH_PORT=0 in `.env`; dashboard loopback only |
+| Backups / restore | online backup + manifest checksum + integrity_check, restore keeps the old DB (tests pass) |
+| Git protections | `git push` always needs approval; agent never pushes; work on `agent/<slug>` branches |
+| Dependencies | `npm audit --omit=dev`: 0 vulnerabilities. Full tree: 10 moderate, all in the dev-only ESLint/typescript-eslint toolchain; not shipped, not fixed (would need `--force` major upgrades) |
+
+## Remaining risks
+
+- Regex screening is bypassable by a worker that writes a script and runs it (documented since Phase 1). For real
+  unattended use: dedicated low-privilege Windows account or VM, no production credentials on the host.
+- The SDK (paid API) provider applies the agent-control pattern but not the protected-path check (it is disabled by
+  default: `ALLOW_PAID_API=false`).
+- Scratch cleanup is offered only for workspaces inside the managed WORKSPACE_ROOT; projects in separately approved
+  directories fall back to an owner approval.

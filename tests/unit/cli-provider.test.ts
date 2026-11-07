@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { spawnSync, type ChildProcess } from 'node:child_process';
 import { EventEmitter } from 'node:events';
-import { mkdtempSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { PassThrough, Writable } from 'node:stream';
@@ -150,6 +150,41 @@ describe('ClaudeCliProvider: launch contract', () => {
     expect(env['CLAUDE_CODE_RESUME_PROMPT']).toMatch(/latest durable checkpoint/);
     expect(s.pids).toEqual([999_999, null]);
     expect(out.kind === 'completed' && out.usage?.raw).toEqual({ billing: 'subscription' });
+  });
+
+  it('writes a read-only policy with the agent paths protected, and never exposes its path to the worker', async () => {
+    let policy: Record<string, unknown> = {};
+    let writable = true;
+    const s = setup((c) => {
+      c.emitLine(init());
+      c.emitLine(success());
+      c.exit(0);
+    });
+    const orig = s.calls.push.bind(s.calls);
+    s.calls.push = (...items) => {
+      const args = items[0]!.args;
+      const settings = JSON.parse(readFileSync(args[args.indexOf('--settings') + 1]!, 'utf8')) as {
+        hooks: { PreToolUse: { hooks: { command: string }[] }[] };
+      };
+      const pf = /"([^"]+\.policy\.json)"$/.exec(settings.hooks.PreToolUse[0]!.hooks[0]!.command)![1]!;
+      policy = JSON.parse(readFileSync(pf, 'utf8')) as Record<string, unknown>;
+      try {
+        writeFileSync(pf, '{}', { flag: 'r+' });
+      } catch {
+        writable = false;
+      }
+      return orig(...items);
+    };
+    await s.provider.run(s.req());
+    expect(writable).toBe(false);
+    expect(policy['protectedPaths']).toEqual([home, path.resolve(__dirname, '../..')]);
+    const env = s.calls[0]!.env;
+    expect(Object.values(env).some((v) => v.endsWith('.policy.json'))).toBe(false);
+    if (env['ELEVARIQ_SCRATCH_CLEAN']) {
+      expect(env['ELEVARIQ_WORKSPACE']).toBe(ws);
+      expect(env['ELEVARIQ_AGENT_HOME']).toBe(home);
+    }
+    expect(readdirSync(path.join(home, 'run')).some((f) => f.endsWith('.policy.json'))).toBe(false); // cleaned up
   });
 
   it('resumes an existing session with --resume and does not invent a new id', async () => {

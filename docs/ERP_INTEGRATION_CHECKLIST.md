@@ -48,3 +48,25 @@ been assumed. Everything below the line "what is ready" runs against synthetic m
 3. Read-only staging run: `sync_runs` audit, record counts compared with the ERP UI by the owner.
 4. Daily briefing generated only from synced records (never invented activity), owner review of the first briefings.
 5. Only after a separate authorisation: write-back through `WriteGate` with idempotency keys.
+
+## Status check (final stabilization, 2026-11-07)
+
+- Still **BLOCKED on owner resources**; nothing in the code base names a real ELEVARIQ endpoint, table or field.
+- Writes: `WriteGate` defaults to disabled and is never constructed enabled anywhere in `src/` - every write intent is
+  refused. `INTEGRATION_ERP_ENABLED=false` / `INTEGRATION_CRM_ENABLED=false` in `.env`; only mock adapters run.
+- No production database credentials are used or requested: the agent integrates through an API with a read-only
+  service identity, never through a direct database connection.
+
+### Owner request list (copy/paste)
+
+1. Read-only access to the ERP/CRM source (or an export of): API routes/controllers + serializers, auth middleware,
+   schema/migrations for projects, tasks, milestones, team members, assignments, activity, clients, interactions.
+2. OpenAPI/Swagger (if any) and the base URL of a **staging or read-only** environment.
+3. Auth scheme facts: token type (bearer/API key/OAuth2 client credentials), issuer/token URL, scopes/roles, expiry and
+   refresh behaviour.
+4. Pagination, filtering (`updated_since`?), rate limits, error format.
+5. A dedicated **read-only** service identity limited to the entities in (1), no financial/payroll/HR-private fields,
+   delivered as environment variables on the agent host (never in chat, git or the dashboard).
+6. Data-handling decisions: which client/employee fields may enter model prompts and daily briefings; retention period;
+   whether CRM data is needed in the first live phase.
+7. (Later, separate decision) write-phase authorisation: which events may write, which endpoints, idempotency, approver.

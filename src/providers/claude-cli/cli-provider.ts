@@ -66,6 +66,8 @@ export interface AuthStatus {
 export interface CliDeps {
   config: {
     agentHome: string;
+    /** Managed workspace root; scratch cleanup is offered only for workspaces strictly inside it. */
+    workspaceRoot?: string;
     claudeCliPath?: string;
     claudeModel?: string;
     claudeCli: {
@@ -97,6 +99,45 @@ export function hookCommand(): string {
   // tsx is resolved from this package, not from the project workspace the hook runs in.
   const tsxLoader = import.meta.resolve('tsx');
   return `${q(process.execPath)} --import ${q(tsxLoader)} ${q(ts)}`;
+}
+
+/**
+ * Variables that let a worker remove a generated scratch directory without `rm -rf` (which needs owner approval):
+ * `"$ELEVARIQ_NODE" "$ELEVARIQ_SCRATCH_CLEAN" .qa-mut`. Only offered when the compiled script exists (plain node, no
+ * loader). The context variables are not a privilege: a worker that changes them only changes what this one tool may
+ * delete, which it could do with any program; the approval policy file is deliberately NOT exposed.
+ */
+export function scratchCleanEnv(
+  agentHome: string,
+  workspace: string,
+  workspaceRoot: string,
+  executionId: string,
+): Record<string, string> {
+  // Next to this module when running from dist; the built copy when running from src through tsx.
+  const js = [
+    path.resolve(
+      path.dirname(fileURLToPath(import.meta.url)),
+      '..',
+      '..',
+      'workspaces',
+      'scratch-clean-main.js',
+    ),
+    path.join(agentRepoRoot(), 'dist', 'workspaces', 'scratch-clean-main.js'),
+  ].find((p) => existsSync(p));
+  if (!js) return {};
+  return {
+    ELEVARIQ_NODE: process.execPath,
+    ELEVARIQ_SCRATCH_CLEAN: js,
+    ELEVARIQ_AGENT_HOME: agentHome,
+    ELEVARIQ_WORKSPACE: workspace,
+    ELEVARIQ_WORKSPACE_ROOT: workspaceRoot,
+    ELEVARIQ_EXECUTION_ID: executionId,
+  };
+}
+
+/** Root of this agent's own repository/installation (two levels above src|dist/providers/claude-cli). */
+export function agentRepoRoot(): string {
+  return path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 }
 
 export class ClaudeCliProvider implements ExecutionProvider {
@@ -207,8 +248,11 @@ export class ClaudeCliProvider implements ExecutionProvider {
       readOnly: !!req.readOnly,
       allowWeb: !!req.allowWeb,
       decisionsFile,
+      protectedPaths: [cfg.agentHome, agentRepoRoot()],
     };
-    writeFileSync(policyFile, JSON.stringify(policy));
+    // Read-only: a worker must not be able to widen its own policy by rewriting this file (guardrail; it is also
+    // outside the workspace and commands naming *.policy.json are denied).
+    writeFileSync(policyFile, JSON.stringify(policy), { mode: 0o444 });
     writeFileSync(
       settingsFile,
       JSON.stringify({
@@ -270,7 +314,12 @@ export class ClaudeCliProvider implements ExecutionProvider {
     ];
     if (cfg.claudeModel) args.push('--model', cfg.claudeModel);
 
-    const env = buildWorkerEnv(this.d.parentEnv ?? process.env, cfg.claudeCli.watchdogEnv);
+    const env = buildWorkerEnv(this.d.parentEnv ?? process.env, {
+      ...cfg.claudeCli.watchdogEnv,
+      ...(cfg.workspaceRoot
+        ? scratchCleanEnv(cfg.agentHome, req.cwd, cfg.workspaceRoot, req.executionId)
+        : {}),
+    });
     const spawnFn =
       this.d.spawnFn ??
       ((cmd, a, o) =>

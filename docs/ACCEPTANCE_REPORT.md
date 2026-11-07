@@ -66,3 +66,51 @@ plus a layout overflow and a misleading evidence count. Screenshots: `docs/scree
   `@playwright/test` and a browser download (owner decision). The command center itself was checked in real Edge.
 - Completing every task of the live pipeline: blocked on the owner's decision about a destructive-delete request.
 - Ubuntu VPS deployment: no server was provided, and public deployment requires owner approval.
+
+## Final stabilization (2026-11-07) - status by category
+
+**Not production-ready yet**: the production scheduled task is not installed, no reboot check has happened, and
+browser tests of the command-center workflows are not implemented (Playwright not authorised).
+
+| Category | Items |
+| --- | --- |
+| Implemented and tested | everything in the table above marked Done; scoped scratch cleanup; agent-control (self-approval) guard |
+| Live verified on this PC | real CLI smoke 8/8 + recovery 7/7; scheduler acceptance 45/45 (isolated task); live pipeline planning + task 1 + independent QA; command center in real Edge (20 views); scratch tool + compiled hook on the real pending payload; `claude doctor` / `auth status`; install preview |
+| Simulated (mock provider / fake streams) | usage-limit wait and resume (`rate_limit_event`, `api_retry`), quota backoff, most pipeline stages, ERP/CRM sync |
+| Based on official documentation only | `CLAUDE_CODE_RETRY_WATCHDOG` semantics (indefinite 429/529 retry, wait until reset), `..._USAGE_LIMIT_RECHECK_MS` range, `RESUME_INTERRUPTED_TURN` behaviour |
+| Awaiting owner action | `apr_mw67xtxk4c1e992a8e`; `.env` provider switch + production task install; reboot verification; Playwright download; ERP/CRM resources; PR / merge |
+| Blocked | ERP/CRM live integration; full live pipeline completion (waits on the approval decision) |
+
+### Subscription usage-limit recovery - limits of the evidence
+
+- Verified live: all four watchdog variables are in the `claude` worker's spawn environment; the Bash tool sees
+  `RETRY_WATCHDOG` and `USAGE_LIMIT_RECHECK_MS`; billing source is the subscription; API-key variables are stripped.
+- Simulated: the stream messages a real usage-limit wait would produce. If the real CLI emits neither
+  `rate_limit_event (rejected)` nor `api_retry (429)` while it waits, the provider sees silence and after
+  `CLAUDE_CLI_STALL_TIMEOUT_MS` (15 min) ends the worker as TIMEOUT; the task is retried with backoff at most
+  `DEFAULT_MAX_RETRIES` (3) times, the session id is kept for resumption. Worst case: 3 extra launches, each one
+  request that is refused - no parallel duplicates, because `MAX_CONCURRENT_WORKERS=1` and the task's lease holds the
+  slot during a recognised wait (no stall kill, no budget timeout while waiting).
+- Not verified: an actual reset being picked up by the CLI, and the CLI's output during a long wait. Deliberately not
+  provoked (would exhaust the owner's subscription). The first real occurrence will be visible as `capacity_wait`
+  or `retry` events in `task:show` / the command center.
+
+### Owner actions (exact)
+
+1. **Approval `apr_mw67xtxk4c1e992a8e`** (sandbox `%TEMP%\elevariq-live-pipeline-8vworl`): recommended **deny**,
+   then `task:retry tsk_mw67vgwd47e80cb55c` only if you want the live run continued (needs a supervisor on that
+   sandbox home with `EXECUTION_PROVIDER=claude-cli` and the rebuilt `dist/`, which gives the worker the scoped
+   cleanup). Commands (set `AGENT_HOME` to the sandbox first):
+   `npm run agent -- deny apr_mw67xtxk4c1e992a8e --by <you>`. Approving instead grants recursive deletes for the rest
+   of that sandbox task (low impact there; `.qa-mut` does not exist).
+2. **Production task**: edit `.env` (`EXECUTION_PROVIDER=claude-cli`, `ENVIRONMENT=production`), `npm run build`, then
+   `powershell -NoProfile -ExecutionPolicy Bypass -File scripts\windows\install-task.ps1`, `Start-ScheduledTask
+   ElevariqPersonalAgent`, `scripts\windows\verify-install.ps1`. No reboot is triggered.
+3. **Reboot check** at a convenient time: `docs/OPERATIONS.md`, "Manual reboot verification".
+4. **Playwright**: authorise `npm install -D @playwright/test@1.65.0` (~14 MB, npm registry) to drive the installed
+   Edge 156 (`channel: 'msedge'`, no browser download); optionally `npx playwright install chromium` (download from
+   Playwright's CDN, size not published in advance - typically 100-200 MB; C: has 316 GB free).
+5. **Claude login** expires 2026-12-04: run `claude auth status` before then; re-login interactively if needed.
+6. **ERP/CRM**: provide the items in `docs/ERP_INTEGRATION_CHECKLIST.md`, "Owner request list".
+7. **Review and merge**: push `feat/windows-compat` and open a PR into `claude/dreamy-edison-hiyq3n` (or `main`) when
+   you have reviewed it - the agent does not push.

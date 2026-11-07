@@ -185,3 +185,79 @@ ufw allow OpenSSH; ufw enable`. For `EXECUTION_PROVIDER=claude-cli` install Clau
 in once interactively (`sudo -u elevariq-agent -H bash -lc claude`, then `/login`); confirm with
 `sudo -u elevariq-agent -H node dist/cli/index.js provider:status`. Moving from Windows: stop the agent, `backup`,
 copy the backup + workspaces, `restore` on the VPS, start the service.
+# Final stabilization addendum (2026-11-07)
+
+## Scoped scratch-directory cleanup (replaces `rm -rf` for throw-away directories)
+
+Recursive deletes from a worker still need owner approval (`destructive_delete`). For the one routine case - a
+throw-away directory the worker created itself - workers get a scoped tool (CLI provider, when `dist/` is built):
+
+```
+"$ELEVARIQ_NODE" "$ELEVARIQ_SCRATCH_CLEAN" .qa-mut          # worker, inside its workspace
+npm run agent -- scratch:clean <project> .qa-mut [--dry-run]  # owner, same checks
+```
+
+It deletes exactly one directory named `.qa-*`, `.scratch-*` or `.tmp-*` strictly inside the project workspace and
+refuses: the workspace root, parents, anything outside the workspace (e.g. `E:\elevariq-ui-tmp`), `..`/wildcards/
+variables/`~`, `.git` internals, links/junctions (target, ancestors, or anywhere inside), protected paths, trees over
+50 000 entries, and any call without a valid AGENT_HOME. A missing directory returns `absent` (repeats are harmless).
+Every call appends to `<AGENT_HOME>\logs\scratch-cleanup.jsonl`; the intent line is written before deletion.
+
+## Production scheduled task - install (owner action)
+
+Preview (verified 2026-11-07, nothing registered):
+
+```
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\windows\install-task.ps1 -WhatIf
+```
+
+Before installing, set in `E:\Agent\Personal-agent\.env` (currently `EXECUTION_PROVIDER=mock`,
+`ENVIRONMENT=development` - with these values the task would run the mock provider, not Claude Code):
+
+```
+EXECUTION_PROVIDER=claude-cli
+ENVIRONMENT=production
+```
+
+Then `npm run build` and install (no restart is triggered):
+
+```
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\windows\install-task.ps1
+Start-ScheduledTask -TaskName ElevariqPersonalAgent
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\windows\verify-install.ps1
+node dist\cli\index.js status
+```
+
+What the task is: user `<PC>\<owner>`, Interactive logon, Limited run level; action `powershell.exe -File
+scripts\windows\run-supervisor.ps1 -RepoPath E:\Agent\Personal-agent -NodePath "C:\Program Files\nodejs\node.exe"`;
+working dir = repo; triggers = at logon of the owner + keepalive every 5 min; restart 999 x 1 min; no time limit;
+`IgnoreNew` (one instance); starts and keeps running on battery; hidden. State: `%LOCALAPPDATA%\ElevariqAgent`
+(`agent.db`, `logs\wrapper.log`, `logs\supervisor-std*.log`, app logs, `workspaces\`). Duplicate prevention: Task
+Scheduler `IgnoreNew` + the supervisor lease (a second supervisor exits with code 3 and its wrapper only monitors).
+Watchdog variables come from the app config (defaults on) and are injected per worker, not via the task.
+The task runs the build in the repo working tree: switching branches or rebuilding changes what runs - stop the agent
+(`stop --hold`) before doing either.
+
+## Manual reboot verification (owner; not performed by the agent)
+
+1. `node dist\cli\index.js status` before rebooting; note running/queued tasks.
+2. Reboot normally, sign in.
+3. Within ~2 minutes: `Get-ScheduledTask ElevariqPersonalAgent | Get-ScheduledTaskInfo` -> LastRunTime after the
+   sign-in, LastTaskResult 267009 (running).
+4. `node dist\cli\index.js health` exits 0; `status` shows a live supervisor.
+5. `claude auth status` -> `loggedIn: true`, `authMethod: claude.ai`; `node dist\cli\index.js provider:status` ready.
+6. `node dist\cli\index.js projects` / `tasks` -> same projects and tasks as before.
+7. A task that was RUNNING before the reboot is recovered (`task:show <id>`: `interrupted` then re-queued/completed).
+8. Exactly one supervisor: `Get-CimInstance Win32_Process -Filter "Name='node.exe'" | ? CommandLine -match 'cli\\index\.js"? start'`
+   returns one process; `logs\wrapper.log` shows one `supervisor launched` after the boot (or `monitoring`).
+
+## Claude Code health (checked 2026-11-07)
+
+`claude doctor`: native install 2.1.319 (= latest published), "No installation issues found", auto-updates enabled
+(channel latest), **last update attempt failed (install_failed)**. Doctor gives no further reason. Most likely cause
+(inference, not confirmed): on Windows the running `claude.exe` (this interactive session, started 05:57) locks the
+file the updater must replace. No action is required now - nothing newer exists. If a later update fails again: close
+all Claude Code sessions, `stop --hold` the agent, run `claude update`, then `start`. Do not reinstall; the
+subscription login lives in `%USERPROFILE%\.claude` and is not touched by an update.
+`claude auth status`: logged in, `claude.ai`, Max. `loginExpiresAt` = 2026-12-04 - check `claude auth status` before
+that date; an expired login stops all CLI workers (`provider:status` reports it).

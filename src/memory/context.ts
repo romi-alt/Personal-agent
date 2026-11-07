@@ -29,6 +29,9 @@ Rules you must follow:
   say so plainly and continue with other work.
 - Before changing anything on a continued task, inspect the existing artifacts (git status, git diff, existing files, tests)
   and continue from them. Do not redo work that already exists.
+- Recursive deletion (rm -rf, Remove-Item -Recurse, ...) needs owner approval. For a throw-away directory you create
+  yourself, name it .qa-<x>, .scratch-<x> or .tmp-<x> inside the workspace and, when ELEVARIQ_SCRATCH_CLEAN is set,
+  remove it with: "$ELEVARIQ_NODE" "$ELEVARIQ_SCRATCH_CLEAN" <dir>  (no approval needed; it refuses anything else).
 - Commit meaningful progress to the current local branch with clear messages (no pushing).
 - Run the relevant tests before finishing. End with a short report: what is done, what remains, test results.
 `.trim();

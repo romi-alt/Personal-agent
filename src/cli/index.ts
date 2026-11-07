@@ -5,6 +5,7 @@ import { accessSync, constants, mkdirSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
+import { cleanScratchDir } from '../workspaces/scratch-cleanup.js';
 import { promisify } from 'node:util';
 import { ConfigError } from '../config/index.js';
 import { createApp, type App } from '../core/app.js';
@@ -84,6 +85,7 @@ const OPTIONS = {
   port: { type: 'string' },
   rotate: { type: 'boolean' },
   hold: { type: 'boolean' },
+  'dry-run': { type: 'boolean' },
 } as const;
 
 const HELP = `ELEVARIQ Personal Agent
@@ -99,6 +101,8 @@ Usage: npm run agent -- <command> [options]
   project:add --name N [--description D] [--path P --allow-dirty] [--priority N]
   workspaces                  List approved workspace roots
   workspace:approve <path>    Explicitly approve an existing directory as a workspace root
+  scratch:clean <project> <dir> [--dry-run]   Delete ONE generated scratch dir (.qa-*/.scratch-*/.tmp-*) inside the
+                              project workspace; refuses links, traversal, roots; audited in logs/scratch-cleanup.jsonl
   tasks [--project P] [--status S]
   task:add --project P (--title T --instructions I | --file F.json|F.md) [--criteria C] [--depends id,id]
            [--priority N] [--max-retries N] [--key K] [--start-at ISO]
@@ -412,6 +416,23 @@ async function main(): Promise<void> {
         if (!rest[0]) fail('usage: workspace:approve <path>');
         const w = registry.register(rest[0], path.basename(rest[0]), values.by ?? 'owner-cli');
         out(`approved workspace ${w.path}`);
+        break;
+      }
+      case 'scratch:clean': {
+        if (!rest[0] || !rest[1]) fail('usage: scratch:clean <project> <dir> [--dry-run]');
+        const p = resolveProject(rest[0]);
+        const managed = registry.root;
+        const r = cleanScratchDir({
+          agentHome: config.agentHome,
+          workspace: p.repoPath,
+          allowedRoots: [managed],
+          approvedWorkspaces: registry.approvedRoots().filter((w) => w !== managed),
+          target: rest[1],
+          actor: values.by ?? 'owner-cli',
+          dryRun: !!values['dry-run'],
+        });
+        out(`${r.status}: ${r.reason}${r.resolved ? ` (${r.resolved})` : ''}`);
+        if (r.status === 'refused') process.exitCode = 1;
         break;
       }
       case 'tasks': {

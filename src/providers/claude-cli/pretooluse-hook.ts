@@ -29,6 +29,8 @@ export interface HookPolicyFile {
   allowWeb?: boolean;
   /** JSONL file that receives one line per decision so the provider can report denials with their approval type. */
   decisionsFile: string;
+  /** Agent-owned directories shell commands must not reference (AGENT_HOME, the agent repository). */
+  protectedPaths?: string[];
 }
 
 export interface HookDecisionRecord {
@@ -68,6 +70,7 @@ export function decide(
     alsoRequire: policy.alsoRequire,
     readOnly: policy.readOnly,
     allowWeb: policy.allowWeb,
+    protectedPaths: policy.protectedPaths,
   });
   const record: HookDecisionRecord = {
     at: Date.now(),
