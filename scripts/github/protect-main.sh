@@ -2,17 +2,17 @@
 # Configures `main` as the default branch and protects it. Run by a repository ADMIN with an authenticated gh CLI:
 #   gh auth login
 #   scripts/github/protect-main.sh romi-alt/Personal-agent
-# Idempotent. Requires the CI workflow (job "check") to have run at least once so GitHub knows the status-check name.
+# Idempotent. Requires the CI workflow (jobs "check" and "check-windows") to have run at least once so GitHub knows the status-check names.
 set -euo pipefail
 REPO="${1:?usage: protect-main.sh <owner/repo>}"
 
 echo "Setting default branch to main on $REPO"
 gh api -X PATCH "repos/$REPO" -f default_branch=main --jq '.default_branch'
 
-echo "Protecting main (PR required, status check 'check' required, no force-push, no deletion)"
+echo "Protecting main (PR required, status checks 'check' and 'check-windows' required, no force-push, no deletion)"
 gh api -X PUT "repos/$REPO/branches/main/protection" --input - <<'JSON'
 {
-  "required_status_checks": { "strict": true, "contexts": ["check"] },
+  "required_status_checks": { "strict": true, "contexts": ["check", "check-windows"] },
   "enforce_admins": false,
   "required_pull_request_reviews": { "required_approving_review_count": 0, "dismiss_stale_reviews": true },
   "restrictions": null,

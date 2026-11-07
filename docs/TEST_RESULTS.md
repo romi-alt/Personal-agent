@@ -98,7 +98,7 @@ Not covered: real model output, prompt quality, plan cost, Windows, GitHub CI (a
 | Job | Runner | Result |
 |---|---|---|
 | `check` (required) | ubuntu-latest, Node 22 | **pass**: npm ci, typecheck, lint, format, build, `npm test` (226/226), `npm audit --omit=dev`, secret scan |
-| `check-windows (experimental)` | windows-latest, Node 22.23.4 | **pass**: npm ci, build, `npm test` (226/226) |
+| `check-windows` (named `check-windows (experimental)` and non-blocking at the time; now required) | windows-latest, Node 22.23.4 | **pass**: npm ci, build, `npm test` (226/226) |
 
 History: the first Windows run failed at `npm ci` (node-gyp rebuild of `better-sqlite3`; fixed by `.npmrc` `ignore-scripts=true`), the second ran 219/226 (one real CRLF bug in `task:add --file`, plus test-harness issues on file locks, timing and path forms; all fixed with a regression test).
 Still unverified: PowerShell / Task Scheduler scripts, Windows sleep/reboot behaviour, live Claude provider.

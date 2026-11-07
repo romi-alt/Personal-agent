@@ -79,7 +79,7 @@ powershell -ExecutionPolicy RemoteSigned -File scripts\windows\install-task.ps1 
 | 9 | `npm test` on Windows | report failures: the suite was developed on Linux (symlink and signal tests may need adaptation) |
 | 10 | Remove: `scripts\windows\uninstall-task.ps1` | graceful stop, task removed |
 
-The repository's CI also contains an **experimental** `check-windows` job (build + tests on `windows-latest`, non-blocking). It exercises the
+The repository's CI runs a required `check-windows` job (install, build and all tests on `windows-latest`). It exercises the
 TypeScript code on Windows but **not** the Task Scheduler scripts.
 
 ## Operating limits

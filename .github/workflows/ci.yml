@@ -35,12 +35,11 @@ jobs:
             echo "Possible secret committed"; exit 1
           fi
 
-  # Experimental: real Windows evidence for the code (NOT for the Task Scheduler scripts, which need a user session).
-  # Non-blocking until the suite is confirmed green on Windows.
+  # Real Windows verification of the code and test suite (NOT of the Task Scheduler scripts, which need a user session).
+  # Required status check: keep the job id/name "check-windows".
   check-windows:
-    name: check-windows (experimental)
+    name: check-windows
     runs-on: windows-latest
-    continue-on-error: true
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
