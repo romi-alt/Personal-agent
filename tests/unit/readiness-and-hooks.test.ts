@@ -274,3 +274,76 @@ describe('Claude adapter: permission enforcement against the real SDK semantics'
     }
   });
 });
+
+describe('Claude adapter: read-only planning mode', () => {
+  const cfg = {
+    allowPaidApi: true,
+    maxBudgetUsdPerExecution: 2,
+    claudeModel: undefined,
+    claudeCliPath: undefined,
+    maxTurnsPerExecution: 10,
+  };
+  it('exposes only Read/Glob/Grep and denies mutations at both permission layers', async () => {
+    const cap: { options?: any } = {};
+    const provider = new ClaudeProvider({
+      config: cfg,
+      credentials: creds(KEY),
+      queryFn: ((p: { options?: any }) => {
+        cap.options = p.options;
+        return {
+          async *[Symbol.asyncIterator]() {
+            yield {
+              type: 'system',
+              subtype: 'init',
+              session_id: 's',
+              apiKeySource: 'ANTHROPIC_API_KEY',
+            } as never;
+            yield {
+              type: 'result',
+              subtype: 'success',
+              is_error: false,
+              result: '{}',
+              session_id: 's',
+              permission_denials: [],
+              errors: [],
+            } as never;
+          },
+          close() {},
+        };
+      }) as never,
+    });
+    await provider.run({
+      executionId: 'e',
+      taskId: 't',
+      taskTitle: 'Plan: analyze',
+      prompt: 'p',
+      systemAppend: 's',
+      cwd: '/tmp/ws',
+      approvedActionTypes: [],
+      alsoRequireApproval: [],
+      attemptIndex: 1,
+      readOnly: true,
+      limits: { maxTurns: 5, timeoutMs: 5000 },
+      signal: new AbortController().signal,
+      onEvent: () => undefined,
+      onSession: () => undefined,
+    });
+    expect(cap.options.tools).toEqual(['Read', 'Glob', 'Grep']);
+    const hook = cap.options.hooks.PreToolUse[0].hooks[0];
+    const sig = { signal: new AbortController().signal };
+    const write = await hook(
+      { hook_event_name: 'PreToolUse', tool_name: 'Write', tool_input: { file_path: 'x' } },
+      'id',
+      sig,
+    );
+    expect(write.hookSpecificOutput.permissionDecision).toBe('deny');
+    expect((await cap.options.canUseTool('Bash', { command: 'ls' }, sig)).behavior).toBe('deny');
+    expect(
+      await hook(
+        { hook_event_name: 'PreToolUse', tool_name: 'Read', tool_input: { file_path: 'a.ts' } },
+        'id',
+        sig,
+      ),
+    ).toEqual({});
+  });
+});

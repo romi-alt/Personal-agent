@@ -236,6 +236,83 @@ CREATE TABLE provider_verification (
 );
 `,
   },
+  {
+    version: 3,
+    name: 'phase_2_planning_workflows',
+    sql: `
+-- Task kinds: CODING tasks change the repository; PLANNING tasks are read-only model calls whose output feeds a workflow
+ALTER TABLE tasks ADD COLUMN kind TEXT NOT NULL DEFAULT 'CODING';
+ALTER TABLE tasks ADD COLUMN read_only INTEGER NOT NULL DEFAULT 0;
+
+-- Full final output of a completed execution (the summary column on executions is truncated)
+CREATE TABLE task_outputs (
+  task_id TEXT NOT NULL REFERENCES tasks(id),
+  execution_id TEXT NOT NULL,
+  content TEXT NOT NULL,
+  created_at INTEGER NOT NULL,
+  PRIMARY KEY (task_id, execution_id)
+);
+
+-- Durable workflows (Phase 2 planning pipeline)
+CREATE TABLE workflow_runs (
+  id TEXT PRIMARY KEY,
+  project_id TEXT NOT NULL REFERENCES projects(id),
+  kind TEXT NOT NULL,
+  status TEXT NOT NULL,
+  current_step TEXT,
+  context TEXT NOT NULL DEFAULT '{}',
+  error TEXT,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL
+);
+CREATE INDEX idx_wfruns_status ON workflow_runs(status);
+CREATE TABLE workflow_steps (
+  id TEXT PRIMARY KEY,
+  run_id TEXT NOT NULL REFERENCES workflow_runs(id),
+  name TEXT NOT NULL,
+  attempt INTEGER NOT NULL,
+  status TEXT NOT NULL,
+  task_id TEXT,
+  output TEXT,
+  error TEXT,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL,
+  UNIQUE (run_id, name, attempt)
+);
+
+-- Requirements model (seeded from the assignment by code; refined by analysis)
+CREATE TABLE requirements (
+  project_id TEXT NOT NULL REFERENCES projects(id),
+  req_id TEXT NOT NULL,
+  text TEXT NOT NULL,
+  kind TEXT NOT NULL,
+  priority TEXT NOT NULL,
+  source TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'OPEN',
+  PRIMARY KEY (project_id, req_id)
+);
+
+-- Milestones and the link from tasks back to the plan that created them
+CREATE TABLE milestones (
+  project_id TEXT NOT NULL REFERENCES projects(id),
+  key TEXT NOT NULL,
+  title TEXT NOT NULL,
+  goal TEXT NOT NULL,
+  position INTEGER NOT NULL,
+  requirement_ids TEXT NOT NULL DEFAULT '[]',
+  status TEXT NOT NULL DEFAULT 'PLANNED',
+  PRIMARY KEY (project_id, key)
+);
+CREATE TABLE plan_tasks (
+  task_id TEXT PRIMARY KEY REFERENCES tasks(id),
+  run_id TEXT NOT NULL,
+  plan_key TEXT NOT NULL,
+  milestone_key TEXT NOT NULL,
+  requirement_ids TEXT NOT NULL DEFAULT '[]',
+  size TEXT NOT NULL
+);
+`,
+  },
 ];
 
 export function runMigrations(db: Database.Database, migrations: Migration[] = MIGRATIONS): number[] {

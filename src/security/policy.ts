@@ -96,6 +96,8 @@ export interface PolicyOptions {
   extraReadable?: string[];
   /** Approval categories the owner has explicitly granted for this task. */
   approvedTypes?: readonly string[];
+  /** Planning mode: only Read/Glob/Grep/TodoWrite are allowed. */
+  readOnly?: boolean;
   /** Extra categories this project forces to need approval (e.g. 'web_access'). */
   alsoRequire?: readonly string[];
 }
@@ -107,6 +109,9 @@ export function evaluateToolUse(
   options: PolicyOptions = {},
 ): PolicyDecision {
   const extraReadable = options.extraReadable ?? [];
+  if (options.readOnly && !['Read', 'Glob', 'Grep', 'TodoWrite'].includes(toolName)) {
+    return { allow: false, reason: `${toolName} is not permitted: this is a read-only planning task` };
+  }
   const pathKeys = FILE_TOOLS[toolName];
   if (pathKeys) {
     for (const key of pathKeys) {

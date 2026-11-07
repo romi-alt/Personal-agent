@@ -4,7 +4,7 @@ import { buildProjectContext, renderProjectContext } from '../assignments/contex
 import type { AppConfig } from '../config/index.js';
 import { ExecutionLog } from '../logging/logger.js';
 import type { Logger } from '../logging/logger.js';
-import { SYSTEM_APPEND, buildPrompt, loadMemory } from '../memory/context.js';
+import { PLANNING_APPEND, SYSTEM_APPEND, buildPrompt, loadMemory } from '../memory/context.js';
 import type { ExecutionProvider, PermissionDenial, ProviderFailure, RunOutcome } from '../providers/types.js';
 import { StaleLeaseError, type Store } from '../queue/store.js';
 import { decide, type Decision, type OutcomeKind } from '../recovery/decide.js';
@@ -174,7 +174,8 @@ export class TaskRunner {
         taskId: task.id,
         taskTitle: task.title,
         prompt,
-        systemAppend: SYSTEM_APPEND,
+        systemAppend: task.readOnly ? PLANNING_APPEND : SYSTEM_APPEND,
+        readOnly: task.readOnly,
         cwd,
         resumeSessionId: task.sessionId ?? undefined,
         approvedActionTypes,
@@ -488,6 +489,9 @@ export class TaskRunner {
             severity: 'error',
             payload: { reason: decision.reason, errorClass: decision.errorClass },
           });
+        }
+        if (decision.next === 'COMPLETED' && outcome.kind === 'completed') {
+          store.saveTaskOutput(taskId, executionId, outcome.summary);
         }
         if (decision.next === 'COMPLETED')
           store.updateProject(projectId, {

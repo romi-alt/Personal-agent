@@ -59,6 +59,8 @@ const STRIPPED_ENV = [
  */
 const AVAILABLE_TOOLS = ['Read', 'Glob', 'Grep', 'Edit', 'Write', 'Bash', 'TodoWrite'];
 
+const READ_ONLY_TOOLS = ['Read', 'Glob', 'Grep'];
+
 async function defaultSessionExists(sessionId: string, cwd: string): Promise<boolean> {
   try {
     return !!(await getSessionInfo(sessionId, { dir: cwd })) || !!(await getSessionInfo(sessionId));
@@ -147,6 +149,7 @@ export class ClaudeProvider implements ExecutionProvider {
       const decision = evaluateToolUse(hookInput.tool_name, toolInput, workspace, {
         approvedTypes: req.approvedActionTypes,
         alsoRequire: req.alsoRequireApproval,
+        readOnly: req.readOnly,
       });
       if (decision.allow) return {}; // defer to the normal permission flow (canUseTool is the second layer)
       denials.push({
@@ -182,7 +185,7 @@ export class ClaudeProvider implements ExecutionProvider {
       maxTurns: req.limits.maxTurns,
       maxBudgetUsd: req.limits.maxBudgetUsd,
       permissionMode: 'default',
-      tools: AVAILABLE_TOOLS,
+      tools: req.readOnly ? READ_ONLY_TOOLS : AVAILABLE_TOOLS,
       // SDK isolation mode: load NO filesystem settings (user, project or local). Project settings can define hooks,
       // MCP servers and allow-rules; since the model can write files in its own workspace, honouring them would let it
       // grant itself permissions or run commands outside the policy. Context is supplied by the supervisor's prompt instead.
@@ -194,6 +197,7 @@ export class ClaudeProvider implements ExecutionProvider {
         const decision = evaluateToolUse(toolName, input, workspace, {
           approvedTypes: req.approvedActionTypes,
           alsoRequire: req.alsoRequireApproval,
+          readOnly: req.readOnly,
         });
         if (decision.allow) return { behavior: 'allow', updatedInput: input };
         denials.push({ tool: toolName, reason: decision.reason, approvalType: decision.approvalType, input });

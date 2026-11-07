@@ -78,3 +78,12 @@ This is DOC-VERIFIED (SDK docs + type definitions), **not yet exercised against 
 ## Residual risks (unchanged or newly documented)
 
 Regex command screening is not a sandbox; verification executes model-written code; abort/resume and rate-limit semantics unverified live; SQLite file unencrypted; session transcripts under `~/.claude` may contain prompts and file contents - protect the service user's home.
+
+---
+
+# Phase 2 addendum
+
+* Planning tasks are **read-only**: toolset restricted to `Read/Glob/Grep` (SDK `tools`), enforced again by the PreToolUse hook and `canUseTool`, plus a read-only system prompt. A planning step can therefore not modify the repository even if the model tries.
+* Model-produced plans are untrusted input: validated by schema and deterministic rules, bounded in size (`MAX_PLAN_TASKS`), never executed as code, and by default need the owner's explicit approval before any coding task is created (`PLAN_APPROVAL=required`).
+* A plan cannot raise privileges: planned tasks inherit the assignment's approval policy and budgets; verification levels come from a fixed enum.
+* Unverified: behaviour of the read-only toolset against the live SDK (DOC-VERIFIED only).

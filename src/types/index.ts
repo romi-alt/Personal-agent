@@ -90,6 +90,10 @@ export interface Task {
   providerFailureStreak: number;
   /** Verification levels that must not FAIL before the task may become COMPLETED. */
   verificationRequired: string[];
+  /** CODING tasks change the repository; PLANNING tasks are read-only model calls feeding a workflow. */
+  kind: 'CODING' | 'PLANNING';
+  /** Provider must expose read-only tools only. */
+  readOnly: boolean;
   createdAt: number;
   updatedAt: number;
   completedAt: number | null;

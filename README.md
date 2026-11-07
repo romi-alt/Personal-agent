@@ -1,4 +1,4 @@
-# ELEVARIQ Personal Agent - Phase 1.5
+# ELEVARIQ Personal Agent - Phase 2 (in progress: planning pipeline)
 
 A persistent, crash-safe **supervisor + durable task queue** that can run coding assignments through Claude (Claude Agent SDK) in isolated project workspaces,
 pause when the provider runs out of capacity, and resume unfinished work after interruptions - without relying on any single Claude conversation staying open.
@@ -29,6 +29,7 @@ Phase 1.5 = Phase 1 foundation + an independent audit (14 defects fixed, two of 
 | Verification evidence: `CHANGES_EXIST`, `BUILD_PASSES`, `TESTS_PASS`, owner acceptance | **IMPLEMENTED AND TESTED** |
 | Verification of requirements satisfied / security checks | **NOT IMPLEMENTED** (always `NOT_EVALUATED`; Phase 2) |
 | Provider readiness report (SDK / credentials / API access / budget / live execution / live recovery) | **IMPLEMENTED AND TESTED**; live levels are **NOT VERIFIED** |
+| Phase 2 planning pipeline: analyse -> architect -> decompose -> owner approval -> tasks (read-only planning tasks, validated structured output, bounded repair loop) | **IMPLEMENTED AND TESTED** with the mock provider + real-process SIGKILL e2e; **not run with a real model** |
 | Live-provider verification (`provider:verify --access`, `smoke:live`, `smoke:live-recovery`) | **BLOCKED** - needs `ANTHROPIC_API_KEY` + spending authorisation in the running environment |
 | Windows scripts | static review + string guards only; **never parsed or run by PowerShell**; checklist in `docs/WINDOWS_DEPLOYMENT.md` |
 | GitHub `main` created; default-branch switch and branch protection | `main` **DONE**; default branch + protection **BLOCKED** by the session proxy - owner steps in `docs/GITHUB_SETUP.md` |
@@ -79,6 +80,7 @@ All settings are environment variables validated at startup (`src/config/index.t
 | `docs/OPERATIONS.md` | Running as a service, monitoring, backups, troubleshooting |
 | `docs/PHASE_2_ROADMAP.md` | Next stage (not implemented) |
 | `docs/TEST_RESULTS.md` | Real commands and results |
+| `docs/PLANNING.md` | Phase 2 planning pipeline (stages 1-4) |
 | `docs/AUDIT_PHASE_1_5.md` | Independent audit: defects, fixes, residual weaknesses |
 | `docs/PROJECT_ASSIGNMENTS.md` | Assignment schema, durable context, project lifecycle |
 | `docs/COMPLETION_VERIFICATION.md` | Verification ladder, interfaces, evidence |

@@ -45,6 +45,9 @@ const schema = z
     MAX_PROVIDER_FAILURE_STREAK: int(20, 1),
     EVENT_RETENTION_DAYS: int(30, 1),
     VERIFY_COMMAND_TIMEOUT_MS: int(600_000, 1000),
+    PLAN_APPROVAL: z.enum(['required', 'auto']).default('required'),
+    MAX_PLAN_TASKS: int(60, 1),
+    MAX_PLAN_REPAIRS: int(2, 0),
 
     BACKOFF_BASE_MS: int(30_000, 1),
     BACKOFF_MAX_MS: int(3_600_000, 1),
@@ -130,6 +133,10 @@ export interface AppConfig {
   maxProviderFailureStreak: number;
   eventRetentionDays: number;
   verifyCommandTimeoutMs: number;
+  /** 'required': the owner must approve a generated plan before coding tasks are created. */
+  planApproval: 'required' | 'auto';
+  maxPlanTasks: number;
+  maxPlanRepairs: number;
   backoff: { baseMs: number; maxMs: number; jitter: number; quotaMinWaitMs: number; resetMarginMs: number };
   workerTimeoutMs: number;
   heartbeatIntervalMs: number;
@@ -211,6 +218,9 @@ export function loadConfig(opts: LoadConfigOptions = {}): AppConfig {
     maxProviderFailureStreak: c.MAX_PROVIDER_FAILURE_STREAK,
     eventRetentionDays: c.EVENT_RETENTION_DAYS,
     verifyCommandTimeoutMs: c.VERIFY_COMMAND_TIMEOUT_MS,
+    planApproval: c.PLAN_APPROVAL,
+    maxPlanTasks: c.MAX_PLAN_TASKS,
+    maxPlanRepairs: c.MAX_PLAN_REPAIRS,
     backoff: {
       baseMs: c.BACKOFF_BASE_MS,
       maxMs: c.BACKOFF_MAX_MS,

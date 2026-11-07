@@ -89,6 +89,8 @@ function mapTask(r: Row): Task {
     interruptionCount: r['interruption_count'] as number,
     providerFailureStreak: r['provider_failure_streak'] as number,
     verificationRequired: JSON.parse(r['verification_required'] as string) as string[],
+    kind: (r['kind'] as 'CODING' | 'PLANNING') ?? 'CODING',
+    readOnly: !!r['read_only'],
     createdAt: r['created_at'] as number,
     updatedAt: r['updated_at'] as number,
     completedAt: (r['completed_at'] as number | null) ?? null,
@@ -436,6 +438,7 @@ export class Store {
     scheduledStart?: number | null;
     dedupeKey?: string;
     verificationRequired?: string[];
+    kind?: 'CODING' | 'PLANNING';
   }): { task: Task; created: boolean } {
     const dedupeKey =
       input.dedupeKey ??
@@ -462,8 +465,8 @@ export class Store {
         const id = newId('tsk');
         this.db
           .prepare(
-            `INSERT INTO tasks(id,project_id,title,instructions,acceptance_criteria,depends_on,priority,status,max_retries,scheduled_start,dedupe_key,verification_required,created_at,updated_at)
-           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+            `INSERT INTO tasks(id,project_id,title,instructions,acceptance_criteria,depends_on,priority,status,max_retries,scheduled_start,dedupe_key,verification_required,kind,read_only,created_at,updated_at)
+           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
           )
           .run(
             id,
@@ -478,6 +481,8 @@ export class Store {
             input.scheduledStart ?? null,
             dedupeKey,
             JSON.stringify(input.verificationRequired ?? []),
+            input.kind ?? 'CODING',
+            input.kind === 'PLANNING' ? 1 : 0,
             now,
             now,
           );
@@ -495,6 +500,7 @@ export class Store {
         // New work re-opens a project that was waiting on verification/approval/delivery.
         const lc = this.getProject(input.projectId)!.lifecycle;
         if (
+          (input.kind ?? 'CODING') === 'CODING' &&
           [
             'REGISTERED',
             'ANALYZING',
@@ -1203,7 +1209,7 @@ export class Store {
     if (!p || p.lifecycle !== 'IN_DEVELOPMENT') return;
     const counts = this.db
       .prepare(
-        `SELECT SUM(CASE WHEN status NOT IN ('COMPLETED','CANCELLED') THEN 1 ELSE 0 END) AS open, SUM(CASE WHEN status = 'COMPLETED' THEN 1 ELSE 0 END) AS done FROM tasks WHERE project_id = ?`,
+        `SELECT SUM(CASE WHEN status NOT IN ('COMPLETED','CANCELLED') THEN 1 ELSE 0 END) AS open, SUM(CASE WHEN status = 'COMPLETED' THEN 1 ELSE 0 END) AS done FROM tasks WHERE project_id = ? AND kind = 'CODING'`,
       )
       .get(projectId) as { open: number | null; done: number | null };
     if ((counts.open ?? 0) === 0 && (counts.done ?? 0) > 0) {
@@ -1341,6 +1347,26 @@ export class Store {
       };
     }
     return out;
+  }
+
+  // --------------------------------------------------------- task outputs
+  /** Persist the FULL final output of an execution (executions.summary is truncated). Capped at 512 KiB. */
+  saveTaskOutput(taskId: string, executionId: string, content: string): void {
+    this.db
+      .prepare(
+        'INSERT OR REPLACE INTO task_outputs(task_id,execution_id,content,created_at) VALUES (?,?,?,?)',
+      )
+      .run(taskId, executionId, content.slice(0, 512 * 1024), this.clock.now());
+  }
+
+  /** Latest stored output of a task, or null. */
+  getTaskOutput(taskId: string): string | null {
+    const r = this.db
+      .prepare(
+        'SELECT content FROM task_outputs WHERE task_id = ? ORDER BY created_at DESC, rowid DESC LIMIT 1',
+      )
+      .get(taskId) as { content: string } | undefined;
+    return r?.content ?? null;
   }
 
   // ----------------------------------------------------------- maintenance

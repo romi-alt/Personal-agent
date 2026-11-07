@@ -97,6 +97,8 @@ export interface RunRequest {
   resumeSessionId?: string;
   /** Approval categories the owner has granted for this task (see security/policy.ts). */
   approvedActionTypes: string[];
+  /** Planning workers: expose read-only tools only (no writes, no shell). */
+  readOnly?: boolean;
   /** Extra categories the project's approval policy forces to require approval. */
   alsoRequireApproval: string[];
   /** 1-based count of executions already made for this task (for deterministic mock scenarios). */

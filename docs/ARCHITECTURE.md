@@ -103,3 +103,10 @@ a `canUseTool` callback enforcing the workspace/approval policy, `maxTurns`, `ma
 * **Escalation counters** (`interruption_count`, `provider_failure_streak`) bound retries; `MAX_INTERRUPTIONS`, `MAX_PROVIDER_FAILURE_STREAK`.
 * **Provider readiness** (`src/providers/readiness.ts`) with persisted, staleness-aware live-verification evidence.
 * Schema migration 2 upgrades Phase 1 databases in place (tested).
+
+---
+
+# Phase 2 addendum
+
+`src/planning/*` (schemas, JSON extraction, prompts, deterministic validators) and `src/workflows/*` (`WorkflowEngine`, `WorkflowRepository`) implement the planning pipeline on top of the existing queue:
+planning steps are read-only `PLANNING` tasks, the engine advances on every supervisor tick, and plan materialisation creates ordinary coding tasks. See `docs/PLANNING.md`.

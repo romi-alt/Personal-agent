@@ -8,6 +8,7 @@ import { MockProvider, type MockProviderOptions } from '../../src/providers/mock
 import type { ExecutionProvider } from '../../src/providers/types.js';
 import { Store } from '../../src/queue/store.js';
 import { Supervisor } from '../../src/supervisor/supervisor.js';
+import { WorkflowEngine } from '../../src/workflows/engine.js';
 import type { Clock, Project } from '../../src/types/index.js';
 import { WorkspaceRegistry } from '../../src/workspaces/registry.js';
 
@@ -31,6 +32,7 @@ export interface TestEnv {
   mock?: MockProvider;
   project: Project;
   supervisor: Supervisor;
+  workflows: WorkflowEngine;
   lines: string[];
   log: Logger;
   cleanup(): void;
@@ -72,7 +74,17 @@ export async function makeEnv(
     name: 'Test Project',
     provider: provider.name,
   });
-  const supervisor = new Supervisor({ config, store, provider, registry, log, rng: () => 0.5 });
+  const workflows = new WorkflowEngine(
+    store,
+    {
+      planApproval: config.planApproval,
+      maxPlanTasks: config.maxPlanTasks,
+      maxPlanRepairs: config.maxPlanRepairs,
+      defaultMaxRetries: config.defaultMaxRetries,
+    },
+    log,
+  );
+  const supervisor = new Supervisor({ config, store, provider, registry, log, rng: () => 0.5, workflows });
   return {
     dir,
     config,
@@ -83,6 +95,7 @@ export async function makeEnv(
     mock,
     project,
     supervisor,
+    workflows,
     lines,
     log,
     cleanup: () => {
@@ -120,3 +133,14 @@ export async function drain(env: TestEnv, maxRounds = 50): Promise<void> {
 
 export const statuses = (env: TestEnv, taskId: string): string[] =>
   env.store.listTransitions(taskId).map((t) => t.to);
+
+/** Drive supervisor ticks and workflow advancement until nothing more can happen right now. */
+export async function settle(env: TestEnv, maxRounds = 80): Promise<void> {
+  for (let i = 0; i < maxRounds; i++) {
+    const { claimed } = await env.supervisor.tick();
+    await waitFor(() => env.supervisor.activeWorkers === 0);
+    const changed = env.workflows.advanceAll();
+    if (claimed === 0 && changed === 0) return;
+  }
+  throw new Error('settle: still making progress after ' + maxRounds + ' rounds');
+}

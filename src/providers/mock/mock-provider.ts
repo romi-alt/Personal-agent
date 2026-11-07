@@ -78,6 +78,7 @@ export class MockProvider implements ExecutionProvider {
     step: MockStepType;
     /** The exact prompt the worker sent (lets tests assert recovery context). */
     prompt: string;
+    readOnly: boolean;
   }[] = [];
 
   constructor(private readonly opts: MockProviderOptions = {}) {}
@@ -161,7 +162,7 @@ export class MockProvider implements ExecutionProvider {
     // Record execution marker in the workspace so tests can prove no work is duplicated.
     mkdirSync(req.cwd, { recursive: true });
     // (Skipped for noArtifact steps, which must leave the working tree untouched.)
-    if (!step.noArtifact) {
+    if (!step.noArtifact && !req.readOnly) {
       appendFileSync(
         path.join(req.cwd, '.mock-executions.log'),
         `${req.taskTitle}\t${req.attemptIndex}\t${step.type}\t${req.resumeSessionId ?? 'new'}\n`,
@@ -182,7 +183,8 @@ export class MockProvider implements ExecutionProvider {
 
     switch (step.type) {
       case 'success':
-        if (!step.noArtifact) writeFileSync(path.join(req.cwd, `${req.taskId}.done`), 'done\n');
+        if (!step.noArtifact && !req.readOnly)
+          writeFileSync(path.join(req.cwd, `${req.taskId}.done`), 'done\n');
         return {
           kind: 'completed',
           summary,
@@ -288,6 +290,7 @@ export class MockProvider implements ExecutionProvider {
       resumed: req.resumeSessionId,
       step,
       prompt: req.prompt,
+      readOnly: !!req.readOnly,
     });
   }
 }

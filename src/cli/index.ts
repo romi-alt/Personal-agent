@@ -21,6 +21,8 @@ import {
   verifyProject,
 } from '../verification/service.js';
 import { providerReadiness, verifyApiAccess } from '../providers/readiness.js';
+import { validatePlan } from '../planning/validate-plan.js';
+import type { Plan } from '../planning/schemas.js';
 import { EnvCredentialSource } from '../providers/claude/credentials.js';
 import { Supervisor } from '../supervisor/supervisor.js';
 import { startHealthServer } from '../supervisor/health.js';
@@ -67,6 +69,9 @@ const OPTIONS = {
   reason: { type: 'string' },
   'acknowledge-unverified': { type: 'string' },
   access: { type: 'boolean' },
+  question: { type: 'string' },
+  text: { type: 'string' },
+  assume: { type: 'boolean' },
 } as const;
 
 const HELP = `ELEVARIQ Personal Agent - Phase 1
@@ -98,6 +103,12 @@ Usage: npm run agent -- <command> [options]
   project:verify <project>                 Run independent verification (changes/build/tests); records evidence
   project:accept <project> [--acknowledge-unverified "why"]   Owner acceptance (never automatic)
   project:deliver <project> --reason R     Mark a READY_FOR_DELIVERY project DELIVERED (records only; deploys nothing)
+  plan:start <project>                     Start the planning workflow (analyse -> architect -> decompose -> owner approval -> tasks)
+  plan:show <project>                      Requirements, milestones, planned tasks and requirement coverage
+  workflow:list | workflow:show <run>      Workflow runs, steps and what they are waiting for
+  workflow:answer <run> --question Q --text "..."   Answer a blocking clarification question
+  workflow:resume <run> --assume           Continue without answers (the analysis' assumptions are used)
+  workflow:cancel <run> [--reason R]       Cancel a planning run
   provider:status                          Provider readiness report (SDK / credentials / API access / budget / live execution / live recovery)
   provider:verify --access                 Non-billable API key check (GET /v1/models); records API_ACCESS_VERIFIED
 `;
@@ -199,7 +210,14 @@ async function main(): Promise<void> {
           out(`supervisor launching in background (pid ${child.pid}). Check: npm run agent -- status`);
           break;
         }
-        const sup = new Supervisor({ config, store, provider, registry, log: app.log });
+        const sup = new Supervisor({
+          config,
+          store,
+          provider,
+          registry,
+          log: app.log,
+          workflows: app.workflows,
+        });
         const onSignal = (sig: string) => sup.requestStop(`received ${sig}`);
         for (const s of ['SIGINT', 'SIGTERM', 'SIGBREAK'] as const) process.on(s, () => onSignal(s));
         // A bug must never leave a zombie supervisor: log, shut down gracefully (checkpointing), exit non-zero for the service manager.
@@ -721,6 +739,149 @@ async function main(): Promise<void> {
         const p = resolveProject(rest[0]);
         for (const m of store.listMemory(p.id).filter((x) => !rest[1] || x.section === rest[1]))
           out(`## ${m.section}\n${m.content}\n`);
+        break;
+      }
+      case 'plan:start': {
+        const p = resolveProject(rest[0]);
+        const run = app.workflows.startPlanning(p.id);
+        out(`planning workflow ${run.id} for ${p.slug}: ${run.status} (phase ${run.context.phase})`);
+        out(
+          'The supervisor executes the planning steps as read-only tasks. Watch with: workflow:show ' +
+            run.id,
+        );
+        break;
+      }
+      case 'workflow:list': {
+        const runs = app.workflows.repo.listRuns({
+          projectId: values.project ? resolveProject(values.project).id : undefined,
+        });
+        out(
+          table(
+            runs.map((r) => ({
+              id: r.id,
+              project: store.getProject(r.projectId)?.slug,
+              kind: r.kind,
+              status: r.status,
+              phase: r.context.phase,
+              error: r.error,
+            })),
+            ['id', 'project', 'kind', 'status', 'phase', 'error'],
+          ),
+        );
+        break;
+      }
+      case 'workflow:show': {
+        const run = app.workflows.repo.getRun(rest[0] ?? '');
+        if (!run) fail(`unknown workflow run ${rest[0] ?? ''}`);
+        out(
+          `${run.id}  ${run.kind}  status=${run.status}  phase=${run.context.phase}${run.error ? `  error=${run.error}` : ''}`,
+        );
+        out(
+          '\nSteps:\n' +
+            table(
+              app.workflows.repo.listSteps(run.id).map((s2) => ({
+                step: s2.name,
+                attempt: s2.attempt,
+                status: s2.status,
+                task: s2.taskId,
+                error: s2.error?.split('\n')[0],
+              })),
+              ['step', 'attempt', 'status', 'task', 'error'],
+            ),
+        );
+        if (run.status === 'WAITING_FOR_OWNER' && run.context.phase === 'clarify') {
+          out(
+            '\nBlocking questions (answer with workflow:answer, or continue with workflow:resume --assume):',
+          );
+          for (const q of run.context.questions.filter((x) => x.blocking))
+            out(
+              `  ${q.id}: ${q.text}${run.context.answers[q.id] ? `\n     answer: ${run.context.answers[q.id]}` : ''}`,
+            );
+        }
+        if (run.status === 'WAITING_FOR_OWNER' && run.context.phase === 'approval')
+          out(
+            `\nWaiting for plan approval: npm run agent -- approve ${run.context.approvalId}   (or deny ${run.context.approvalId})`,
+          );
+        break;
+      }
+      case 'workflow:answer': {
+        if (!rest[0] || !values.question || !values.text)
+          fail('usage: workflow:answer <run> --question Q-1 --text "answer"');
+        app.workflows.answerQuestion(rest[0], values.question, values.text);
+        out('answer recorded');
+        break;
+      }
+      case 'workflow:resume': {
+        if (!rest[0] || !values.assume) fail('usage: workflow:resume <run> --assume');
+        app.workflows.resumeWithAssumptions(rest[0]);
+        out('continuing with the analysis assumptions');
+        break;
+      }
+      case 'workflow:cancel': {
+        if (!rest[0]) fail('usage: workflow:cancel <run> [--reason R]');
+        app.workflows.cancel(rest[0], values.reason ?? 'cancelled by owner');
+        out('cancelled');
+        break;
+      }
+      case 'plan:show': {
+        const p = resolveProject(rest[0]);
+        const reqs = app.workflows.repo.listRequirements(p.id);
+        const tasks = app.workflows.repo.listPlanTasks(p.id);
+        out(
+          `Requirements (${reqs.length}):\n` +
+            table(
+              reqs.map((r) => ({
+                id: r.id,
+                priority: r.priority,
+                source: r.source,
+                covered_by:
+                  tasks
+                    .filter((t) => t.requirementIds.includes(r.id))
+                    .map((t) => t.planKey)
+                    .join(',') || '-',
+                text: r.text.slice(0, 60),
+              })),
+              ['id', 'priority', 'source', 'covered_by', 'text'],
+            ),
+        );
+        out(
+          '\nMilestones:\n' +
+            table(
+              app.workflows.repo.listMilestones(p.id).map((m) => ({
+                pos: m.position + 1,
+                key: m.key,
+                title: m.title,
+                tasks: tasks.filter((t) => t.milestoneKey === m.key).length,
+              })),
+              ['pos', 'key', 'title', 'tasks'],
+            ),
+        );
+        out(
+          '\nPlanned tasks:\n' +
+            table(
+              tasks.map((t) => ({
+                key: t.planKey,
+                milestone: t.milestoneKey,
+                size: t.size,
+                status: t.status,
+                title: t.title,
+              })),
+              ['key', 'milestone', 'size', 'status', 'title'],
+            ),
+        );
+        const runs = app.workflows.repo.listRuns({ projectId: p.id });
+        const last = runs.at(-1);
+        const planJson = last ? app.workflows.repo.completedOutput(last.id, 'decompose') : null;
+        if (planJson) {
+          const v = validatePlan(
+            JSON.parse(planJson) as Plan,
+            reqs.map((r) => r.id),
+            { maxTasks: config.maxPlanTasks },
+          );
+          out(
+            `\nLatest plan: ${v.ok ? 'valid' : 'INVALID'}; uncovered requirements: ${v.coverage.uncovered.join(', ') || 'none'}`,
+          );
+        }
         break;
       }
       case 'assignment:add': {

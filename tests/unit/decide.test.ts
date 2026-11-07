@@ -36,6 +36,8 @@ const task = (o: Partial<Task> = {}): Task => ({
   interruptionCount: 0,
   providerFailureStreak: 0,
   verificationRequired: [],
+  kind: 'CODING',
+  readOnly: false,
   createdAt: 0,
   updatedAt: 0,
   completedAt: null,

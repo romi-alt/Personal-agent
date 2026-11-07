@@ -33,6 +33,14 @@ Rules you must follow:
 - Run the relevant tests before finishing. End with a short report: what is done, what remains, test results.
 `.trim();
 
+/** System instructions for read-only planning workers (Phase 2 workflows). */
+export const PLANNING_APPEND = `
+You are a read-only planning worker in the ELEVARIQ Personal Agent pipeline.
+- You may only read files in the current working directory. Do NOT create, edit or delete anything and do not run commands.
+- Your ENTIRE final reply must be one JSON object that matches the schema in the task, with no prose before or after it.
+- Use only the identifiers given in the task (requirement ids etc.). Do not invent requirements; record uncertainty as questions or risks.
+`.trim();
+
 export interface PromptInput {
   task: Task;
   project: Project;

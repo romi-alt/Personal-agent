@@ -9,6 +9,7 @@ import { reconcileOrphans, type ReconcileAction } from '../recovery/reconcile.js
 import { TaskRunner } from '../workers/runner.js';
 import type { WorkspaceRegistry } from '../workspaces/registry.js';
 import type { ExecutionRecord, Task } from '../types/index.js';
+import type { WorkflowEngine } from '../workflows/engine.js';
 
 export interface SupervisorDeps {
   config: AppConfig;
@@ -18,6 +19,8 @@ export interface SupervisorDeps {
   log: Logger;
   instanceId?: string;
   rng?: () => number;
+  /** Planning-workflow orchestrator; advanced on every tick (local SQL only). */
+  workflows?: WorkflowEngine;
 }
 
 export interface GateResult {
@@ -192,6 +195,9 @@ export class Supervisor {
   async tick(): Promise<{ claimed: number; gate: GateResult }> {
     const { store, config, log, provider } = this.d;
     store.sweepDependencyBlocks();
+    // Workflow orchestration is pure database work, so it also runs while the provider gate is closed
+    // (e.g. creating the next planning task or recording an owner's answer).
+    this.d.workflows?.advanceAll();
     const gate = await this.gate();
     if (gate.reason !== this.lastGate) {
       this.lastGate = gate.reason;
