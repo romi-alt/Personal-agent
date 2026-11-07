@@ -50,6 +50,8 @@ if ($task) {
   Check 'task last result is OK or still running' (($info.LastTaskResult -eq 0) -or ($info.LastTaskResult -eq 267009) -or ($info.LastTaskResult -eq 267011)) ("LastTaskResult=$($info.LastTaskResult) LastRun=$($info.LastRunTime)")
   Check 'task has no execution time limit' ($task.Settings.ExecutionTimeLimit -eq 'PT0S') "$($task.Settings.ExecutionTimeLimit)"
   Check 'task ignores duplicate starts' ($task.Settings.MultipleInstances -eq 'IgnoreNew') "$($task.Settings.MultipleInstances)"
+  Check 'task runs on battery and is not stopped when unplugged' ((-not $task.Settings.DisallowStartIfOnBatteries) -and (-not $task.Settings.StopIfGoingOnBatteries)) "DisallowStartIfOnBatteries=$($task.Settings.DisallowStartIfOnBatteries) StopIfGoingOnBatteries=$($task.Settings.StopIfGoingOnBatteries)"
+  Check 'keepalive trigger present' (@($task.Triggers | Where-Object { $_.Repetition.Interval }).Count -ge 1) 'restarts the agent if its process tree ends'
 }
 
 $power = (powercfg /query SCHEME_CURRENT SUB_SLEEP STANDBYIDLE 2>&1 | Out-String)

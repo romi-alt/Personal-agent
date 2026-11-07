@@ -25,6 +25,7 @@ param(
   [switch]$KeepTask
 )
 $ErrorActionPreference = 'Stop'
+Add-Type -AssemblyName System.Windows.Forms
 if (-not $RepoPath) { $RepoPath = Split-Path -Parent (Split-Path -Parent $PSScriptRoot) }
 $RepoPath = (Resolve-Path -LiteralPath $RepoPath).Path
 if (-not $NodePath) { $NodePath = (Get-Command node).Source }
@@ -99,16 +100,22 @@ function TaskId([string]$text) { $m = [regex]::Match($text, 'tsk_[a-z0-9]+'); re
 
 Write-Output "Acceptance home: $AgentHome"
 # ---------------------------------------------------------------- 1. install + definition
-& (Join-Path $RepoPath 'scripts\windows\install-task.ps1') -TaskName $TaskName -RepoPath $RepoPath -NodePath $NodePath -AgentHome $AgentHome -EnvFile $envFile | Out-Null
+& (Join-Path $RepoPath 'scripts\windows\install-task.ps1') -TaskName $TaskName -RepoPath $RepoPath -NodePath $NodePath -AgentHome $AgentHome -EnvFile $envFile -KeepAliveMinutes 1 | Out-Null
+# From here on, a failing step is recorded as FAIL and the run continues (cleanup always happens).
+$ErrorActionPreference = 'Continue'
 $t = Get-ScheduledTask -TaskName $TaskName
 $act = $t.Actions[0]
 Check 'task registered' ($null -ne $t) $TaskName
 Check 'action runs the wrapper with an absolute node path' (($act.Execute -eq 'powershell.exe') -and $act.Arguments.Contains((Join-Path $RepoPath 'scripts\windows\run-supervisor.ps1')) -and $act.Arguments.Contains("-NodePath `"$NodePath`"")) $act.Arguments
 Check 'absolute working directory' ($act.WorkingDirectory -eq $RepoPath) $act.WorkingDirectory
 Check 'logon trigger for this user' (($t.Triggers[0].CimClass.CimClassName -eq 'MSFT_TaskLogonTrigger') -and ($t.Triggers[0].UserId -like "*$env:USERNAME")) "$($t.Triggers[0].CimClass.CimClassName) $($t.Triggers[0].UserId)"
+Check 'keepalive trigger (repeats indefinitely)' (($t.Triggers.Count -ge 2) -and ($t.Triggers[1].Repetition.Interval -eq 'PT1M') -and (-not $t.Triggers[1].Repetition.Duration)) "interval=$($t.Triggers[1].Repetition.Interval) duration='$($t.Triggers[1].Repetition.Duration)'"
 Check 'runs as this user, interactive token, not elevated' (($t.Principal.UserId -like "*$env:USERNAME") -and ($t.Principal.LogonType -eq 'Interactive') -and ($t.Principal.RunLevel -eq 'Limited')) "$($t.Principal.UserId) $($t.Principal.LogonType) $($t.Principal.RunLevel)"
 Check 'single instance (IgnoreNew), no time limit, restart on failure' (($t.Settings.MultipleInstances -eq 'IgnoreNew') -and ($t.Settings.ExecutionTimeLimit -eq 'PT0S') -and ($t.Settings.RestartCount -ge 1)) "$($t.Settings.MultipleInstances) $($t.Settings.ExecutionTimeLimit) restart=$($t.Settings.RestartCount)x$($t.Settings.RestartInterval)"
 Check 'no secret in task arguments' (-not ($act.Arguments -match '(?i)(api[_-]?key|token|password|secret)')) 'paths only'
+Check 'runs on battery power and is not stopped when unplugged' ((-not $t.Settings.DisallowStartIfOnBatteries) -and (-not $t.Settings.StopIfGoingOnBatteries)) "DisallowStartIfOnBatteries=$($t.Settings.DisallowStartIfOnBatteries) StopIfGoingOnBatteries=$($t.Settings.StopIfGoingOnBatteries)"
+$power = [System.Windows.Forms.SystemInformation]::PowerStatus
+Info 'power source during this run' "$($power.PowerLineStatus) (Offline = on battery)"
 
 # ---------------------------------------------------------------- 2. what the task context can see
 $probeName = "$TaskName-Probe"
@@ -116,9 +123,11 @@ $probeOut = Join-Path $AgentHome 'probe.json'
 $probeArgs = "-NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File `"$(Join-Path $RepoPath 'scripts\windows\task-probe.ps1')`" -Out `"$probeOut`" -RepoPath `"$RepoPath`" -NodePath `"$NodePath`" -AgentHome `"$AgentHome`" -EnvFile `"$envFile`""
 $pAction = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument $probeArgs -WorkingDirectory $RepoPath
 $pPrincipal = New-ScheduledTaskPrincipal -UserId "$env:USERDOMAIN\$env:USERNAME" -LogonType Interactive -RunLevel Limited
-Register-ScheduledTask -TaskName $probeName -Action $pAction -Principal $pPrincipal -Settings (New-ScheduledTaskSettingsSet -Hidden) -Force | Out-Null
+# Battery flags matter: Task Scheduler's default is "do not start on battery power" (the task would stay Queued).
+$pSettings = New-ScheduledTaskSettingsSet -Hidden -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -ExecutionTimeLimit (New-TimeSpan -Minutes 10)
+Register-ScheduledTask -TaskName $probeName -Action $pAction -Principal $pPrincipal -Settings $pSettings -Force | Out-Null
 Start-ScheduledTask -TaskName $probeName
-$null = WaitUntil { Test-Path -LiteralPath $probeOut } 120
+$null = WaitUntil { Test-Path -LiteralPath $probeOut } 240
 Start-Sleep -Seconds 1
 Unregister-ScheduledTask -TaskName $probeName -Confirm:$false
 $probe = $null
@@ -166,7 +175,7 @@ Check 'manually started second supervisor refused (exit 3)' ($second.ExitCode -e
 # ---------------------------------------------------------------- 6. supervisor crash -> wrapper restart -> task recovery
 $tl = TaskId (Agent @('task:add', '--project', 'scheduler-acceptance', '--title', 'sched long', '--instructions', 'hangs until interrupted')).out
 $null = WaitUntil { (TaskStatus $tl) -eq 'RUNNING' } 60
-Stop-Process -Id $sup1 -Force
+Stop-Process -Id $sup1 -Force -ErrorAction SilentlyContinue
 $restarted = WaitUntil { $p = LivePid; ($p -gt 0) -and ($p -ne $sup1) } 120
 $sup2 = LivePid
 Check 'wrapper restarted the killed supervisor' $restarted "old=$sup1 new=$sup2"
@@ -177,7 +186,7 @@ Check 'restart recorded in wrapper log' ((Get-Content (Join-Path $logDir 'wrappe
 
 # ---------------------------------------------------------------- 7. wrapper lost while the supervisor survives
 $w1 = @(Wrappers)
-if ($w1.Count) { Stop-Process -Id $w1[0].ProcessId -Force }
+if ($w1.Count) { Stop-Process -Id $w1[0].ProcessId -Force -ErrorAction SilentlyContinue }
 Start-Sleep -Seconds 3
 Check 'supervisor survives loss of its wrapper' ((LivePid) -eq $sup2) "pid=$(LivePid)"
 $tsRestarted = WaitUntil { @(Wrappers).Count -ge 1 } 150
@@ -185,7 +194,7 @@ Info 'Task Scheduler restarted the killed wrapper by itself' "$tsRestarted (Rest
 if (-not $tsRestarted) { Start-ScheduledTask -TaskName $TaskName; $null = WaitUntil { @(Wrappers).Count -ge 1 } 30 }
 $monitoring = WaitUntil { (Get-Content (Join-Path $logDir 'wrapper.log') -Raw) -match 'monitoring it' } 60
 Check 'new wrapper monitors the surviving supervisor (no second supervisor)' ($monitoring -and ((LivePid) -eq $sup2)) "wrappers=$(@(Wrappers).Count)"
-Stop-Process -Id $sup2 -Force
+Stop-Process -Id $sup2 -Force -ErrorAction SilentlyContinue
 $takeover = WaitUntil { $p = LivePid; ($p -gt 0) -and ($p -ne $sup2) } 120
 $sup3 = LivePid
 Check 'monitoring wrapper takes over after that supervisor dies' $takeover "old=$sup2 new=$sup3"
@@ -196,6 +205,26 @@ $ended = WaitUntil { ((Get-ScheduledTask -TaskName $TaskName).State -ne 'Running
 $st = Status
 Check 'graceful stop ends supervisor, wrapper and task' (($stop.code -eq 0) -and $ended -and ($st.supervisor.status -eq 'STOPPED')) "stop=$($stop.code) taskState=$((Get-ScheduledTask -TaskName $TaskName).State) supervisor=$($st.supervisor.status)"
 Check 'wrapper logged the graceful stop' ((Get-Content (Join-Path $logDir 'wrapper.log') -Raw) -match 'graceful stop; wrapper exiting') ''
+
+# ---------------------------------------------------------------- 8b. whole task tree terminated -> keepalive restarts
+$back = WaitUntil { (LivePid) -gt 0 } 150
+Check 'keepalive trigger restarts the agent after it ended' $back "pid=$(LivePid)"
+$supK = LivePid
+# Simulated total failure: wrapper AND supervisor killed (nothing left to restart anything locally).
+foreach ($w in @(Wrappers)) { Stop-Process -Id $w.ProcessId -Force -ErrorAction SilentlyContinue }
+if ($supK) { Stop-Process -Id $supK -Force -ErrorAction SilentlyContinue }
+$gone = WaitUntil { (@(Wrappers).Count -eq 0) -and -not (Get-Process -Id $supK -ErrorAction SilentlyContinue) } 30
+Check 'wrapper and supervisor both killed (simulated total failure)' $gone "wrappers=$(@(Wrappers).Count) supervisorAlive=$([bool](Get-Process -Id $supK -ErrorAction SilentlyContinue))"
+$rec2 = WaitUntil { $p = LivePid; ($p -gt 0) -and ($p -ne $supK) } 150
+Check 'keepalive recovers from total failure of the task process tree' $rec2 "old=$supK new=$(LivePid)"
+
+# ---------------------------------------------------------------- 8c. stop --hold is honoured by keepalive
+$hold = Agent @('stop', '--hold')
+$null = WaitUntil { (LivePid) -eq 0 } 60
+Start-Sleep -Seconds 100
+Check 'stop --hold: keepalive does not restart the agent' (((LivePid) -eq 0) -and ((Get-Content (Join-Path $logDir 'wrapper.log') -Raw) -match 'STOP-HOLD present')) "stop=$($hold.code) live=$(LivePid)"
+Remove-Item -LiteralPath (Join-Path $AgentHome 'STOP-HOLD') -Force -ErrorAction SilentlyContinue
+Stop-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue
 
 # ---------------------------------------------------------------- 9. real Claude Code CLI under the task (optional)
 if ($RealCli) {

@@ -121,12 +121,18 @@ export async function verifyProject(
     'SECURITY_CHECKS_PASS',
   ] as const) {
     const v = verifierFor(deps, level)!;
-    const res = await v.verify({
-      projectId: project.id,
-      cwd,
-      commands: { build: assignment?.verification.buildCommand, test: assignment?.verification.testCommand },
-      timeoutMs: deps.timeoutMs,
-    });
+    const res =
+      level === 'REQUIREMENTS_SATISFIED' && !deps.verifiers?.REQUIREMENTS_SATISFIED
+        ? requirementCoverage(store, project.id)
+        : await v.verify({
+            projectId: project.id,
+            cwd,
+            commands: {
+              build: assignment?.verification.buildCommand,
+              test: assignment?.verification.testCommand,
+            },
+            timeoutMs: deps.timeoutMs,
+          });
     evidence.push(
       store.addEvidence({
         projectId: project.id,
@@ -159,6 +165,62 @@ export async function verifyProject(
     }
   }
   return { readiness, evidence };
+}
+
+/**
+ * Project-level REQUIREMENTS_SATISFIED: every planned requirement must be implemented by at least one task whose
+ * latest independent review (task-level REQUIREMENTS_SATISFIED evidence, src/engineering/qa.ts) PASSED.
+ * Without independent reviews the answer is NOT_EVALUATED - never an implicit pass.
+ */
+export function requirementCoverage(
+  store: Store,
+  projectId: string,
+): { status: EvidenceStatus; summary: string; evidence: Record<string, unknown> } {
+  const reqs = store.db.prepare('SELECT req_id FROM requirements WHERE project_id = ?').all(projectId) as {
+    req_id: string;
+  }[];
+  const links = store.db
+    .prepare(
+      `SELECT p.task_id, p.requirement_ids, t.status, t.verification_required FROM plan_tasks p JOIN tasks t ON t.id = p.task_id WHERE t.project_id = ?`,
+    )
+    .all(projectId) as {
+    task_id: string;
+    requirement_ids: string;
+    status: string;
+    verification_required: string;
+  }[];
+  if (!reqs.length || !links.some((l) => l.verification_required.includes('REQUIREMENTS_SATISFIED')))
+    return {
+      status: 'NOT_EVALUATED',
+      summary: 'no planned tasks with independent review: requirement coverage cannot be evaluated',
+      evidence: { requirements: reqs.length },
+    };
+  const latest = (taskId: string) =>
+    store.listEvidence({ taskId, level: 'REQUIREMENTS_SATISFIED' }).at(-1)?.status;
+  const reviewed = new Set(
+    links.filter((l) => l.status === 'COMPLETED' && latest(l.task_id) === 'PASSED').map((l) => l.task_id),
+  );
+  const byReq: Record<string, string[]> = {};
+  for (const r of reqs)
+    byReq[r.req_id] = links
+      .filter(
+        (l) => (JSON.parse(l.requirement_ids) as string[]).includes(r.req_id) && reviewed.has(l.task_id),
+      )
+      .map((l) => l.task_id);
+  const missing = Object.entries(byReq)
+    .filter(([, t]) => t.length === 0)
+    .map(([id]) => id);
+  return missing.length
+    ? {
+        status: 'FAILED',
+        summary: `${missing.length} of ${reqs.length} requirement(s) without an independently verified implementation: ${missing.join(', ')}`,
+        evidence: { byRequirement: byReq, missing },
+      }
+    : {
+        status: 'PASSED',
+        summary: `all ${reqs.length} requirement(s) implemented by independently reviewed tasks`,
+        evidence: { byRequirement: byReq },
+      };
 }
 
 export class AcceptanceRefusedError extends Error {

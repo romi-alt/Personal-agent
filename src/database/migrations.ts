@@ -448,6 +448,44 @@ CREATE TABLE qa_reviews (
 CREATE INDEX idx_qa_status ON qa_reviews(status);
 `,
   },
+  {
+    version: 8,
+    name: 'phase_4_integration_sync',
+    sql: `
+-- Read-only ERP/CRM sync audit, resumable cursors, idempotent external records (no live adapter yet)
+CREATE TABLE sync_runs (
+  id TEXT PRIMARY KEY,
+  system TEXT NOT NULL,
+  kind TEXT NOT NULL,
+  scope TEXT NOT NULL,
+  status TEXT NOT NULL,            -- running | completed | partial | failed
+  started_at INTEGER NOT NULL,
+  finished_at INTEGER,
+  pages INTEGER NOT NULL DEFAULT 0,
+  created INTEGER NOT NULL DEFAULT 0,
+  updated INTEGER NOT NULL DEFAULT 0,
+  unchanged INTEGER NOT NULL DEFAULT 0,
+  error TEXT
+);
+CREATE TABLE sync_cursors (
+  key TEXT PRIMARY KEY,
+  cursor TEXT,
+  updated_at INTEGER NOT NULL
+);
+CREATE TABLE external_records (
+  system TEXT NOT NULL,
+  kind TEXT NOT NULL,
+  external_id TEXT NOT NULL,
+  content_hash TEXT NOT NULL,
+  data TEXT NOT NULL,
+  first_seen_at INTEGER NOT NULL,
+  last_seen_at INTEGER NOT NULL,
+  last_changed_at INTEGER NOT NULL,
+  last_run_id TEXT NOT NULL,
+  PRIMARY KEY(system, kind, external_id)
+);
+`,
+  },
 ];
 
 export function runMigrations(db: Database.Database, migrations: Migration[] = MIGRATIONS): number[] {

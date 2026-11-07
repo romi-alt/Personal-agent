@@ -36,7 +36,22 @@ supervisor refused (exit 3); killed supervisor restarted by the wrapper and the 
 (`interrupted,completed`); supervisor survives loss of its wrapper; new wrapper monitors, then takes over; graceful
 stop ends supervisor/wrapper/task; **real CLI task under the task COMPLETED** (haiku, artifact written).
 
+**Run 5 (final): 45 PASS / 0 FAIL / 5 INFO** on battery power, evidence in `docs/evidence-scheduler-acceptance.json`
+(machine/user names replaced by placeholders).
+
+Run 4 (after commit `08abbb3`, keepalive + hold added): 38 PASS / 2 FAIL. The two FAILs were test-harness problems,
+both fixed: (1) the probe task used Task Scheduler's default "do not start on battery" and stayed Queued (the PC was
+on battery); (2) `Stop-ScheduledTask` killed the wrapper but not the `Start-Process`-launched supervisor, so the
+"total failure" step now kills both by pid. New live PASSes in run 4: keepalive trigger restarts the agent after it
+ended, `stop --hold` is honoured, all 4 watchdog variables in the spawn environment of the real claude worker,
+`billing: subscription`.
+
 Observed facts (do not re-derive):
+- Task Scheduler's default settings refuse to START a task on battery power; the agent task sets
+  `AllowStartIfOnBatteries` + `DontStopIfGoingOnBatteries` (now asserted by verify-install.ps1).
+- Run 3: a supervisor and its wrapper vanished with no exit record while the machine was under heavy test load on
+  battery; the TaskScheduler operational log is disabled here, so the cause is unknown. The keepalive trigger now
+  recovers that situation within KeepAliveMinutes.
 - Task Scheduler did NOT restart a force-killed wrapper by itself (RestartCount does not cover that case); the
   monitoring wrapper design covers it.
 - On Windows a non-detached child is in libuv's kill-on-close job object: the whole `claude` worker tree dies with a
@@ -59,8 +74,6 @@ Observed facts (do not re-derive):
 
 ## Not yet verified / open
 
-- Re-run `scheduler-acceptance.ps1 -RealCli` after the evidence-field fixes (`worker_env` spawn record, `billing`):
-  the two remaining FAILs of run 2 were evidence-recording problems, not behaviour (see facts above).
 - Windows restart / sign-in trigger: cannot be automated safely here. Manual check in `docs/WINDOWS_DEPLOYMENT.md`.
 - Real usage-limit wait output of the CLI: inferred from docs, never observed live (deliberately).
 - Command-center UI has not been rendered in a real browser in this environment (API, auth and script syntax are

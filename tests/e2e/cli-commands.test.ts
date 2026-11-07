@@ -226,7 +226,7 @@ describe('CLI: Phase 1.5 commands (assignments, project lifecycle, verification,
   it('project:verify records per-level evidence (unknowns stay unknown)', () => {
     const out = ok('project:verify', 'school-management-erp');
     expect(out).toMatch(/REQUIREMENTS_SATISFIED\s+NOT_EVALUATED/);
-    expect(out).toMatch(/SECURITY_CHECKS_PASS\s+NOT_EVALUATED/);
+    expect(out).toMatch(/SECURITY_CHECKS_PASS\s+PASSED\s+secret scan: 0 findings/); // real scan, scope stated
     expect(out).toMatch(/delivery ready: NO/);
   });
   it('provider:status reports each readiness level without claiming operational; provider:verify demands an explicit flag', () => {

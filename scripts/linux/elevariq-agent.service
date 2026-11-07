@@ -18,6 +18,9 @@ Environment=NODE_ENV=production
 Environment=AGENT_HOME=/var/lib/elevariq-agent
 Environment=AGENT_ENV_FILE=/etc/elevariq-agent/agent.env
 Environment=HOME=/var/lib/elevariq-agent
+# claude-cli provider: the native installer puts `claude` in $HOME/.local/bin of the service user; its subscription
+# login lives in $HOME/.claude (log in once interactively: sudo -u elevariq-agent -H bash -lc 'claude' then /login).
+Environment=PATH=/var/lib/elevariq-agent/.local/bin:/usr/local/bin:/usr/bin:/bin
 EnvironmentFile=-/etc/elevariq-agent/agent.env
 # Adjust the node path to match `command -v node` on the host.
 ExecStart=/usr/bin/node dist/cli/index.js start

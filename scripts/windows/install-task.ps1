@@ -29,7 +29,11 @@ param(
   [string]$RepoPath = '',
   [string]$NodePath = '',
   [string]$AgentHome = '',
-  [string]$EnvFile = ''
+  [string]$EnvFile = '',
+  # Keepalive: an extra trigger every N minutes. While the agent runs it is ignored (MultipleInstances IgnoreNew);
+  # if the task's processes were terminated (crash of the whole tree, killed task), it restarts the agent.
+  # 0 disables. A deliberate `stop --hold` is honoured by the wrapper (STOP-HOLD marker).
+  [int]$KeepAliveMinutes = 5
 )
 $ErrorActionPreference = 'Stop'
 # Windows PowerShell 5.1 leaves $PSScriptRoot empty inside param() defaults, so resolve it here.
@@ -59,6 +63,11 @@ if ($AgentHome) { $argLine += " -AgentHome `"$AgentHome`"" }
 if ($EnvFile) { $argLine += " -EnvFile `"$EnvFile`"" }
 $action = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument $argLine -WorkingDirectory $RepoPath
 if ($Trigger -eq 'AtStartup') { $trig = New-ScheduledTaskTrigger -AtStartup } else { $trig = New-ScheduledTaskTrigger -AtLogOn -User "$env:USERDOMAIN\$env:USERNAME" }
+if ($KeepAliveMinutes -gt 0) {
+  # Empty Repetition.Duration = repeat indefinitely (Windows PowerShell 5.1 default for -Once with an interval).
+  $keep = New-ScheduledTaskTrigger -Once -At (Get-Date).AddMinutes(1) -RepetitionInterval (New-TimeSpan -Minutes $KeepAliveMinutes)
+  $trig = @($trig, $keep)
+}
 $settings = New-ScheduledTaskSettingsSet `
   -RestartCount 999 -RestartInterval (New-TimeSpan -Minutes 1) `
   -ExecutionTimeLimit ([TimeSpan]::Zero) `
@@ -69,6 +78,7 @@ Write-Output "Task      : $TaskName ($Trigger, user $env:USERDOMAIN\$env:USERNAM
 Write-Output "Execute   : powershell.exe $argLine"
 Write-Output "WorkingDir: $RepoPath"
 Write-Output "Node      : $NodePath ($nodeVersion)"
+Write-Output "Keepalive: $(if ($KeepAliveMinutes -gt 0) { "every $KeepAliveMinutes min (no-op while running)" } else { 'off' })"
 if ($PSCmdlet.ShouldProcess($TaskName, "Register scheduled task ($Trigger) using $NodePath ($nodeVersion)")) {
   if ($RunWhetherLoggedOnOrNot) {
     $cred = Get-Credential -UserName "$env:USERDOMAIN\$env:USERNAME" -Message 'Windows password for the scheduled task (stored by Task Scheduler, not by this script)'

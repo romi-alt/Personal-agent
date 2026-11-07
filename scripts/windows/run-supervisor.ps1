@@ -55,8 +55,11 @@ if (-not $env:LOG_TO_CONSOLE) { $env:LOG_TO_CONSOLE = 'false' }
 Set-Location -LiteralPath $RepoPath
 Log "start repo=$RepoPath node=$NodePath home=$agentHome user=$env:USERDOMAIN\$env:USERNAME"
 
+$holdFile = Join-Path $agentHome 'STOP-HOLD'
 $delay = 10
 while ($true) {
+  # The owner stopped the agent with `stop --hold`: do not restart it (keepalive/logon triggers included).
+  if (Test-Path -LiteralPath $holdFile) { Log "STOP-HOLD present ($holdFile); not starting"; exit 0 }
   foreach ($f in @($outLog, $errLog)) {
     if ((Test-Path -LiteralPath $f) -and ((Get-Item -LiteralPath $f).Length -gt 5MB)) { Remove-Item -LiteralPath $f -Force }
   }

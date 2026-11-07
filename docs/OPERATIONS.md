@@ -120,3 +120,68 @@ npm run agent -- plan:show <project>         # requirements <-> tasks coverage, 
 
 New settings: `PLAN_APPROVAL` (`required`|`auto`), `MAX_PLAN_TASKS`, `MAX_PLAN_REPAIRS`. A run that `FAILED` (invalid output after the repairs, or a failed planning task) leaves the project `BLOCKED`;
 read `workflow:show`, fix the cause (assignment wording, budget, provider), then `plan:start` again. Planning uses the same budgets/caps as coding tasks, so check `provider:status` first.
+
+---
+
+# Session 3 addendum (2026-11-07) - project intelligence, QA, command center, operations
+
+## Assign work in plain language
+
+```bash
+npm run agent -- intake "Build a complete educational ERP for Pakistani institutions." --attach spec.md
+npm run agent -- workflow:show <run>          # intake -> analyse -> research -> architect -> decompose -> review -> approval
+npm run agent -- research:show <project>      # findings: verified (cited source actually retrieved) vs assumption
+npm run agent -- architecture:show <project>  # 11 areas; diagrams + ADRs are also written to docs/ in the project repo
+npm run agent -- adr:list <project>           # significant decisions need your approval together with the plan
+npm run agent -- review:show <project>        # deterministic + independent model planning review rounds
+npm run agent -- approve <approval-id>        # approve plan + significant ADRs -> coding tasks are created
+npm run agent -- roadmap <project>            # milestones, epics, critical path, progress counted from evidence only
+npm run agent -- qa <project>                 # independent review per completed task, corrections, escalations
+```
+
+Settings: `RESEARCH_WEB_ACCESS` (default true; never when the assignment requires `web_access` approval),
+`WRITE_PLAN_DOCS`, `INDEPENDENT_REVIEW` (default true), `MAX_CORRECTION_ROUNDS` (default 2).
+A `qa_escalation` approval means the independent reviewer could not confirm a task after the correction rounds:
+approve to accept it anyway (recorded as an owner override), deny to keep its dependants blocked.
+
+## Command center
+
+```bash
+npm run agent -- dashboard                    # http://127.0.0.1:4317/  (DASHBOARD_PORT)
+npm run agent -- dashboard:token [--rotate]   # owner token (stored in AGENT_HOME/dashboard.token)
+```
+
+Loopback only by default. Remote use: VPN or `ssh -L 4317:127.0.0.1:4317 host`; never bind 0.0.0.0 without a TLS
+proxy (`DASHBOARD_ALLOW_REMOTE=true`, `DASHBOARD_ALLOWED_HOSTS`, `DASHBOARD_SECURE_COOKIES=true`). Every owner action
+(pause/resume/priority/cancel/approve/deny/assign) is an audit event with actor, channel and address.
+
+## Backups, restore, notifications
+
+```bash
+npm run agent -- backup                       # online backup + verification (AGENT_HOME/backups)
+npm run agent -- backup:list
+npm run agent -- backup:verify [file]         # restore drill: checksum, integrity_check, row counts
+npm run agent -- stop && npm run agent -- restore <file> --reason "why"   # old DB kept as *.pre-restore-*
+```
+
+The supervisor backs up every `BACKUP_INTERVAL_HOURS` (24; 0 = off) and keeps `BACKUP_RETENTION` (14). Back up
+`AGENT_HOME/workspaces` (git repositories) and the env file separately; the owner token is intentionally not in backups.
+Errors, escalations and approval requests go to `AGENT_HOME/notifications.jsonl` and, only if you set it,
+`NOTIFY_WEBHOOK_URL` (payload: type, severity, short title, ids - no task output or credentials).
+
+## Windows background operation (verified on the owner PC, 2026-11-07)
+
+`scripts\windows\install-task.ps1` registers a logon trigger plus a keepalive trigger (`-KeepAliveMinutes`, default 5)
+that restarts the agent if the whole task process tree ends. `npm run agent -- stop` stops it until the next keepalive;
+`npm run agent -- stop --hold` keeps it stopped until you run `start` explicitly. Live acceptance:
+`powershell -ExecutionPolicy Bypass -File scripts\windows\scheduler-acceptance.ps1 [-RealCli]` (isolated task + home).
+**Not automatable here:** verify after a real reboot + sign-in that `status` shows a live supervisor within 2 minutes.
+
+## Ubuntu VPS (prepared, never deployed by the agent)
+
+`sudo scripts/linux/install.sh` installs `elevariq-agent.service` (non-root `elevariq-agent`, hardened, state in
+`/var/lib/elevariq-agent`) and the loopback-only `elevariq-dashboard.service`. Firewall: `ufw default deny incoming;
+ufw allow OpenSSH; ufw enable`. For `EXECUTION_PROVIDER=claude-cli` install Claude Code for the service user and log
+in once interactively (`sudo -u elevariq-agent -H bash -lc claude`, then `/login`); confirm with
+`sudo -u elevariq-agent -H node dist/cli/index.js provider:status`. Moving from Windows: stop the agent, `backup`,
+copy the backup + workspaces, `restore` on the VPS, start the service.

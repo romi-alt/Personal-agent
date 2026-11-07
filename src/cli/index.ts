@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { spawn, execFile } from 'node:child_process';
-import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { accessSync, constants, mkdirSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -83,6 +83,7 @@ const OPTIONS = {
   attach: { type: 'string', multiple: true },
   port: { type: 'string' },
   rotate: { type: 'boolean' },
+  hold: { type: 'boolean' },
 } as const;
 
 const HELP = `ELEVARIQ Personal Agent
@@ -91,7 +92,7 @@ Usage: npm run agent -- <command> [options]
 
   doctor                      Verify environment, configuration and provider readiness
   start [--detach]            Run the supervisor (foreground, or detached background process)
-  stop [--wait <ms>]          Request graceful shutdown of the running supervisor
+  stop [--wait <ms>] [--hold]  Graceful shutdown; --hold also stops background restarts until the next explicit start
   status [--json]             Supervisor, worker, queue, waiting tasks, checkpoint, auth and provider state
   health                      Exit 0 only if the supervisor is live, the DB is healthy and auth is ready
   projects                    List projects
@@ -224,6 +225,8 @@ async function main(): Promise<void> {
         break;
       }
       case 'start': {
+        // An explicit start ends a `stop --hold` (wrappers check the marker before ever launching `start`).
+        rmSync(path.join(config.agentHome, 'STOP-HOLD'), { force: true });
         if (values.detach) {
           const child = spawn(
             process.execPath,
@@ -267,6 +270,14 @@ async function main(): Promise<void> {
         break;
       }
       case 'stop': {
+        if (values.hold) {
+          // Background wrappers (Task Scheduler keepalive/logon) honour this marker and do not restart the agent.
+          writeFileSync(
+            path.join(config.agentHome, 'STOP-HOLD'),
+            `held by owner at ${new Date().toISOString()}\n`,
+          );
+          out(`STOP-HOLD set: background restarts are suspended until "start" is run explicitly`);
+        }
         const sup = store.getSupervisorState();
         if (!sup || !store.supervisorIsLive(sup, config.leaseTtlMs)) {
           out('no live supervisor');

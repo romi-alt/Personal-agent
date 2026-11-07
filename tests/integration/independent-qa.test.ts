@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { registerAssignment } from '../../src/assignments/register.js';
+import { verifyProject } from '../../src/verification/service.js';
 import { assignmentExample } from '../helpers/assignment.js';
 import { makeEnv, settle, type TestEnv } from '../helpers/env.js';
 import { happyPlanning, reply } from '../helpers/plan-fixtures.js';
@@ -134,6 +135,16 @@ describe('Phase 3: independent QA of completed tasks', () => {
     ]);
     // Project reaches VERIFYING only after the last review passed
     expect(env.store.getProject(project.id)!.lifecycle).toBe('VERIFYING');
+    // Project-level REQUIREMENTS_SATISFIED aggregates the independent reviews (every requirement covered)
+    const v = await verifyProject(
+      { store: env.store, timeoutMs: 60_000 },
+      env.store.getProject(project.id)!,
+      project.repoPath,
+    );
+    expect(v.evidence.find((e) => e.level === 'REQUIREMENTS_SATISFIED')).toMatchObject({
+      status: 'PASSED',
+      summary: 'all 4 requirement(s) implemented by independently reviewed tasks',
+    });
   });
 
   it('escalates to the owner when corrections are exhausted; dependants stay blocked until the owner decides', async () => {
