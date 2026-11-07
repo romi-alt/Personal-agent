@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { type ChildProcess, spawn, spawnSync } from 'node:child_process';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, writeFileSync } from 'node:fs';
+import { removeDir } from '../helpers/fs.js';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { openDatabase } from '../../src/database/connection.js';
@@ -18,6 +19,7 @@ const ROOT = path.resolve(__dirname, '../..');
 let home: string;
 let env: NodeJS.ProcessEnv;
 const procs: ChildProcess[] = [];
+const opened: Store[] = [];
 
 const cli = (args: string[]) =>
   spawnSync(process.execPath, ['--import', 'tsx', 'src/cli/index.ts', ...args], {
@@ -63,7 +65,8 @@ beforeEach(() => {
 afterEach(() => {
   for (const p of procs) if (p.exitCode === null) p.kill('SIGKILL');
   procs.length = 0;
-  rmSync(home, { recursive: true, force: true });
+  for (const s of opened.splice(0)) s.db.close(); // Windows cannot delete a database file that is still open
+  removeDir(home);
 });
 
 describe('E2E: assignment -> planned tasks -> executed -> VERIFYING, across a SIGKILL during planning', () => {
@@ -84,6 +87,7 @@ describe('E2E: assignment -> planned tasks -> executed -> VERIFYING, across a SI
     ok('plan:start', 'school-management-erp');
 
     const store = new Store(openDatabase(path.join(home, 'agent.db')));
+    opened.push(store);
     const wf = new WorkflowRepository(store);
     const project = store.listProjects()[0]!;
     const run = wf.listRuns({ projectId: project.id })[0]!;

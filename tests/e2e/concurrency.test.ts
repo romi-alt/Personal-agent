@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { spawn } from 'node:child_process';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync } from 'node:fs';
+import { removeDir } from '../helpers/fs.js';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { openDatabase } from '../../src/database/connection.js';
@@ -15,7 +16,7 @@ let home: string;
 beforeAll(() => {
   home = mkdtempSync(path.join(tmpdir(), 'elevariq-conc-'));
 });
-afterAll(() => rmSync(home, { recursive: true, force: true }));
+afterAll(() => removeDir(home));
 
 function runWorker(args: string[]): Promise<{ workerId: string; claimed: string[]; errors: string[] }> {
   return new Promise((resolve, reject) => {
@@ -67,5 +68,6 @@ describe('multi-process database concurrency', () => {
       ]);
     }
     expect(setup.db.pragma('integrity_check', { simple: true })).toBe('ok');
+    setup.db.close(); // Windows cannot delete a database file that is still open
   }, 90_000);
 });

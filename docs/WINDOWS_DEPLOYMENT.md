@@ -90,3 +90,24 @@ TypeScript code on Windows but **not** the Task Scheduler scripts.
 * Hard stops (power loss, forced kill, Task Scheduler End) lose in-flight model work but never queue state; reconciliation resumes from the last checkpoint on the next start.
 * No script disables Defender, UAC, the firewall or execution-policy protections; `RemoteSigned` is used per invocation only.
 * For 24/7 reliability move the same code to the Ubuntu VPS (systemd unit in `scripts/linux`).
+
+---
+
+## Evidence from a real Windows run (GitHub Actions `windows-latest`, Node 22.23.4, NTFS)
+
+First real Windows execution of this code (CI job `check-windows`, run on PR #1). **This covers the TypeScript code and test suite only - the PowerShell/Task Scheduler scripts have still never been run.**
+
+| Step | Result |
+|---|---|
+| `npm ci` (before `.npmrc`) | **FAILED**: `node-gyp rebuild` for `better-sqlite3` found no usable Visual Studio. Fixed with `.npmrc` `ignore-scripts=true` |
+| `npm ci` (after) / `npm run build` | pass |
+| `npm test` | **219 of 226 passed** - supervisor, queue, leases, recovery, planning workflow, verification, readiness, CLI all worked on Windows |
+| 7 failures | 1 real Windows bug + 6 test-harness issues, all fixed (below) |
+
+Fixed:
+1. **Real bug:** `task:add --file x.md` mis-parsed Markdown with CRLF line endings (a Windows checkout/editor default): the title regex expected `\n`, so the title fell back to the file name. Now normalised; regression test added.
+2. Tests deleted temp directories while a SQLite handle was still open (`EBUSY`) - Windows cannot delete open files. Tests now close handles first and retry removal.
+3. A test assumed a worker finishes within 150 ms (Windows is slower) - now waits for completion.
+4. A test compared a raw temp path with the registry's canonical path (Windows 8.3 short name `RUNNER~1` vs `runneradmin`); the product's canonicalisation was correct, the test now compares canonical paths.
+
+Whether all 226 pass on Windows after these fixes is confirmed by the next CI run (see PR #1), not assumed.

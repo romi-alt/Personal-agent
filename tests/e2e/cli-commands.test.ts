@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, mkdirSync, rmSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync } from 'node:fs';
+import { removeDir } from '../helpers/fs.js';
 import { tmpdir, hostname } from 'node:os';
 import path from 'node:path';
 import { openDatabase } from '../../src/database/connection.js';
@@ -21,7 +22,12 @@ const ok = (...args: string[]) => {
   expect(r.status, `${args.join(' ')} => ${r.stderr}`).toBe(0);
   return r.stdout;
 };
-const store = () => new Store(openDatabase(path.join(home, 'agent.db')));
+const opened: Store[] = [];
+const store = () => {
+  const s = new Store(openDatabase(path.join(home, 'agent.db')));
+  opened.push(s);
+  return s;
+};
 
 beforeAll(() => {
   home = mkdtempSync(path.join(tmpdir(), 'elevariq-cli-'));
@@ -34,7 +40,10 @@ beforeAll(() => {
     NODE_NO_WARNINGS: '1',
   };
 });
-afterAll(() => rmSync(home, { recursive: true, force: true }));
+afterAll(() => {
+  for (const s of opened.splice(0)) s.db.close(); // Windows cannot delete a database file that is still open
+  removeDir(home);
+});
 
 describe('CLI commands', () => {
   let taskId = '';
@@ -80,6 +89,10 @@ describe('CLI commands', () => {
     expect(ok('task:add', '--project', 'cli-demo', '--file', 'examples/task-example.md')).toContain(
       'Add attendance tracking',
     );
+    // Regression (found on a real Windows runner): CRLF line endings must not break the markdown title parse.
+    const crlf = path.join(home, 'crlf-task.md');
+    writeFileSync(crlf, '# CRLF titled task\r\n\r\nDo the thing carefully.\r\n');
+    expect(ok('task:add', '--project', 'cli-demo', '--file', crlf)).toContain('CRLF titled task');
     expect(ok('tasks', '--project', 'cli-demo')).toMatch(/First\s+QUEUED\s+3/);
     expect(ok('tasks', '--status', 'queued')).toContain('First');
     expect(run('tasks', '--status', 'nonsense').status).toBe(1);

@@ -1,4 +1,5 @@
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync } from 'node:fs';
+import { removeDir } from './fs.js';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { type AppConfig, loadConfig } from '../../src/config/index.js';
@@ -104,7 +105,7 @@ export async function makeEnv(
       } catch {
         /* already closed */
       }
-      rmSync(dir, { recursive: true, force: true });
+      removeDir(dir);
     },
   };
 }
