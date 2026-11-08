@@ -67,8 +67,9 @@ describe('A2 pilot false positives (now allowed)', () => {
       'npm test',
     ].join('\n');
     expect(bash(heredoc)).toMatchObject({ allow: true });
+    // v2 review (strict by default): text handed to a non-data program (curl/gh send it elsewhere) stays visible.
     expect(bash(`curl -s "http://127.0.0.1:3000/api/products?q='; DROP TABLE products; --"`)).toMatchObject({
-      allow: true,
+      allow: false,
     });
   });
 
@@ -82,7 +83,6 @@ describe('A2 pilot false positives (now allowed)', () => {
     for (const c of [
       'git commit -m "docs: never git push from workers"',
       'echo "run kubectl apply -f prod.yaml manually" >> NOTES.md',
-      'gh pr create --title "x" --body "after merge: npm publish"',
       'grep -rn "rm -rf" src # look for dangerous calls',
     ])
       expect(bash(c), c).toMatchObject({ allow: true });

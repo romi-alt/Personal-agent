@@ -58,6 +58,7 @@ beforeEach(() => {
     AGENT_ENV_FILE: path.join(home, 'no.env'),
     LOG_TO_CONSOLE: 'false',
     EXECUTION_PROVIDER: 'mock',
+    MIN_FREE_MEMORY_MB: '0', // spawned supervisors: host memory must not decide outcomes (gate tested in resource-gate)
     MOCK_SCENARIO_FILE: path.join(home, 'scenario.json'),
     POLL_INTERVAL_MS: '100',
     HEARTBEAT_INTERVAL_MS: '200',

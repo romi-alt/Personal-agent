@@ -344,6 +344,8 @@ export class ClaudeCliProvider implements ExecutionProvider {
 
     const env = buildWorkerEnv(this.d.parentEnv ?? process.env, {
       ...cfg.claudeCli.watchdogEnv,
+      // Marker for the agent CLI's owner-only guard (defense in depth behind the policy hook's hard deny).
+      ELEVARIQ_WORKER: '1',
       ...(cfg.workspaceRoot
         ? scratchCleanEnv(cfg.agentHome, req.cwd, cfg.workspaceRoot, req.executionId)
         : {}),
@@ -412,6 +414,8 @@ export class ClaudeCliProvider implements ExecutionProvider {
       (this.d.terminateFn ?? terminate)(child);
     };
     let waitResetsAt: number | undefined; // last provider-reported reset seen during a wait (kept after it ends)
+    let rejectedResetsAt: number | undefined; // reset of the last REJECTED rate-limit event
+    const futureReset = (ms: number | undefined) => (ms !== undefined && ms > this.now() ? ms : undefined);
     const startWait = (reason: string, resetsAtMs?: number, recheck?: boolean) => {
       if (resetsAtMs) waitResetsAt = resetsAtMs;
       if (!waiting) {
@@ -476,9 +480,11 @@ export class ClaudeCliProvider implements ExecutionProvider {
           },
         });
         if (watchdogOn && (error === 'rate_limit' || msg['error_status'] === 429)) {
+          // v2 review fix: only a REJECTED limit's reset that is still in the future may steer the wait; a stale or
+          // other-window reset would hand a short throttle to the queue for hours, or (if past) loop capacity_resume.
           startWait(
             'usage or rate limit: official retry watchdog waiting',
-            resetsAtToMs(rate?.resetsAt),
+            futureReset(rejectedResetsAt),
             true,
           );
         }
@@ -492,8 +498,9 @@ export class ClaudeCliProvider implements ExecutionProvider {
           type: 'rate_limit',
           data: { status: info.status, type: info.rateLimitType, resetsAtMs, errorCode: info.errorCode },
         });
+        if (info.status === 'rejected') rejectedResetsAt = resetsAtMs;
         if (info.status === 'rejected' && watchdogOn)
-          startWait(`${info.rateLimitType ?? 'usage'} limit reached`, resetsAtMs, true);
+          startWait(`${info.rateLimitType ?? 'usage'} limit reached`, futureReset(resetsAtMs), true);
         return;
       }
       // Any model/tool traffic means the provider is making progress again.

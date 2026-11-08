@@ -175,6 +175,45 @@ const COMMAND_PREFIXES = new Set([
   '}',
 ]);
 
+/**
+ * v2 review fix (strict by default): quoted multi-word text is treated as DATA only for programs that never execute
+ * their arguments; for every other program it stays visible to the rules (a quoted argument of `git rebase -x`,
+ * `tar --checkpoint-action`, `concurrently`, `env -i X='...'` etc. may be executed). Heredoc bodies are likewise only
+ * dropped when they feed one of these programs.
+ */
+const DATA_PROGRAMS = new Set(['echo', 'printf', 'cat', 'tee', 'grep', 'egrep', 'fgrep', 'rg', 'ag', 'git']);
+/** For git, only these subcommands take free text (messages, patterns) and never execute it. */
+const GIT_DATA_SUBCOMMANDS = new Set([
+  'commit',
+  'tag',
+  'log',
+  'show',
+  'notes',
+  'stash',
+  'grep',
+  'status',
+  'diff',
+]);
+
+/** The program of a segment (first word that is not an assignment or a command prefix) and the word after it. */
+function segmentProgram(words: { value: string }[]): { prog: string | null; sub: string | null } {
+  let k = 0;
+  while (k < words.length) {
+    const v = words[k]!.value;
+    if (ASSIGNMENT.test(v) || COMMAND_PREFIXES.has(programName(v))) k++;
+    else break;
+  }
+  const prog = k < words.length ? programName(words[k]!.value) : null;
+  let s = k + 1;
+  while (s < words.length && words[s]!.value.startsWith('-')) s++; // git -C dir, -c is caught elsewhere
+  return { prog, sub: s < words.length ? words[s]!.value.toLowerCase() : null };
+}
+function isDataProgram(words: { value: string }[]): boolean {
+  const { prog, sub } = segmentProgram(words);
+  if (!prog || !DATA_PROGRAMS.has(prog)) return false;
+  return prog !== 'git' || (sub !== null && GIT_DATA_SUBCOMMANDS.has(sub));
+}
+
 const programName = (value: string): string => {
   const base = value.split(/[\\/]/).pop() ?? value;
   return base.toLowerCase().replace(/\.(exe|cmd|bat|com)$/, '');
@@ -188,7 +227,7 @@ function lex(src: string, reasons: string[]): { normalized: string; segments: Se
   const segments: Segment[] = [];
   let seg: Segment = { words: [], pipeTarget: false, stdinLiteral: false };
   const stack: string[] = []; // open '(' / '$(' / '<(' / '`'
-  const pendingHeredocs: { delim: string; stripTabs: boolean }[] = [];
+  const pendingHeredocs: { delim: string; stripTabs: boolean; quoted: boolean; data: boolean }[] = [];
   let cmdPos = true;
   let redirectNext = false;
   let i = 0;
@@ -203,7 +242,8 @@ function lex(src: string, reasons: string[]): { normalized: string; segments: Se
   const readHeredocBodies = () => {
     // `i` is just past a newline. Consume each pending body up to and including its delimiter line.
     while (pendingHeredocs.length) {
-      const { delim, stripTabs } = pendingHeredocs.shift()!;
+      const { delim, stripTabs, quoted, data } = pendingHeredocs.shift()!;
+      const body: string[] = [];
       for (;;) {
         if (i >= n) throw new ParseError(`unterminated heredoc (${delim})`);
         let end = src.indexOf('\n', i);
@@ -212,7 +252,13 @@ function lex(src: string, reasons: string[]): { normalized: string; segments: Se
         if (stripTabs) line = line.replace(/^\t+/, '');
         i = end + 1;
         if (line === delim) break;
+        body.push(line);
       }
+      // v2 review fix: Bash runs $(...) and backticks inside an UNQUOTED heredoc body before the program sees it.
+      if (!quoted && /\$\(|`/.test(body.join('\n')))
+        reasons.push('unquoted heredoc body contains command substitution (executed by the shell)');
+      // A heredoc feeding anything but a data program (make -f -, docker exec ... sh, kubectl exec, ...) may be code.
+      if (!data) reasons.push('heredoc feeds a program that may execute it');
     }
   };
 
@@ -316,7 +362,7 @@ function lex(src: string, reasons: string[]): { normalized: string; segments: Se
   const pushWord = (parts: Part[], dynamic: boolean, glued: boolean) => {
     const value = parts.map((p) => p.text).join('');
     const quoted = parts.some((p) => p.quoted);
-    const keepAll = cmdPos || redirectNext;
+    const keepAll = cmdPos || redirectNext || !isDataProgram(seg.words);
     const norm = keepAll
       ? value
       : parts
@@ -464,7 +510,12 @@ function lex(src: string, reasons: string[]): { normalized: string; segments: Se
         const delim = parts.map((p) => p.text).join('');
         if (!delim) throw new ParseError('heredoc without delimiter');
         out.push(` <<${stripTabs ? '-' : ''}${src.slice(j, i)}`); // keep the heredoc start, drop the body
-        pendingHeredocs.push({ delim, stripTabs });
+        pendingHeredocs.push({
+          delim,
+          stripTabs,
+          quoted: parts.some((p) => p.quoted) || /\\/.test(src.slice(j, i)),
+          data: isDataProgram(seg.words),
+        });
         seg.stdinLiteral = true;
         prevWasWordEnd = false;
         continue;
@@ -543,9 +594,22 @@ function executedTextReasons(segments: Segment[]): string[] {
  */
 export function analyzeShellCommand(command: string): ShellAnalysis {
   const reasons: string[] = [];
+  // v2 review fix: the lexer has no arithmetic context, so `<<` inside $((...)) / ((...)) would start a fake heredoc
+  // and hide the following lines. Any arithmetic expression selects the strict raw view.
+  if (/\$\(\(|(^|[\s;&|(!])\(\(/.test(command))
+    return { useRaw: true, normalized: command, reasons: ['arithmetic expression (( ))'] };
   try {
     const { normalized, segments } = lex(command, reasons);
     reasons.push(...executedTextReasons(segments));
+    // v2 review fix: writing a file through a heredoc and running a script in the same command (`cat > x.sh <<EOF
+    // ... EOF; chmod +x x.sh && ./x.sh`) executes the hidden body.
+    const hasHeredoc = segments.some((s) => s.stdinLiteral);
+    const runsScript = segments.some((s) => {
+      const { prog } = segmentProgram(s.words);
+      const first = s.words.find((w) => !ASSIGNMENT.test(w.value))?.value ?? '';
+      return prog === 'chmod' || prog === 'make' || /^(\.{1,2}[\\/]|[\\/]|[A-Za-z]:[\\/])/.test(first);
+    });
+    if (hasHeredoc && runsScript) reasons.push('a heredoc-written file may be executed in the same command');
     return { useRaw: reasons.length > 0, normalized, reasons: [...new Set(reasons)] };
   } catch (err) {
     if (err instanceof ParseError)

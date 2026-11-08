@@ -119,6 +119,11 @@ export function ensureDerivedCommands(
   if (!data) return null;
   const v = parseAssignment(data).verification;
   if (COMMAND_KEYS.some((k) => v[k])) return null;
+  // An owner decision (including clearing every command) is never overridden by derivation (v2 review).
+  const ownerDecided = store
+    .listEvents({ projectId })
+    .some((e) => e.type === 'assignment.verification_changed' && e.payload['source'] === 'owner');
+  if (ownerDecided) return null;
   const derived = deriveVerificationCommands(repoPath);
   if (!Object.keys(derived).length) return null;
   setVerificationCommands(store, projectId, derived, {

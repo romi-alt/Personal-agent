@@ -213,11 +213,36 @@ export function requirementCoverage(
   const done = links.filter((l) => l.status === 'COMPLETED');
   const verified = new Set(done.filter((l) => kindOf(l.task_id) === 'verified').map((l) => l.task_id));
   const accepted = new Set(done.filter((l) => kindOf(l.task_id) === 'owner_accepted').map((l) => l.task_id));
+  // v2 review fix (A1 interplay): since contributing tasks no longer judge requirements they only contribute to, a
+  // requirement is verified only by a task whose latest PASSED review judged THAT id met as one of its own criteria
+  // (normally the owner task) - not by any passing linked task.
+  const judgedMet = (taskId: string): Set<string> => {
+    const row = store.db
+      .prepare(
+        "SELECT result FROM qa_reviews WHERE task_id = ? AND status = 'PASSED' ORDER BY round DESC LIMIT 1",
+      )
+      .get(taskId) as { result: string | null } | undefined;
+    const out = new Set<string>();
+    try {
+      const res = JSON.parse(row?.result ?? '{}') as {
+        criteria?: { id: string; met: boolean }[];
+        unmet?: { id: string }[];
+      };
+      const unmet = new Set((res.unmet ?? []).map((u) => u.id));
+      for (const c of res.criteria ?? []) if (c.met && !unmet.has(c.id)) out.add(c.id);
+    } catch {
+      /* no usable review result: judges nothing */
+    }
+    return out;
+  };
+  const judged = new Map([...verified].map((t) => [t, judgedMet(t)]));
   const byReq: Record<string, string[]> = {};
   const acceptedOnly: Record<string, string[]> = {};
   for (const r of reqs) {
     const linked = links.filter((l) => (JSON.parse(l.requirement_ids) as string[]).includes(r.req_id));
-    byReq[r.req_id] = linked.filter((l) => verified.has(l.task_id)).map((l) => l.task_id);
+    byReq[r.req_id] = linked
+      .filter((l) => verified.has(l.task_id) && judged.get(l.task_id)!.has(r.req_id))
+      .map((l) => l.task_id);
     if (!byReq[r.req_id]!.length) {
       const acc = linked.filter((l) => accepted.has(l.task_id)).map((l) => l.task_id);
       if (acc.length) acceptedOnly[r.req_id] = acc;

@@ -129,8 +129,16 @@ describe('project:verify records real execution evidence when commands exist (A5
       .filter((e) => e.type === 'assignment.verification_changed');
     expect(ev).toHaveLength(1);
     expect(ev[0]!.payload).toMatchObject({ source: 'derived', by: 'project:verify' });
-    // owner-set commands are never overridden by derivation
+    // derived commands are not re-derived while set
     expect(ensureDerivedCommands(env.store, project.id, project.repoPath, 'again')).toBeNull();
+    // v2 review: an owner who CLEARS every command is not overridden by a later re-derivation
+    setVerificationCommands(
+      env.store,
+      project.id,
+      { buildCommand: null, testCommand: null },
+      { by: 'owner', reason: 'no automated checks for this repo', source: 'owner' },
+    );
+    expect(ensureDerivedCommands(env.store, project.id, project.repoPath, 'project:verify')).toBeNull();
   });
 
   it('deriveVerificationCommands: ignores the npm placeholder test script; picks the browser suite', () => {

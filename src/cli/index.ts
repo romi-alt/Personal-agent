@@ -164,6 +164,34 @@ Usage: npm run agent -- <command> [options]
   provider:verify --access                 Non-billable API key check (GET /v1/models); records API_ACCESS_VERIFIED
 `;
 
+const OWNER_ONLY_COMMANDS = new Set([
+  'approve',
+  'deny',
+  'project:accept',
+  'project:deliver',
+  'project:verify',
+  'project:add',
+  'assignment:add',
+  'assignment:set-verification',
+  'task:add',
+  'task:unblock',
+  'task:retry',
+  'task:cancel',
+  'task:pause',
+  'task:resume',
+  'restore',
+  'workspace:approve',
+  'dashboard:token',
+  'memory:set',
+  'plan:start',
+  'workflow:answer',
+  'workflow:resume',
+  'workflow:cancel',
+  'intake',
+  'start',
+  'stop',
+]);
+
 function fail(msg: string, code = 1): never {
   process.stderr.write(`error: ${msg}\n`);
   process.exit(code);
@@ -177,6 +205,10 @@ async function main(): Promise<void> {
     strict: true,
   });
   const [cmd, ...rest] = positionals;
+  // Defense in depth (v2 review): owner-only commands refuse to run inside a coding worker's environment. The policy
+  // hook already hard-denies agent CLI invocations by workers; this catches invocations that slipped past text rules.
+  if (cmd && process.env['ELEVARIQ_WORKER'] === '1' && OWNER_ONLY_COMMANDS.has(cmd))
+    fail(`"${cmd}" is an owner-only command and cannot be run from a coding worker`, 2);
   if (!cmd || values.help || cmd === 'help') {
     process.stdout.write(HELP);
     return;

@@ -31,6 +31,7 @@ beforeAll(() => {
     AGENT_ENV_FILE: path.join(home, 'none.env'),
     LOG_TO_CONSOLE: 'false',
     EXECUTION_PROVIDER: 'mock',
+    MIN_FREE_MEMORY_MB: '0', // spawned supervisors: host memory must not decide outcomes (gate tested in resource-gate)
     NODE_NO_WARNINGS: '1',
   };
 });
@@ -72,6 +73,40 @@ describe('CLI v2: verification after intake and task:add QA parity', () => {
     expect(ev).toHaveLength(1);
     expect(ev[0]!.payload).toMatchObject({ by: 'owner', source: 'owner' });
     store.db.close();
+  });
+
+  it('defense in depth: owner-only commands refuse to run inside a coding worker environment', () => {
+    const inWorker = { ...env, ELEVARIQ_WORKER: '1' };
+    for (const args of [
+      ['project:accept', 'school-management-erp'],
+      ['approve', 'apr_x'],
+      [
+        'assignment:set-verification',
+        'school-management-erp',
+        '--by',
+        'w',
+        '--reason',
+        'r',
+        '--test',
+        'true',
+      ],
+      ['task:unblock', 'tsk_x'],
+    ]) {
+      const r = spawnSync(process.execPath, ['--import', 'tsx', 'src/cli/index.ts', ...args], {
+        cwd: ROOT,
+        env: inWorker,
+        encoding: 'utf8',
+      });
+      expect(r.status, args[0]).toBe(2);
+      expect(r.stderr).toMatch(/owner-only command/);
+    }
+    // read-only commands still work for a worker
+    const ro = spawnSync(process.execPath, ['--import', 'tsx', 'src/cli/index.ts', 'projects'], {
+      cwd: ROOT,
+      env: inWorker,
+      encoding: 'utf8',
+    });
+    expect(ro.status).toBe(0);
   });
 
   it('task:add requires criteria, enables independent review and the configured commands, audits waivers', () => {

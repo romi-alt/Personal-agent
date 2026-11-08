@@ -237,6 +237,44 @@ describe('A10: the in-process wait ends once the reported reset has passed (slee
   });
 });
 
+describe('v2 review: stale or unrelated reset times do not steer the wait', () => {
+  it('a 429 after a non-rejected (warning) event with a far reset is NOT handed off for hours', async () => {
+    const s = setup(async (c) => {
+      c.emitLine(init);
+      c.emitLine({
+        type: 'rate_limit_event',
+        rate_limit_info: {
+          status: 'allowed_warning',
+          rateLimitType: 'seven_day',
+          resetsAt: Math.floor(Date.now() / 1000) + 4 * 3600,
+        },
+      });
+      c.emitLine(retry429); // a short throttle
+      await sleep(400);
+      c.emitLine(text('throttle over'));
+      c.emitLine(success('same process'));
+      c.exit(0);
+    });
+    const out = await s.provider.run(s.req());
+    expect(out).toMatchObject({ kind: 'completed', summary: 'same process' });
+  });
+
+  it('a rejected event whose reset is already in the past cannot trigger a capacity_resume loop', async () => {
+    const s = setup(async (c) => {
+      c.emitLine(init);
+      c.emitLine(rejected(Date.now() - 10 * 60_000));
+      c.emitLine(retry429);
+      await sleep(500);
+      c.emitLine(text('back'));
+      c.emitLine(success('no premature resume'));
+      c.exit(0);
+    });
+    const out = await s.provider.run(s.req());
+    expect(out).toMatchObject({ kind: 'completed', summary: 'no premature resume' });
+    expect(s.calls).toHaveLength(1);
+  });
+});
+
 describe('A12: bounded in-process capacity waits and escalation', () => {
   it('a reset beyond the in-process ceiling is handed to the durable queue immediately (session kept)', async () => {
     let reset = 0;

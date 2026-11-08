@@ -142,10 +142,19 @@ const AGENT_CLI_ENTRY_PATTERN =
   /(\bcli[\\/]+index\.[cm]?[jt]sx?\b|\belevariq\b|\b(npm|pnpm|yarn|bun)\s+(run\s+)?agent(:dist)?\b)/i;
 const AGENT_CLI_BARE_SUBCOMMAND = /(?<![\w:-])(approve|deny|restore|backup)(?![\w:-])/i;
 
+/** Subcommand assembled from a variable (`p=project; ... $p:accept`). */
+const AGENT_CLI_ASSEMBLED =
+  /\$\{?[A-Za-z_]\w*\}?\s*["']?:(add|accept|deliver|verify|approve|set-verification|pause|resume|cancel|retry|unblock|set|start|answer|token|clean)\b/i;
+
 export function invokesAgentCli(command: string): boolean {
-  return (
-    AGENT_CLI_SUBCOMMAND_PATTERN.test(command) ||
-    (AGENT_CLI_ENTRY_PATTERN.test(command) && AGENT_CLI_BARE_SUBCOMMAND.test(command))
+  // v2 review fix: shell quoting/escaping (`"project:"accept`, `task:un''block`, `set-verificatio\n`, PowerShell
+  // `'project:'+'accept'`) must not defeat the deny: also test a de-quoted, de-escaped, de-concatenated copy.
+  const flat = command.replace(/['"`]\s*\+\s*['"`]/g, '').replace(/[\\'"`]/g, '');
+  return [command, flat].some(
+    (c) =>
+      AGENT_CLI_SUBCOMMAND_PATTERN.test(c) ||
+      AGENT_CLI_ASSEMBLED.test(c) ||
+      (AGENT_CLI_ENTRY_PATTERN.test(c) && AGENT_CLI_BARE_SUBCOMMAND.test(c)),
   );
 }
 
