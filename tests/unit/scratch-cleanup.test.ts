@@ -136,14 +136,30 @@ describe('cleanScratchDir', () => {
     expect(existsSync(path.join(outside, '.qa-inner'))).toBe(true);
   });
 
-  it('refuses a scratch directory that contains a link anywhere inside', () => {
+  it('v2 (A8): a link inside the tree is removed as a link, never followed; its outside target is untouched', () => {
     mkdirSync(path.join(ws, '.qa-mut', 'deep'), { recursive: true });
     dirLink(outside, path.join(ws, '.qa-mut', 'deep', 'escape'));
     const r = cleanScratchDir(req('.qa-mut'));
-    expect(r.status).toBe('refused');
-    expect(r.reason).toMatch(/contains a link/);
-    expect(existsSync(path.join(ws, '.qa-mut'))).toBe(true);
+    expect(r.status).toBe('deleted');
+    expect(existsSync(path.join(ws, '.qa-mut'))).toBe(false);
     expect(readFileSync(path.join(outside, 'precious.txt'), 'utf8')).toBe('keep');
+    const intent = auditLines().find((l) => l['status'] === 'deleting')!;
+    expect((intent['links'] as { path: string }[]).map((l) => path.basename(l.path))).toEqual(['escape']);
+  });
+
+  it('v2 (A8): a fresh npm-workspace clone (node_modules/@scope/pkg junction -> apps/pkg) is cleaned', () => {
+    const clone = path.join(ws, '.tmp-gate');
+    mkdirSync(path.join(clone, 'apps', 'api', 'src'), { recursive: true });
+    writeFileSync(path.join(clone, 'apps', 'api', 'src', 'main.ts'), 'x');
+    mkdirSync(path.join(clone, 'node_modules', '@elevariq'), { recursive: true });
+    dirLink(path.join(clone, 'apps', 'api'), path.join(clone, 'node_modules', '@elevariq', 'api'));
+    // v1 refused here ("target contains a link"), so workers fell back to rm -rf, which needs owner approval.
+    const dry = cleanScratchDir(req('.tmp-gate', { dryRun: true }));
+    expect(dry.status).toBe('would_delete');
+    const r = cleanScratchDir(req('.tmp-gate'));
+    expect(r.status).toBe('deleted');
+    expect(existsSync(clone)).toBe(false);
+    expect(existsSync(path.join(ws, 'sum.js'))).toBe(true);
   });
 
   it('reports a missing directory as absent, and a repeated cleanup is idempotent', () => {

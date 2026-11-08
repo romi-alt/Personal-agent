@@ -5,8 +5,10 @@ import {
   mkdirSync,
   readdirSync,
   realpathSync,
+  rmdirSync,
   rmSync,
   statSync,
+  unlinkSync,
 } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -26,7 +28,8 @@ import path from 'node:path';
  *    canonical (link-resolved) path equals the lexical one;
  *  - the target is not, and does not contain, a protected path (AGENT_HOME, workspace roots, the user profile, drive
  *    roots, and any extra protected paths supplied by the caller);
- *  - the tree under the target contains no symbolic links or junctions and at most `maxEntries` entries.
+ *  - the tree under the target has at most `maxEntries` entries; symbolic links / junctions inside it are never
+ *    followed: they are recorded in the audit line and removed as links before the directory is deleted (v2, A8).
  * A missing target is reported as `absent` (idempotent repeat). Every call, including refusals, appends one JSON line
  * to `<AGENT_HOME>/logs/scratch-cleanup.jsonl`; the intent is written BEFORE deletion and deletion does not happen if
  * that write fails.
@@ -85,6 +88,17 @@ const strictlyInside = (a: string, b: string) => {
   return rel !== '' && !rel.startsWith('..') && !path.isAbsolute(rel);
 };
 const isLink = (p: string) => lstatSync(p).isSymbolicLink();
+
+/** Remove a symbolic link or junction itself (never its target). Directory junctions need rmdir on Windows. */
+function unlinkOnly(p: string): void {
+  try {
+    unlinkSync(p);
+  } catch (e) {
+    const code = (e as NodeJS.ErrnoException).code;
+    if (code === 'EPERM' || code === 'EISDIR' || code === 'EACCES') rmdirSync(p);
+    else throw e;
+  }
+}
 
 export function cleanScratchDir(req: ScratchCleanupRequest): ScratchCleanupResult {
   let auditFile: string | null = null;
@@ -179,9 +193,12 @@ export function cleanScratchDir(req: ScratchCleanupRequest): ScratchCleanupResul
     if (!st.isDirectory()) refuse('target is not a directory');
     if (!same(realpathSync.native(lexical), lexical)) refuse('target resolves through a link');
 
-    // 7. Tree scan: no links anywhere, bounded size.
+    // 7. Tree scan, bounded size. Links/junctions inside the tree (e.g. npm-workspace junctions such as
+    // node_modules/@scope/pkg -> ../../apps/pkg in a fresh clone, A8) are never traversed: they are recorded, then
+    // removed as links in step 8, so their targets are untouched.
     const max = req.maxEntries ?? DEFAULT_MAX_ENTRIES;
     let entries = 0;
+    const links: { path: string; target: string | null }[] = [];
     const stack = [lexical];
     while (stack.length) {
       const dir = stack.pop()!;
@@ -189,18 +206,32 @@ export function cleanScratchDir(req: ScratchCleanupRequest): ScratchCleanupResul
         entries++;
         if (entries > max) refuse(`target has more than ${max} entries`);
         const full = path.join(dir, e.name);
-        if (e.isSymbolicLink() || isLink(full)) refuse(`target contains a link (${full})`);
+        if (e.isSymbolicLink() || isLink(full)) {
+          let target: string | null = null;
+          try {
+            target = realpathSync.native(full);
+          } catch {
+            /* dangling link */
+          }
+          links.push({ path: full, target });
+          continue; // never descend through a link
+        }
         if (e.isDirectory()) stack.push(full);
       }
     }
 
     if (req.dryRun) {
-      audit({ status: 'would_delete', entries });
+      audit({ status: 'would_delete', entries, links });
       return { status: 'would_delete', reason: 'all checks passed (dry run)', resolved, entries, auditFile };
     }
 
-    // 8. Intent first (fails closed), then delete exactly this directory, then confirm.
-    audit({ status: 'deleting', entries });
+    // 8. Intent first (fails closed), then unlink links WITHOUT following them, then delete exactly this directory.
+    audit({ status: 'deleting', entries, links });
+    for (const l of links) {
+      if (!isLink(l.path)) refuse(`link ${l.path} changed during cleanup`);
+      unlinkOnly(l.path);
+      if (l.target && !existsSync(l.target)) refuse(`link target ${l.target} vanished while unlinking`);
+    }
     rmSync(lexical, { recursive: true, force: false, maxRetries: 3 });
     if (existsSync(lexical)) refuse('directory still exists after deletion');
     audit({ status: 'deleted', entries });

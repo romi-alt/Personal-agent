@@ -65,6 +65,7 @@ export async function makeEnv(
       // Independent QA is opt-in per test (it adds a review task after every planned coding task).
       INDEPENDENT_REVIEW: 'false',
       BACKUP_INTERVAL_HOURS: '0', // scheduled backups are opt-in per test
+      MIN_FREE_MEMORY_MB: '0', // host memory must not decide test outcomes; the gate has its own test
       ...opts.env,
     },
   });

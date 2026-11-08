@@ -1,4 +1,5 @@
 import { randomBytes } from 'node:crypto';
+import os from 'node:os';
 import path from 'node:path';
 import type { AppConfig } from '../config/index.js';
 import type { Logger } from '../logging/logger.js';
@@ -26,6 +27,8 @@ export interface SupervisorDeps {
   workflows?: WorkflowEngine;
   /** Independent QA (Phase 3): reviews completed coding tasks, creates corrections, escalates. */
   qa?: QaEngine;
+  /** Injectable free-memory probe (bytes) for tests; defaults to os.freemem. */
+  freeMemory?: () => number;
 }
 
 export interface GateResult {
@@ -47,6 +50,7 @@ export class Supervisor {
   private readonly workers = new Map<string, Promise<void>>();
   private readonly runner: TaskRunner;
   private lastGate = '';
+  private memoryDeferred = false;
   private lastRetentionRun = 0;
   private done: Promise<void> | null = null;
 
@@ -255,6 +259,33 @@ export class Supervisor {
       log.info('supervisor.gate', { open: gate.open, reason: gate.reason });
     }
     if (!gate.open || this.stopping) return { claimed: 0, gate };
+
+    // A9: do not START new work while the host is short of memory (the pilot supervisor's heartbeat went stale at
+    // 0.83 GB free under test-heavy load). Running workers are never killed for this; claiming resumes on recovery.
+    const minFree = config.minFreeMemoryMb * 1024 * 1024;
+    if (minFree > 0 && this.workers.size === 0) {
+      const free = (this.d.freeMemory ?? os.freemem)();
+      if (free < minFree) {
+        const low: GateResult = {
+          open: false,
+          reason: `low memory: ${Math.round(free / 1048576)} MB free < MIN_FREE_MEMORY_MB ${config.minFreeMemoryMb}; new work deferred`,
+        };
+        if (!this.memoryDeferred) {
+          this.memoryDeferred = true;
+          log.warn('supervisor.resource_deferred', {
+            freeMb: Math.round(free / 1048576),
+            minFreeMb: config.minFreeMemoryMb,
+          });
+          store.recordEvent({
+            type: 'supervisor.resource_deferred',
+            severity: 'warn',
+            payload: { freeMb: Math.round(free / 1048576), minFreeMb: config.minFreeMemoryMb },
+          });
+        }
+        return { claimed: 0, gate: low };
+      }
+      this.memoryDeferred = false;
+    }
 
     let claimed = 0;
     while (this.workers.size < config.maxConcurrentWorkers && !this.stopping) {

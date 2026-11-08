@@ -77,6 +77,8 @@ const schema = z
     /** Without model output or a known capacity wait for this long, a CLI worker is treated as stalled. */
     CLAUDE_CLI_STALL_TIMEOUT_MS: int(900_000, 10_000),
 
+    /** A9: below this much free RAM (MB) the supervisor starts no new work (0 = off). Running work is not killed. */
+    MIN_FREE_MEMORY_MB: int(300, 0),
     MAX_CONCURRENT_WORKERS: int(1, 1),
     DEFAULT_MAX_RETRIES: int(3, 0),
     MAX_CONTINUATIONS: int(25, 1),
@@ -192,6 +194,7 @@ export interface AppConfig {
     suspendThresholdMs: number;
   };
   capacity: { escalateAfterMs: number; escalation: 'notify' | 'block' };
+  minFreeMemoryMb: number;
   maxConcurrentWorkers: number;
   defaultMaxRetries: number;
   maxContinuations: number;
@@ -314,6 +317,7 @@ export function loadConfig(opts: LoadConfigOptions = {}): AppConfig {
       suspendThresholdMs: c.HOST_SUSPEND_THRESHOLD_MS,
     },
     capacity: { escalateAfterMs: c.CAPACITY_ESCALATE_AFTER_MS, escalation: c.CAPACITY_ESCALATION },
+    minFreeMemoryMb: c.MIN_FREE_MEMORY_MB,
     maxConcurrentWorkers: c.MAX_CONCURRENT_WORKERS,
     defaultMaxRetries: c.DEFAULT_MAX_RETRIES,
     maxContinuations: c.MAX_CONTINUATIONS,
