@@ -294,6 +294,7 @@ export function decomposePrompt(
     [
       `- At most ${limits.maxTasks} tasks; each task is size S or M (split anything larger).`,
       '- Every requirement id must be implemented by at least one task (requirementIds).',
+      "- A requirement linked to several tasks (cross-cutting: UI conventions, audit, security, docs) has exactly ONE owner task that completes it: list it in that task's ownsRequirementIds. The other linked tasks only contribute and are not judged on it. Without an explicit owner, the last linked task in dependency order owns it.",
       '- Every milestone has tasks; a task may only depend on tasks in the same or an EARLIER milestone; no dependency cycles; keys are unique.',
       '- Every task must include "CHANGES_EXIST" in verify; add "BUILD_PASSES"/"TESTS_PASS" where the task is buildable/testable.',
       '- Each task is a self-contained instruction a coding agent can execute in the repository, with concrete acceptance criteria and its own tests.',
@@ -316,6 +317,7 @@ export function decomposePrompt(
           role: 'backend_engineer|frontend_engineer|database_engineer|ai_engineer|uiux_engineer|security_engineer|qa_engineer|devops_engineer',
           dependsOn: [],
           requirementIds: ['FR-1'],
+          ownsRequirementIds: ['FR-1'],
           priority: 0,
           size: 'S|M',
           verify: ['CHANGES_EXIST', 'TESTS_PASS'],

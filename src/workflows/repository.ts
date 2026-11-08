@@ -226,6 +226,13 @@ export class WorkflowRepository {
       .run(projectId, r.id, r.text, r.kind, r.priority, r.source);
   }
 
+  /** A1: record the single plan task that owns (is judged on) a requirement. */
+  setRequirementOwner(projectId: string, reqId: string, taskId: string): void {
+    this.db
+      .prepare('UPDATE requirements SET owner_task_id = ? WHERE project_id = ? AND req_id = ?')
+      .run(taskId, projectId, reqId);
+  }
+
   listRequirements(
     projectId: string,
   ): { id: string; text: string; kind: string; priority: string; source: string; status: string }[] {

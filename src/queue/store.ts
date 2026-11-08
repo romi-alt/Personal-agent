@@ -11,6 +11,7 @@ import type { Db } from '../database/connection.js';
 import { newId } from '../core/ids.js';
 import type { Logger } from '../logging/logger.js';
 import { redactValue } from '../security/redact.js';
+import { reconcileProjectStatus } from '../planning/status-reconcile.js';
 import {
   type ActivityEvent,
   type Approval,
@@ -645,6 +646,7 @@ export class Store {
       payload: { from: current.status, to, reason: opts.reason },
     });
     if (to === 'COMPLETED' || to === 'CANCELLED') this.advanceProjectAfterTerminalTask(current.projectId);
+    this.reconcileRoadmapStatus(current.projectId, taskId);
     return this.requireTask(taskId);
   }
 
@@ -1275,6 +1277,32 @@ export class Store {
    * When every task is terminal (COMPLETED/CANCELLED) the project moves to VERIFYING - never to a
    * delivery state. A single provider success cannot declare a project finished.
    */
+  /**
+   * A4: re-derive requirement and milestone statuses from verified task state (src/planning/status-reconcile.ts).
+   * With `taskId`, only when that task belongs to a plan. Never throws: a reconciliation problem must not undo the
+   * task/QA change that triggered it (it is re-derived on the next change or at supervisor start).
+   */
+  reconcileRoadmapStatus(projectId: string, taskId?: string): void {
+    try {
+      if (taskId && !this.db.prepare('SELECT 1 FROM plan_tasks WHERE task_id = ?').get(taskId)) return;
+      const { changes } = reconcileProjectStatus(this.db, projectId);
+      if (changes.length)
+        this.recordEvent({
+          type: 'roadmap.status_reconciled',
+          projectId,
+          taskId: taskId ?? null,
+          payload: { changes: changes.map((c) => `${c.kind}:${c.id}:${c.from}->${c.to}`) },
+        });
+    } catch (err) {
+      this.recordEvent({
+        type: 'roadmap.reconcile_error',
+        projectId,
+        severity: 'warn',
+        payload: { error: err instanceof Error ? err.message : String(err) },
+      });
+    }
+  }
+
   advanceProjectAfterTerminalTask(projectId: string): void {
     const p = this.getProject(projectId);
     if (!p || p.lifecycle !== 'IN_DEVELOPMENT') return;
