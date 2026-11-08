@@ -1,4 +1,6 @@
 import { getAssignment } from '../assignments/register.js';
+import type { ProjectAssignment } from '../assignments/schema.js';
+import { ensureDerivedCommands } from '../assignments/verification-config.js';
 import type { Store } from '../queue/store.js';
 import type { Project, Task } from '../types/index.js';
 import { defaultVerifiers } from './verifiers.js';
@@ -16,10 +18,18 @@ export interface VerificationDeps {
   store: Store;
   timeoutMs: number;
   verifiers?: Partial<Record<VerificationLevel, Verifier>>;
+  /** project:verify derives missing commands from package.json (default true). */
+  deriveCommands?: boolean;
 }
 
 const verifierFor = (deps: VerificationDeps, level: VerificationLevel): Verifier | undefined =>
   deps.verifiers?.[level] ?? (defaultVerifiers() as Partial<Record<VerificationLevel, Verifier>>)[level];
+
+const commandsOf = (a: ProjectAssignment | null) => ({
+  build: a?.verification.buildCommand,
+  test: a?.verification.testCommand,
+  browserTest: a?.verification.browserTestCommand,
+});
 
 /**
  * Task-level gate run by the worker AFTER the provider claims success. Only FAILED evidence blocks completion;
@@ -45,7 +55,7 @@ export async function verifyTask(
       taskId: task.id,
       cwd,
       baseline: level === 'CHANGES_EXIST' ? (store.taskBaseline(task.id) ?? undefined) : undefined,
-      commands: { build: assignment?.verification.buildCommand, test: assignment?.verification.testCommand },
+      commands: commandsOf(assignment),
       timeoutMs: deps.timeoutMs,
     });
     all.push(
@@ -97,6 +107,9 @@ export async function verifyProject(
   cwd: string,
 ): Promise<{ readiness: DeliveryReadiness; evidence: EvidenceRecord[] }> {
   const { store } = deps;
+  // A5: a project whose assignment configures no command gets them derived from package.json (audited, persisted),
+  // so the run records real execution evidence instead of NOT_CONFIGURED. Owner-set commands are never overridden.
+  if (deps.deriveCommands !== false) ensureDerivedCommands(store, project.id, cwd, 'project:verify');
   const assignment = getAssignment(store, project.id);
   const evidence: EvidenceRecord[] = [];
   const tasks = store.listTasks({ projectId: project.id });
@@ -127,10 +140,7 @@ export async function verifyProject(
         : await v.verify({
             projectId: project.id,
             cwd,
-            commands: {
-              build: assignment?.verification.buildCommand,
-              test: assignment?.verification.testCommand,
-            },
+            commands: commandsOf(assignment),
             timeoutMs: deps.timeoutMs,
           });
     evidence.push(

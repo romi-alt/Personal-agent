@@ -45,6 +45,7 @@ beforeEach(() => {
     AGENT_ENV_FILE: path.join(home, 'no.env'),
     LOG_TO_CONSOLE: 'false',
     EXECUTION_PROVIDER: 'mock',
+    INDEPENDENT_REVIEW: 'false', // recovery scenario; QA has its own suite (v2 task:add enables review by default)
     MOCK_SCENARIO_FILE: path.join(home, 'scenario.json'),
     POLL_INTERVAL_MS: '100',
     HEARTBEAT_INTERVAL_MS: '200',

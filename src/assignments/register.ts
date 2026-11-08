@@ -2,6 +2,7 @@ import type { Project } from '../types/index.js';
 import type { Store } from '../queue/store.js';
 import type { WorkspaceRegistry } from '../workspaces/registry.js';
 import { ASSIGNMENT_SCHEMA_VERSION, parseAssignment, type ProjectAssignment } from './schema.js';
+import { ensureDerivedCommands } from './verification-config.js';
 
 export interface RegisterResult {
   project: Project;
@@ -56,7 +57,11 @@ export async function registerAssignment(
       : await registry.createManagedProject(store, base);
 
   store.db.transaction(() => persistAssignment(store, project.id, a))();
-  return { project: store.getProject(project.id)!, assignment: a, created: true };
+  // A5: an existing repository usually already has build/test scripts; record them at intake (audited).
+  const p = store.getProject(project.id)!;
+  if (a.workspace.type === 'existing' && p.repoPath)
+    ensureDerivedCommands(store, project.id, p.repoPath, 'intake');
+  return { project: p, assignment: getAssignment(store, project.id)!, created: true };
 }
 
 /** Persist a validated assignment for an existing project and seed project memory (call inside a transaction). */

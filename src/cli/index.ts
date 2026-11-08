@@ -15,6 +15,15 @@ import { MEMORY_SECTIONS } from '../memory/context.js';
 import { reconcileOrphans } from '../recovery/reconcile.js';
 import { registerAssignment, getAssignment } from '../assignments/register.js';
 import { AssignmentValidationError } from '../assignments/schema.js';
+import {
+  COMMAND_KEYS,
+  type CommandKey,
+  deriveVerificationCommands,
+  setVerificationCommands,
+  VerificationConfigError,
+} from '../assignments/verification-config.js';
+import { manualTaskPolicy } from '../verification/task-policy.js';
+import { inferRole } from '../engineering/roles.js';
 import { buildProjectContext } from '../assignments/context.js';
 import { readAttachments, submitIntake } from '../assignments/intake.js';
 import { decideApproval, taskAction, type TaskAction } from '../control/owner-actions.js';
@@ -86,6 +95,13 @@ const OPTIONS = {
   rotate: { type: 'boolean' },
   hold: { type: 'boolean' },
   'dry-run': { type: 'boolean' },
+  build: { type: 'string' },
+  test: { type: 'string' },
+  'browser-test': { type: 'string' },
+  clear: { type: 'string' },
+  derive: { type: 'boolean' },
+  'no-review': { type: 'boolean' },
+  verify: { type: 'string' },
 } as const;
 
 const HELP = `ELEVARIQ Personal Agent
@@ -104,8 +120,10 @@ Usage: npm run agent -- <command> [options]
   scratch:clean <project> <dir> [--dry-run]   Delete ONE generated scratch dir (.qa-*/.scratch-*/.tmp-*) inside the
                               project workspace; refuses links, traversal, roots; audited in logs/scratch-cleanup.jsonl
   tasks [--project P] [--status S]
-  task:add --project P (--title T --instructions I | --file F.json|F.md) [--criteria C] [--depends id,id]
-           [--priority N] [--max-retries N] [--key K] [--start-at ISO]
+  task:add --project P (--title T --instructions I | --file F.json|F.md) --criteria C [--depends id,id]
+           [--priority N] [--max-retries N] [--key K] [--start-at ISO] [--verify L1,L2]
+           [--no-review --reason R]   Coding tasks get the same independent QA as planned tasks; acceptance
+                                      criteria are required unless review is explicitly waived (audited)
   task:show <id>              Task details, state transitions, executions and checkpoints
   task:pause|task:resume|task:cancel|task:retry|task:unblock <id>
   approvals                   List approval requests;   approve <id> [--by name] | deny <id>
@@ -128,6 +146,10 @@ Usage: npm run agent -- <command> [options]
   restore <file> --reason R                Restore a verified backup (supervisor must be stopped; old DB is kept)
   assignment:add --file assignment.json    Validate + register a project assignment (see examples/assignment.example.json)
   assignment:show <project>                Persisted assignment contract
+  assignment:set-verification <project> --by NAME --reason R [--build CMD] [--test CMD] [--browser-test CMD]
+                              [--clear build,test,browser-test] [--derive]
+                                           Owner-only, audited: set verification commands after intake
+                                           (--derive: take them from the workspace package.json scripts)
   project:status <project>                 Lifecycle, task progress, spend and delivery readiness
   project:verify <project>                 Run independent verification (changes/build/tests); records evidence
   project:accept <project> [--acknowledge-unverified "why"]   Owner acceptance (never automatic)
@@ -490,11 +512,28 @@ async function main(): Promise<void> {
             const m = text.match(/^#\s+(.+)\n([\s\S]*)$/);
             title ??= m?.[1]?.trim() ?? path.basename(values.file);
             instructions ??= (m?.[2] ?? text).trim();
+            // Acceptance criteria: an "## Acceptance criteria" section or an "Acceptance: ..." line (A6).
+            const acc =
+              /^#{2,}\s*acceptance(?:\s+criteria)?\s*\r?\n([\s\S]*?)(?=\r?\n#|$(?![\s\S]))/im.exec(
+                text,
+              )?.[1] ?? /^acceptance(?:\s+criteria)?\s*:\s*(.+)$/im.exec(text)?.[1];
+            criteria ||= acc?.trim() ?? '';
           }
         }
         if (!title || !instructions) fail('task needs --title and --instructions (or --file)');
+        const asg = getAssignment(store, p.id);
+        const policy = manualTaskPolicy({
+          independentReview: config.independentReview,
+          criteria,
+          noReview: values['no-review'],
+          reason: values.reason,
+          verify: values.verify,
+          commands: { build: asg?.verification.buildCommand, test: asg?.verification.testCommand },
+        });
+        if (!policy.ok) fail(policy.error, 2);
         const { task, created } = store.enqueueTask({
           projectId: p.id,
+          kind: 'CODING',
           title,
           instructions,
           acceptanceCriteria: criteria,
@@ -503,10 +542,24 @@ async function main(): Promise<void> {
           maxRetries: values['max-retries'] ? Number(values['max-retries']) : config.defaultMaxRetries,
           scheduledStart: values['start-at'] ? Date.parse(values['start-at']) : null,
           dedupeKey: values.key,
+          verificationRequired: policy.verificationRequired,
+          role: inferRole(`${title}\n${instructions}`),
         });
+        if (created)
+          store.recordEvent({
+            type: 'task.verification_policy',
+            projectId: p.id,
+            taskId: task.id,
+            payload: {
+              source: 'task:add',
+              verificationRequired: policy.verificationRequired,
+              independentReview: policy.review,
+              reviewWaivedReason: policy.waived,
+            },
+          });
         out(
           created
-            ? `queued task ${task.id}: ${task.title}`
+            ? `queued task ${task.id}: ${task.title}\n  verification: ${policy.verificationRequired.join(', ')}${policy.review ? ' (independent review)' : ` (review WAIVED: ${policy.waived ?? 'INDEPENDENT_REVIEW=false'})`}`
             : `duplicate ignored; existing task ${task.id} (${task.status})`,
         );
         break;
@@ -1225,6 +1278,43 @@ async function main(): Promise<void> {
         const p = resolveProject(rest[0]);
         const a = getAssignment(store, p.id);
         out(a ? JSON.stringify(a, null, 2) : '(no assignment registered for this project)');
+        break;
+      }
+      case 'assignment:set-verification': {
+        const p = resolveProject(rest[0]);
+        const changes: Partial<Record<CommandKey, string | null>> = {};
+        if (values.derive) Object.assign(changes, deriveVerificationCommands(p.repoPath));
+        if (values.build !== undefined) changes.buildCommand = values.build;
+        if (values.test !== undefined) changes.testCommand = values.test;
+        if (values['browser-test'] !== undefined) changes.browserTestCommand = values['browser-test'];
+        const names: Record<string, CommandKey> = {
+          build: 'buildCommand',
+          test: 'testCommand',
+          'browser-test': 'browserTestCommand',
+        };
+        for (const c of (values.clear ?? '')
+          .split(',')
+          .map((s) => s.trim())
+          .filter(Boolean)) {
+          if (!names[c]) fail(`--clear takes build, test and/or browser-test (got "${c}")`, 2);
+          changes[names[c]] = null;
+        }
+        if (!Object.keys(changes).length)
+          fail('nothing to set: give --build/--test/--browser-test, --clear or --derive', 2);
+        try {
+          const r = setVerificationCommands(store, p.id, changes, {
+            by: values.by ?? '',
+            reason: values.reason ?? '',
+            source: 'owner',
+          });
+          out(`verification commands for ${p.slug} updated (audited as assignment.verification_changed)`);
+          for (const k of COMMAND_KEYS)
+            out(`  ${k.padEnd(19)} ${r.before[k] ?? '(none)'}  ->  ${r.after[k] ?? '(none)'}`);
+        } catch (e) {
+          if (e instanceof VerificationConfigError || e instanceof AssignmentValidationError)
+            fail(e.message, 2);
+          throw e;
+        }
         break;
       }
       case 'project:status': {

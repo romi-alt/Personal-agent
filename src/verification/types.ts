@@ -46,7 +46,7 @@ export interface VerifyContext {
   cwd: string;
   /** Working-tree reference captured when the task's first execution started (for CHANGES_EXIST). */
   baseline?: { head: string | null; statusHash: string | null };
-  commands: { build?: string; test?: string };
+  commands: { build?: string; test?: string; browserTest?: string };
   timeoutMs: number;
   signal?: AbortSignal;
 }

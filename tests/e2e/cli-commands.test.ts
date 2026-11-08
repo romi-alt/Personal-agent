@@ -72,9 +72,19 @@ describe('CLI commands', () => {
       '3',
     );
     taskId = out.match(/tsk_[a-z0-9]+/)![0];
-    expect(ok('task:add', '--project', 'cli-demo', '--title', 'First', '--instructions', 'do it')).toContain(
-      'duplicate ignored',
-    );
+    expect(
+      ok(
+        'task:add',
+        '--project',
+        'cli-demo',
+        '--title',
+        'First',
+        '--instructions',
+        'do it',
+        '--criteria',
+        'works',
+      ),
+    ).toContain('duplicate ignored');
     expect(ok('task:add', '--project', 'cli-demo', '--file', 'examples/task-example.json')).toContain(
       'queued task',
     );
@@ -207,7 +217,17 @@ describe('CLI: Phase 1.5 commands (assignments, project lifecycle, verification,
     expect(shown.approvalPolicy.deliveryRequiresOwnerApproval).toBe(true);
   });
   it('project:status shows lifecycle and a strict delivery-readiness table', () => {
-    ok('task:add', '--project', 'school-management-erp', '--title', 'Only task', '--instructions', 'do');
+    ok(
+      'task:add',
+      '--project',
+      'school-management-erp',
+      '--title',
+      'Only task',
+      '--instructions',
+      'do',
+      '--criteria',
+      'done',
+    );
     const status = ok('project:status', 'school-management-erp');
     expect(status).toMatch(/lifecycle=IN_DEVELOPMENT/);
     expect(status).toMatch(/delivery ready: NO/);

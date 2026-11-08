@@ -114,34 +114,56 @@ export class ChangesExistVerifier implements Verifier {
 /** sha256 of the empty string: the fingerprint of a clean tree with no diff and no untracked files. */
 const EMPTY_TREE_HASH = 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855';
 
+/**
+ * Runs the configured command(s) for a level, sequentially, each under its own deadline. TESTS_PASS includes the
+ * browser suite when one is configured (v2); every command's exit code, duration and output tail is evidence.
+ */
 export class CommandVerifier implements Verifier {
   constructor(
     readonly level: 'BUILD_PASSES' | 'TESTS_PASS',
-    private readonly pick: (c: VerifyContext['commands']) => string | undefined,
+    private readonly pick: (c: VerifyContext['commands']) => (string | undefined)[],
   ) {}
   async verify(ctx: VerifyContext): Promise<VerifierResult> {
-    const command = this.pick(ctx.commands);
-    if (!command)
+    const commands = this.pick(ctx.commands).filter((c): c is string => !!c);
+    if (!commands.length)
       return {
         status: 'NOT_CONFIGURED',
-        summary: `no ${this.level === 'BUILD_PASSES' ? 'build' : 'test'} command configured in the assignment`,
+        summary: `no ${this.level === 'BUILD_PASSES' ? 'build' : 'test'} command configured (set one with assignment:set-verification)`,
         evidence: {},
       };
-    const r = await runCommand(command, ctx.cwd, ctx.timeoutMs, ctx.signal);
-    const ok = r.exitCode === 0 && !r.timedOut;
-    return {
-      status: ok ? 'PASSED' : 'FAILED',
-      summary: ok
-        ? `\`${command}\` exited 0 in ${r.durationMs} ms`
-        : r.timedOut
-          ? `\`${command}\` timed out after ${ctx.timeoutMs} ms`
-          : `\`${command}\` exited with code ${r.exitCode}`,
-      evidence: {
+    const runs: Record<string, unknown>[] = [];
+    const parts: string[] = [];
+    let ok = true;
+    for (const command of commands) {
+      const r = await runCommand(command, ctx.cwd, ctx.timeoutMs, ctx.signal);
+      const pass = r.exitCode === 0 && !r.timedOut;
+      ok &&= pass;
+      parts.push(
+        pass
+          ? `\`${command}\` exited 0 in ${r.durationMs} ms`
+          : r.timedOut
+            ? `\`${command}\` timed out after ${ctx.timeoutMs} ms`
+            : `\`${command}\` exited with code ${r.exitCode}`,
+      );
+      runs.push({
         command,
         exitCode: r.exitCode,
         timedOut: r.timedOut,
         durationMs: r.durationMs,
         outputTail: r.outputTail,
+      });
+      if (!pass) break; // later suites are not run on a failed earlier one (recorded as not run)
+    }
+    const notRun = commands.slice(runs.length);
+    return {
+      status: ok ? 'PASSED' : 'FAILED',
+      summary:
+        parts.join('; ') + (notRun.length ? `; not run: ${notRun.map((c) => `\`${c}\``).join(', ')}` : ''),
+      evidence: {
+        // v1 shape kept for the first command (dashboards/reports read these keys)
+        ...runs[0],
+        runs,
+        notRun,
       },
     };
   }
@@ -246,8 +268,8 @@ export function defaultVerifiers(): Record<
 > {
   return {
     CHANGES_EXIST: new ChangesExistVerifier(),
-    BUILD_PASSES: new CommandVerifier('BUILD_PASSES', (c) => c.build),
-    TESTS_PASS: new CommandVerifier('TESTS_PASS', (c) => c.test),
+    BUILD_PASSES: new CommandVerifier('BUILD_PASSES', (c) => [c.build]),
+    TESTS_PASS: new CommandVerifier('TESTS_PASS', (c) => [c.test, c.browserTest]),
     // Project-level requirement coverage needs the database: verifyProject() aggregates independent-QA evidence.
     REQUIREMENTS_SATISFIED: new NotImplementedVerifier(
       'REQUIREMENTS_SATISFIED',

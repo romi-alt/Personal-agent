@@ -94,6 +94,8 @@ export const assignmentSchema = z
       .object({
         buildCommand: z.string().min(1).optional(),
         testCommand: z.string().min(1).optional(),
+        /** Browser/end-to-end suite; part of TESTS_PASS when configured (v2). */
+        browserTestCommand: z.string().min(1).optional(),
       })
       .default({}),
     source: z
