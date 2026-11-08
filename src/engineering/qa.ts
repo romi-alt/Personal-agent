@@ -226,6 +226,8 @@ interface QaRow {
 }
 
 export class QaEngine {
+  private reconciledAtStart = false;
+
   constructor(
     private readonly store: Store,
     private readonly cfg: QaConfig,
@@ -321,6 +323,14 @@ export class QaEngine {
 
   /** One pass over QA state. Cheap when idle; safe to call on every supervisor tick and after any crash. */
   async tick(): Promise<number> {
+    if (!this.reconciledAtStart) {
+      // A4: repair requirement/milestone statuses of databases written before they were maintained (idempotent).
+      this.reconciledAtStart = true;
+      const projects = this.db
+        .prepare('SELECT DISTINCT t.project_id AS id FROM plan_tasks p JOIN tasks t ON t.id = p.task_id')
+        .all() as { id: string }[];
+      for (const p of projects) this.store.reconcileRoadmapStatus(p.id);
+    }
     if (!this.cfg.enabled) return 0;
     let changed = 0;
     // 1. newly completed tasks that need a review
@@ -478,6 +488,7 @@ export class QaEngine {
             },
           });
           if (check.passed) this.store.advanceProjectAfterTerminalTask(task.projectId);
+          this.store.reconcileRoadmapStatus(task.projectId, task.id);
         })
         .immediate();
       if (!check.passed) {
@@ -519,12 +530,14 @@ export class QaEngine {
               evidence: { ownerOverride: true, approvalId: a.id },
             });
             this.store.advanceProjectAfterTerminalTask(task.projectId);
+            this.store.reconcileRoadmapStatus(task.projectId, task.id);
           })
           .immediate();
         return true;
       }
       if (a?.status === 'DENIED') {
         this.update(task.id, row.round, { status: 'OWNER_REJECTED' });
+        this.store.reconcileRoadmapStatus(task.projectId, task.id);
         this.store.recordEvent({
           type: 'qa.owner_rejected',
           projectId: task.projectId,

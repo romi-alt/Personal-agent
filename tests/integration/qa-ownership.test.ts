@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { registerAssignment } from '../../src/assignments/register.js';
+import { reconcileProjectStatus } from '../../src/planning/status-reconcile.js';
 import { assignmentExample } from '../helpers/assignment.js';
 import { makeEnv, settle, type TestEnv } from '../helpers/env.js';
 import { happyPlanning, planJson, reply } from '../helpers/plan-fixtures.js';
@@ -130,5 +131,24 @@ describe('A1: QA judges a task only on its own criteria and the requirements it 
     expect(tasks.some((t) => t.title === 'Fix: Attendance module (QA round 1)')).toBe(true);
     expect(env.qa.rows(attendance.id).map((r) => `${r.round}:${r.status}`)).toEqual(['1:FAILED', '2:PASSED']);
     expect((env.qa.result(attendance.id, 1)!['unmet'] as { id: string }[]).map((u) => u.id)).toEqual(['AC1']);
+
+    // A4 wiring: statuses were maintained as tasks/reviews changed (no manual reconcile call). "Enrollment module"
+    // requires TESTS_PASS, which this project has no command for (NOT_CONFIGURED): its requirements are REVIEWED
+    // (independent review passed) but not VERIFIED. "Attendance module" only requires CHANGES_EXIST: VERIFIED.
+    expect(env.store.listEvidence({ taskId: enroll.id, level: 'TESTS_PASS' }).at(-1)?.status).toBe(
+      'NOT_CONFIGURED',
+    );
+    expect(env.workflows.repo.listRequirements(project.id).map((r) => `${r.id}:${r.status}`)).toEqual([
+      'FR-1:REVIEWED',
+      'FR-2:VERIFIED',
+      'NFR-1:REVIEWED',
+      'DR-1:REVIEWED',
+    ]);
+    expect(env.workflows.repo.listMilestones(project.id).map((m) => `${m.key}:${m.status}`)).toEqual([
+      'M1:REVIEWED',
+      'M2:REVIEWED',
+    ]);
+    // Reconciling again changes nothing (idempotent).
+    expect(reconcileProjectStatus(env.store.db, project.id).changes).toEqual([]);
   });
 });
