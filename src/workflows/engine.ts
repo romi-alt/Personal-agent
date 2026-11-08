@@ -30,6 +30,7 @@ import {
   reviewPrompt,
 } from '../planning/prompts.js';
 import { hasBlockingIssues, reviewPlan } from '../planning/review.js';
+import { resolvePlanOwners } from '../planning/ownership.js';
 import {
   type Analysis,
   type Architecture,
@@ -960,6 +961,12 @@ export class WorkflowEngine {
         subtasks: t.subtasks,
         testing: t.testing,
       });
+    }
+    // A1: one owner task per requirement (explicit ownsRequirementIds, else the last linked task in order); the
+    // other linked tasks only contribute, so their independent reviews are not judged on it.
+    for (const [reqId, ownerKey] of resolvePlanOwners(v.order.map((k) => byKey.get(k)!))) {
+      const ownerId = idByKey.get(ownerKey);
+      if (ownerId) this.repo.setRequirementOwner(run.projectId, reqId, ownerId);
     }
     this.store.setMemory(
       run.projectId,

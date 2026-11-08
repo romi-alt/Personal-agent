@@ -7,6 +7,7 @@ import type { Logger } from '../logging/logger.js';
 import { extractJson } from '../planning/extract-json.js';
 import type { Store } from '../queue/store.js';
 import type { Task } from '../types/index.js';
+import { requirementOwnership } from '../planning/ownership.js';
 import { TASK_VERIFIABLE_LEVELS } from '../verification/types.js';
 import { isPathInside } from '../workspaces/paths.js';
 
@@ -44,6 +45,8 @@ const reviewReplySchema = z.object({
           .array(z.object({ file: z.string().min(1), line: z.number().int().positive() }))
           .default([]),
         note: z.string().default(''),
+        /** Reviewer's claim that the gap belongs to another task (only meaningful for other tasks' requirements). */
+        coveredBy: z.string().optional(),
       }),
     )
     .min(1),
@@ -54,7 +57,15 @@ const reviewReplySchema = z.object({
         description: z.string().min(3),
         file: z.string().optional(),
         line: z.number().int().positive().optional(),
+        /** The criterion (AC id or owned requirement id) the defect violates. */
+        criterionId: z.string().optional(),
       }),
+    )
+    .default([]),
+  /** Informational remarks on project requirements owned by OTHER tasks. Never fail the review. */
+  observations: z
+    .array(
+      z.object({ id: z.string().min(1), note: z.string().default(''), coveredBy: z.string().optional() }),
     )
     .default([]),
   testsAssessment: z.string().default(''),
@@ -64,34 +75,90 @@ export type ReviewReply = z.infer<typeof reviewReplySchema>;
 export interface Criterion {
   id: string;
   text: string;
+  /** 'acceptance' = the task's own acceptance criterion; 'owned' = a project requirement this task owns. */
+  scope?: 'acceptance' | 'owned';
 }
 
-/** Acceptance criteria + linked requirement texts, as numbered checkable items (deterministic). */
-export function criteriaFor(task: Task, requirements: { id: string; text: string }[]): Criterion[] {
+/** A project requirement linked to the task but OWNED by another task: informational for this review. */
+export interface ContributedRequirement {
+  id: string;
+  text: string;
+  ownerTaskId: string | null;
+  ownerTitle: string | null;
+}
+
+/** Informational finding: recorded with the review, never a reason to fail it. */
+export interface ReviewNote {
+  id: string;
+  kind: 'other_task_requirement' | 'uncited_defect' | 'observation';
+  note: string;
+  coveredBy: string | null;
+}
+
+/**
+ * The task's MUST-PASS criteria: its own acceptance criteria plus the project requirements it OWNS (deterministic).
+ * Requirements owned by other tasks are not criteria (A1); pass them to checkReview/reviewTaskPrompt separately.
+ */
+export function criteriaFor(task: Task, ownedRequirements: { id: string; text: string }[]): Criterion[] {
   const items = task.acceptanceCriteria
     .split(/\r?\n|;(?=\s)/)
     .map((s) => s.replace(/^\s*[-*\d.)]+\s*/, '').trim())
     .filter((s) => s.length >= 3);
   return [
-    ...items.map((text, i) => ({ id: `AC${i + 1}`, text })),
-    ...requirements.map((r) => ({ id: r.id, text: r.text })),
+    ...items.map((text, i) => ({ id: `AC${i + 1}`, text, scope: 'acceptance' as const })),
+    ...ownedRequirements.map((r) => ({ id: r.id, text: r.text, scope: 'owned' as const })),
   ];
 }
 
-/** Check citations against the repository: file inside the repo and line within the file. */
+/**
+ * Check a review reply. Code, not the model, decides:
+ *   - a must-pass criterion counts as met only with valid file:line citations inside the repository;
+ *   - verdicts on requirements owned by OTHER tasks are informational notes ("covered by <task>"), never failures;
+ *   - a high-severity defect blocks only when it is about this task: it names one of this task's criteria, or it
+ *     names no criterion but cites a real file:line. A defect that names another task's requirement, or cites
+ *     nothing, becomes a note.
+ * A FAIL therefore always cites at least one of the task's own criteria or a concrete defect in its code; anything
+ * else that the reviewer flagged is normalized to PASS-with-notes (`normalized: true`), so mis-mapped findings can
+ * never create correction tasks.
+ */
 export function checkReview(
   reply: ReviewReply,
   criteria: Criterion[],
   repoPath: string,
+  contributed: ContributedRequirement[] = [],
 ): {
   passed: boolean;
   unmet: { id: string; text: string; reason: string }[];
   defects: ReviewReply['defects'];
+  /** High-severity defects that fail the review. */
+  blockingDefects: ReviewReply['defects'];
+  notes: ReviewNote[];
+  /** The reviewer flagged something that did not count against this task (passed => PASS-with-notes). */
+  normalized: boolean;
   errors: string[];
 } {
   const errors: string[] = [];
+  const notes: ReviewNote[] = [];
   const ids = new Set(criteria.map((c) => c.id));
-  for (const c of reply.criteria) if (!ids.has(c.id)) errors.push(`unknown criterion id "${c.id}"`);
+  const others = new Map(contributed.map((c) => [c.id, c]));
+  const ownerOf = (id: string) => others.get(id)?.ownerTaskId ?? null;
+  // Did the reviewer flag anything that, before ownership existed, would have failed the review?
+  let flagged = reply.observations.length > 0;
+  for (const c of reply.criteria) {
+    if (ids.has(c.id)) continue;
+    if (others.has(c.id)) {
+      // Not this task's scope: a verdict here (met or not) is informational only.
+      if (!c.met) flagged = true;
+      notes.push({
+        id: c.id,
+        kind: 'other_task_requirement',
+        note: `${c.met ? 'met' : 'not met'} here; owned by ${ownerOf(c.id) ?? 'another task'}${c.note ? ` - ${c.note}` : ''}`,
+        coveredBy: c.coveredBy ?? ownerOf(c.id),
+      });
+    } else errors.push(`unknown criterion id "${c.id}"`);
+  }
+  for (const o of reply.observations)
+    notes.push({ id: o.id, kind: 'observation', note: o.note, coveredBy: o.coveredBy ?? ownerOf(o.id) });
   for (const c of criteria)
     if (!reply.criteria.some((r) => r.id === c.id)) errors.push(`criterion "${c.id}" has no verdict`);
   const lineCount = new Map<string, number | null>();
@@ -120,11 +187,30 @@ export function checkReview(
         reason: 'claimed met without a valid file:line citation in the repository',
       });
   }
-  const high = reply.defects.filter((d) => d.severity === 'high');
+  const blockingDefects: ReviewReply['defects'] = [];
+  for (const d of reply.defects.filter((x) => x.severity === 'high')) {
+    const cited = !!d.file && !!d.line && validCite(d.file, d.line);
+    const otherTask = !!d.criterionId && others.has(d.criterionId);
+    const own = d.criterionId && ids.has(d.criterionId) ? true : otherTask ? false : cited;
+    if (own) blockingDefects.push(d);
+    else {
+      flagged = true;
+      notes.push({
+        id: d.criterionId ?? '(none)',
+        kind: otherTask ? 'other_task_requirement' : 'uncited_defect',
+        note: `high-severity defect not attributable to this task: ${d.description}`,
+        coveredBy: otherTask ? ownerOf(d.criterionId!) : null,
+      });
+    }
+  }
+  const passed = errors.length === 0 && unmet.length === 0 && blockingDefects.length === 0;
   return {
-    passed: errors.length === 0 && unmet.length === 0 && high.length === 0,
+    passed,
     unmet,
     defects: reply.defects,
+    blockingDefects,
+    notes,
+    normalized: flagged,
     errors,
   };
 }
@@ -243,15 +329,18 @@ export class QaEngine {
     repairOf?: { errors: string[]; repairs: number },
   ): Promise<void> {
     const project = this.store.getProject(task.projectId)!;
-    const reqs = this.linkedRequirements(task);
-    const criteria = criteriaFor(task, reqs);
+    const scope = this.reviewScope(task);
+    const criteria = criteriaFor(task, scope.owned);
     const diff = await this.diffFor(task, project.repoPath);
     const evidence = this.store
       .listEvidence({ taskId: task.id })
       .filter((e) => (TASK_VERIFIABLE_LEVELS as readonly string[]).includes(e.level))
       .map((e) => `- ${e.level}: ${e.status} - ${e.summary}`)
       .join('\n');
-    const prompt = reviewTaskPrompt(task, criteria, diff, evidence, repairOf?.errors);
+    const prompt = reviewTaskPrompt(task, criteria, diff, evidence, repairOf?.errors, {
+      contributes: scope.contributes,
+      ownershipMap: scope.map,
+    });
     const repairs = repairOf?.repairs ?? 0;
     const title = `Review: ${task.title}${round > 1 ? ` (round ${round})` : ''}${repairs ? ` (repair ${repairs})` : ''}`;
     this.db
@@ -305,7 +394,8 @@ export class QaEngine {
         return this.escalate(task, row, `review task ${review.status}: ${review.lastErrorMessage ?? ''}`);
       if (review.status !== 'COMPLETED') return false;
       const project = this.store.getProject(task.projectId)!;
-      const criteria = criteriaFor(task, this.linkedRequirements(task));
+      const scope = this.reviewScope(task);
+      const criteria = criteriaFor(task, scope.owned);
       const raw = this.store.getTaskOutput(review.id) ?? '';
       const ex = extractJson(raw);
       const parsed = ex.ok ? reviewReplySchema.safeParse(ex.value) : null;
@@ -314,7 +404,9 @@ export class QaEngine {
         : parsed && !parsed.success
           ? parsed.error.issues.map((i) => `${i.path.join('.') || '(root)'}: ${i.message}`)
           : [];
-      const check = parsed?.success ? checkReview(parsed.data, criteria, project.repoPath) : null;
+      const check = parsed?.success
+        ? checkReview(parsed.data, criteria, project.repoPath, scope.contributes)
+        : null;
       if (!check || check.errors.length) {
         const all = [...errors, ...(check?.errors ?? [])];
         if (row.repairs >= this.cfg.maxReviewRepairs)
@@ -322,10 +414,20 @@ export class QaEngine {
         await this.startReview(task, row.round, { errors: all, repairs: row.repairs + 1 });
         return true;
       }
+      const passedWithNotes = check.passed && check.normalized;
+      const ownIds = new Set(criteria.map((c) => c.id));
       const result = {
-        criteria: parsed!.data!.criteria,
+        // Only the task's own criteria are verdicts; other tasks' requirements are kept as notes.
+        criteria: parsed!.data!.criteria.filter((c) => ownIds.has(c.id)),
         defects: check.defects,
+        blockingDefects: check.blockingDefects,
         unmet: check.unmet,
+        notes: check.notes,
+        passedWithNotes,
+        scope: {
+          criteria: criteria.map((c) => ({ id: c.id, scope: c.scope ?? 'acceptance' })),
+          contributes: scope.contributes.map((c) => ({ id: c.id, ownerTaskId: c.ownerTaskId })),
+        },
         testsAssessment: parsed!.data!.testsAssessment,
         reviewTaskId: review.id,
       };
@@ -338,8 +440,10 @@ export class QaEngine {
             level: 'REQUIREMENTS_SATISFIED',
             status: check.passed ? 'PASSED' : 'FAILED',
             summary: check.passed
-              ? `independent review round ${row.round}: all ${criteria.length} criteria met with cited evidence`
-              : `independent review round ${row.round}: ${check.unmet.length} criteria unmet, ${check.defects.filter((d) => d.severity === 'high').length} high-severity defect(s)`,
+              ? passedWithNotes
+                ? `independent review round ${row.round}: passed with notes - all ${criteria.length} own criteria met with cited evidence; ${check.notes.length} finding(s) outside this task's scope recorded as informational`
+                : `independent review round ${row.round}: all ${criteria.length} criteria met with cited evidence`
+              : `independent review round ${row.round}: ${check.unmet.length} criteria unmet, ${check.blockingDefects.length} high-severity defect(s)`,
             evidence: result,
           });
           this.store.recordEvent({
@@ -347,7 +451,11 @@ export class QaEngine {
             projectId: task.projectId,
             taskId: task.id,
             severity: check.passed ? 'info' : 'warn',
-            payload: { round: row.round, unmet: check.unmet.map((u) => u.id) },
+            payload: {
+              round: row.round,
+              unmet: check.unmet.map((u) => u.id),
+              ...(passedWithNotes ? { passedWithNotes: true, notes: check.notes.map((n) => n.id) } : {}),
+            },
           });
           if (check.passed) this.store.advanceProjectAfterTerminalTask(task.projectId);
         })
@@ -359,7 +467,10 @@ export class QaEngine {
             row,
             `still failing after ${this.cfg.maxCorrectionRounds} correction round(s)`,
           );
-        this.createCorrection(task, row.round, check.unmet, check.defects);
+        this.createCorrection(task, row.round, check.unmet, [
+          ...check.blockingDefects,
+          ...check.defects.filter((d) => d.severity !== 'high'),
+        ]);
       }
       return true;
     }
@@ -476,15 +587,35 @@ export class QaEngine {
     return true;
   }
 
-  private linkedRequirements(task: Task): { id: string; text: string }[] {
+  /**
+   * What the review judges (A1). Of the requirements linked to the task, the ones it OWNS are must-pass criteria;
+   * the ones owned by another task are informational ("contributes"). The whole requirement -> owner map is given
+   * to the reviewer so it can attribute a gap to the task that is responsible for it.
+   */
+  reviewScope(task: Task): {
+    owned: { id: string; text: string }[];
+    contributes: ContributedRequirement[];
+    map: { id: string; ownerTaskId: string | null; ownerTitle: string | null }[];
+  } {
     const link = this.db.prepare('SELECT requirement_ids FROM plan_tasks WHERE task_id = ?').get(task.id) as
       { requirement_ids: string } | undefined;
-    if (!link) return [];
+    if (!link) return { owned: [], contributes: [], map: [] };
     const ids = JSON.parse(link.requirement_ids) as string[];
-    const rows = this.db
-      .prepare('SELECT req_id, text FROM requirements WHERE project_id = ?')
-      .all(task.projectId) as { req_id: string; text: string }[];
-    return ids.map((id) => ({ id, text: rows.find((r) => r.req_id === id)?.text ?? id }));
+    const own = requirementOwnership(this.db, task.projectId);
+    const owned: { id: string; text: string }[] = [];
+    const contributes: ContributedRequirement[] = [];
+    for (const id of ids) {
+      const o = own.get(id);
+      // No resolvable owner (unknown requirement, or this task is the only/last link): this task owns it.
+      if (!o || !o.ownerTaskId || o.ownerTaskId === task.id) owned.push({ id, text: o?.text ?? id });
+      else contributes.push({ id, text: o.text, ownerTaskId: o.ownerTaskId, ownerTitle: o.ownerTitle });
+    }
+    const map = [...own.values()].map((o) => ({
+      id: o.reqId,
+      ownerTaskId: o.ownerTaskId,
+      ownerTitle: o.ownerTitle,
+    }));
+    return { owned, contributes, map };
   }
 
   /** Diff of the task's work: from its recorded baseline commit to the current working tree (bounded). */
@@ -536,18 +667,36 @@ export function reviewTaskPrompt(
   diff: string,
   evidence: string,
   repairErrors?: string[],
+  ownership: {
+    contributes?: ContributedRequirement[];
+    ownershipMap?: { id: string; ownerTaskId: string | null; ownerTitle: string | null }[];
+  } = {},
 ): string {
+  const acceptance = criteria.filter((c) => (c.scope ?? 'acceptance') === 'acceptance');
+  const owned = criteria.filter((c) => c.scope === 'owned');
+  const contributes = ownership.contributes ?? [];
+  const map = (ownership.ownershipMap ?? []).slice(0, 120);
+  const owner = (id: string | null, title: string | null) =>
+    id ? `${id}${title ? ` "${title}"` : ''}` : 'unassigned';
   return [
     'You are an INDEPENDENT QA reviewer. Another worker implemented the task below; you did not. Do not trust its claims.',
-    `## Task under review\n${task.title}\n\n${task.instructions.slice(0, 6000)}`,
-    `## Criteria to check (one verdict per id)\n${criteria.map((c) => `- [${c.id}] ${c.text}`).join('\n')}`,
+    `## Task under review\n${task.id}: ${task.title}\n\n${task.instructions.slice(0, 6000)}`,
+    `## Task acceptance criteria (MUST PASS; one verdict per id)\n${acceptance.map((c) => `- [${c.id}] ${c.text}`).join('\n') || '(none)'}`,
+    `## Project requirements OWNED by this task (MUST PASS; one verdict per id)\n${owned.map((c) => `- [${c.id}] ${c.text}`).join('\n') || '(none)'}`,
+    contributes.length
+      ? `## Project requirements this task only CONTRIBUTES to (informational - owned and judged by another task)\nDo NOT give these a verdict in "criteria" and do NOT fail this task on them. If you notice something relevant, add it to "observations" with coveredBy set to the owning task id.\n${contributes.map((c) => `- [${c.id}] ${c.text} - owned by ${owner(c.ownerTaskId, c.ownerTitle)}`).join('\n')}`
+      : '',
+    map.length
+      ? `## Requirement -> owning task map (whole project)\n${map.map((m) => `- ${m.id} -> ${owner(m.ownerTaskId, m.ownerTitle)}`).join('\n')}`
+      : '',
     `## Recorded verification evidence\n${evidence || '(none recorded)'}`,
     `## Changes\n${diff}`,
     '## How to review',
     [
-      '- Read the actual files in the repository (read-only tools). Check each criterion against the code and tests.',
+      '- Read the actual files in the repository (read-only tools). Check each MUST-PASS criterion against the code and tests.',
       '- A criterion is met only if you can cite the file and line that implements it (relative path from the repository root). Citations are checked automatically; a "met" verdict without a valid citation counts as NOT met.',
-      '- Report defects (bugs, security problems, missing tests) with severity; any high-severity defect fails the review.',
+      '- Judge this task only against its own acceptance criteria and the requirements it owns. Work that the map assigns to another task is not this task\'s scope: mention it under observations ("covered by <task id>"), never as an unmet criterion or a defect.',
+      "- Report defects (bugs, security problems, missing tests) in THIS task's work with severity and the criterion id they violate (criterionId) or a file:line; a high-severity defect in this task's work fails the review.",
     ].join('\n'),
     repairErrors?.length
       ? `## REPAIR REQUIRED\nYour previous reply was rejected:\n${repairErrors.map((e) => `- ${e}`).join('\n')}`
@@ -563,7 +712,16 @@ export function reviewTaskPrompt(
             note: 'string',
           },
         ],
-        defects: [{ severity: 'low|medium|high', description: 'string', file: 'optional', line: 1 }],
+        defects: [
+          {
+            severity: 'low|medium|high',
+            description: 'string',
+            criterionId: 'optional (AC1 or an owned requirement id)',
+            file: 'optional',
+            line: 1,
+          },
+        ],
+        observations: [{ id: 'requirement id owned by another task', note: 'string', coveredBy: 'tsk_...' }],
         testsAssessment: 'string',
       },
       null,

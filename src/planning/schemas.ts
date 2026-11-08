@@ -150,6 +150,11 @@ export const planTaskSchema = z.object({
   role: z.enum(ROLES).optional(),
   dependsOn: z.array(key).default([]),
   requirementIds: z.array(key).min(1),
+  /**
+   * Requirements (subset of requirementIds) this task OWNS: its independent review judges them. Other linked tasks
+   * only contribute. Unowned requirements default to the last linked task in dependency order.
+   */
+  ownsRequirementIds: z.array(key).optional(),
   priority: z.number().int().min(-100).max(100).default(0),
   size: z.enum(['S', 'M', 'L']).default('M'),
   /** Verification levels required before the task may complete. */

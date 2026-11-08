@@ -486,6 +486,41 @@ CREATE TABLE external_records (
 );
 `,
   },
+  // v9 is reserved for a concurrent change set; versions are applied in order of what is missing, so a later v9
+  // still applies on a database that already has v10 (the two touch different tables).
+  {
+    version: 10,
+    name: 'qa_requirement_ownership_and_review_links',
+    sql: `
+-- A1: the single plan task that OWNS a requirement (the independent review judges the requirement only there;
+-- every other linked task merely contributes). NULL = not yet resolved: code falls back to the last linked task in
+-- plan (topological) order.
+ALTER TABLE requirements ADD COLUMN owner_task_id TEXT;
+
+-- A3: every review task (including repair re-dispatches that supersede an earlier review of the same round) is
+-- linked to its QA round. qa_reviews.review_task_id keeps pointing at the latest one.
+CREATE TABLE qa_review_tasks (
+  review_task_id TEXT PRIMARY KEY,
+  task_id TEXT NOT NULL,           -- the reviewed (original) coding task
+  round INTEGER NOT NULL,
+  repair INTEGER NOT NULL,
+  created_at INTEGER NOT NULL
+);
+CREATE INDEX idx_qa_review_tasks_task ON qa_review_tasks(task_id, round);
+-- Backfill from the review dedupe key "qa:<taskId>:<round>:<repair>" (existing review tasks become linked).
+INSERT OR IGNORE INTO qa_review_tasks(review_task_id, task_id, round, repair, created_at)
+SELECT id,
+       substr(k, 1, instr(k, ':') - 1),
+       CAST(substr(r, 1, instr(r, ':') - 1) AS INTEGER),
+       CAST(substr(r, instr(r, ':') + 1) AS INTEGER),
+       created_at
+FROM (
+  SELECT id, created_at, k, substr(k, instr(k, ':') + 1) AS r
+  FROM (SELECT id, created_at, substr(dedupe_key, 4) AS k FROM tasks WHERE dedupe_key LIKE 'qa:%:%:%')
+)
+WHERE instr(k, ':') > 0 AND instr(r, ':') > 0;
+`,
+  },
 ];
 
 export function runMigrations(db: Database.Database, migrations: Migration[] = MIGRATIONS): number[] {

@@ -175,6 +175,13 @@ export function validatePlan(
       if (!known.has(id)) errors.push(`task "${t.key}" references unknown requirement "${id}"`);
       else byRequirement[id]!.push(t.key);
     }
+    for (const id of t.ownsRequirementIds ?? []) {
+      if (!t.requirementIds.includes(id))
+        errors.push(`task "${t.key}" owns requirement "${id}" but does not list it in requirementIds`);
+      const other = plan.tasks.find((o) => o !== t && (o.ownsRequirementIds ?? []).includes(id));
+      if (other && plan.tasks.indexOf(other) > plan.tasks.indexOf(t))
+        errors.push(`requirement "${id}" has more than one owner task ("${t.key}", "${other.key}")`);
+    }
     if (!t.verify.includes('CHANGES_EXIST')) {
       errors.push(
         `task "${t.key}" must require CHANGES_EXIST verification (every planned task changes the repository)`,
