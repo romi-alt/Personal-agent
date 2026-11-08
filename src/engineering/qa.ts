@@ -253,6 +253,30 @@ export class QaEngine {
     }));
   }
 
+  /** Every review task of a task's QA rounds, including repair re-dispatches that a later repair superseded. */
+  reviewTasks(taskId: string): { reviewTaskId: string; round: number; repair: number }[] {
+    return (
+      this.db
+        .prepare(
+          'SELECT review_task_id, round, repair FROM qa_review_tasks WHERE task_id = ? ORDER BY round, repair',
+        )
+        .all(taskId) as { review_task_id: string; round: number; repair: number }[]
+    ).map((r) => ({ reviewTaskId: r.review_task_id, round: r.round, repair: r.repair }));
+  }
+
+  /** Review tasks (dedupe key "qa:...") that are linked to no QA round. Empty unless the database is inconsistent. */
+  orphanReviewTasks(): string[] {
+    return (
+      this.db
+        .prepare(
+          `SELECT t.id FROM tasks t WHERE t.dedupe_key LIKE 'qa:%'
+             AND NOT EXISTS (SELECT 1 FROM qa_review_tasks l WHERE l.review_task_id = t.id)
+             AND NOT EXISTS (SELECT 1 FROM qa_reviews q WHERE q.review_task_id = t.id) ORDER BY t.rowid`,
+        )
+        .all() as { id: string }[]
+    ).map((r) => r.id);
+  }
+
   result(taskId: string, round: number): Record<string, unknown> | null {
     const r = this.db
       .prepare('SELECT result FROM qa_reviews WHERE task_id = ? AND round = ?')
@@ -343,8 +367,13 @@ export class QaEngine {
     });
     const repairs = repairOf?.repairs ?? 0;
     const title = `Review: ${task.title}${round > 1 ? ` (round ${round})` : ''}${repairs ? ` (repair ${repairs})` : ''}`;
+    // A3: the review task, its qa_reviews round and its qa_review_tasks link are written in ONE immediate
+    // transaction; a failure anywhere rolls all of them back (no review task without a QA round). A repair
+    // re-dispatch supersedes the round's review_task_id, but the superseded review stays linked through
+    // qa_review_tasks (the pilot's "orphan" review tsk_mw6qev54ed00819a0c was such a superseded repair-0 review).
     this.db
       .transaction(() => {
+        const now = this.store.clock.now();
         const { task: review } = this.store.enqueueTask({
           projectId: task.projectId,
           kind: 'PLANNING', // read-only tools; fresh session
@@ -354,27 +383,18 @@ export class QaEngine {
           maxRetries: this.cfg.defaultMaxRetries,
           dedupeKey: `qa:${task.id}:${round}:${repairs}`,
         });
-        if (round === 1 && repairs === 0 && !this.rows(task.id).length) {
+        if (!this.rows(task.id).some((r) => r.round === round)) {
           this.db
             .prepare(
               'INSERT INTO qa_reviews(task_id,round,review_task_id,status,repairs,created_at,updated_at) VALUES (?,?,?,?,?,?,?)',
             )
-            .run(task.id, round, review.id, 'REVIEWING', 0, this.store.clock.now(), this.store.clock.now());
-        } else if (!this.rows(task.id).some((r) => r.round === round)) {
-          this.db
-            .prepare(
-              'INSERT INTO qa_reviews(task_id,round,review_task_id,status,repairs,created_at,updated_at) VALUES (?,?,?,?,?,?,?)',
-            )
-            .run(
-              task.id,
-              round,
-              review.id,
-              'REVIEWING',
-              repairs,
-              this.store.clock.now(),
-              this.store.clock.now(),
-            );
+            .run(task.id, round, review.id, 'REVIEWING', repairs, now, now);
         } else this.update(task.id, round, { reviewTaskId: review.id, status: 'REVIEWING', repairs });
+        this.db
+          .prepare(
+            'INSERT OR IGNORE INTO qa_review_tasks(review_task_id,task_id,round,repair,created_at) VALUES (?,?,?,?,?)',
+          )
+          .run(review.id, task.id, round, repairs, now);
         this.store.recordEvent({
           type: 'qa.review_queued',
           projectId: task.projectId,
