@@ -77,6 +77,32 @@ describe('capacity waits in the durable queue (v2)', () => {
     expect(esc[0]!.payload).toMatchObject({ policy: 'notify' });
   });
 
+  it('A12 default (24 h): a capacity streak past 24 h is delivered to the owner notification channel once', async () => {
+    env = await makeEnv(); // default CAPACITY_ESCALATE_AFTER_MS = 24 h, CAPACITY_ESCALATION = notify
+    env.mock!['opts'].scenario = { tasks: { build: [quota(6 * HOUR)] } }; // limit keeps coming back
+    const t = env.store.enqueueTask({
+      projectId: env.project.id,
+      title: 'build',
+      instructions: 'b',
+      maxRetries: 2,
+    }).task;
+    for (let i = 0; i < 6; i++) {
+      await drain(env);
+      env.clock.advance(6 * HOUR + 10_000);
+    }
+    await drain(env);
+    expect(env.store.getTask(t.id)!.status).toBe('WAITING_FOR_CAPACITY'); // still waiting, never killed or failed
+    expect(env.store.getTask(t.id)!.attemptCount).toBe(0);
+    const esc = env.store.listEvents({ taskId: t.id }).filter((e) => e.type === 'capacity.escalated');
+    expect(esc).toHaveLength(1);
+    expect(esc[0]!.payload['waitedMs'] as number).toBeGreaterThan(24 * HOUR);
+    const { Notifier } = await import('../../src/ops/notify.js');
+    await new Notifier(env.store, { agentHome: env.dir }).flush();
+    const { readFileSync } = await import('node:fs');
+    const lines = readFileSync(`${env.dir}/notifications.jsonl`, 'utf8').trim().split('\n');
+    expect(lines.filter((l) => l.includes('capacity.escalated'))).toHaveLength(1);
+  });
+
   it('A12 block: the escalation BLOCKS the task for owner review instead of waiting on', async () => {
     env = await makeEnv({
       env: { CAPACITY_ESCALATE_AFTER_MS: String(2 * HOUR), CAPACITY_ESCALATION: 'block' },
