@@ -18,6 +18,14 @@ Phase 1 performs **no deployments** and contacts **no production system**.
 * `Bash` commands are screened against approval categories (`production_deploy`, `publish_release`, `protected_branch_push`, `destructive_delete`,
   `live_database_migration`, `production_credentials`, `customer_communication`, `financial_transaction`, `access_change`, `system_modification`).
   Approval is per task and per category (`approve <id>` records it; the next run passes the category in `approvedActionTypes`).
+  Since A2, rules about executable operations match a *normalized* Bash command (heredoc bodies, comments and quoted multi-word data removed;
+  `src/security/shell-normalize.ts`), so `passwd` / `DROP TABLE` in a test file body or commit message no longer asks for approval. The raw
+  command is used whenever quoted/heredoc text may be executed (shells, `eval`, `-c`/`-e`, SQL clients, interpreters fed inline code, `ssh`,
+  `xargs`, ...), when parsing is not confident, for every PowerShell-tool command, and always for `customer_communication`,
+  `financial_transaction`, the agent-control/agent-CLI hard denies and the protected-path check. `rm -r` stays gated whatever the target
+  (use the scratch-clean tool). Write/Edit file content is never screened as a command (only the path).
+* Direct agent CLI invocation (`node dist/cli/index.js <state-changing subcommand>`, `tsx src/cli/index.ts ...`, any relative path) is a hard
+  deny, like `npm run agent` (`invokesAgentCli` in `src/security/policy.ts`).
 * **Known limitation:** pattern screening of shell commands is a *guardrail, not a sandbox*. A determined or confused model can construct commands that evade regexes
   (e.g. via scripts it writes and then runs). Mitigations for real unattended use: run under a dedicated low-privilege OS account, use a dedicated VM/VPS or container,
   keep no production credentials on the host, and use a network egress allow-list. OS-level sandboxing (the SDK `sandbox` option) is a Phase 2 item.
