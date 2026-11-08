@@ -73,6 +73,19 @@ describe('A1: checkReview distinguishes own criteria from requirements owned by 
     }
   });
 
+  it("a CITED high-severity defect blocks even when filed under another task's requirement (no mislabel bypass)", () => {
+    const d = {
+      severity: 'high' as const,
+      description: 'auth bypass in this code',
+      criterionId: 'NFR-4',
+      file: 'a.ts',
+      line: 2,
+    };
+    const r = checkReview(reply({ defects: [d] }), criteria, repo, contributed);
+    expect(r.passed).toBe(false);
+    expect(r.blockingDefects).toEqual([d]);
+  });
+
   it('a high-severity defect with neither an own criterion nor a valid citation is a note, not a failure', () => {
     const r = checkReview(
       reply({ defects: [{ severity: 'high', description: 'something somewhere' }] }),

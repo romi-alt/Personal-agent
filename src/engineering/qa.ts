@@ -191,7 +191,11 @@ export function checkReview(
   for (const d of reply.defects.filter((x) => x.severity === 'high')) {
     const cited = !!d.file && !!d.line && validCite(d.file, d.line);
     const otherTask = !!d.criterionId && others.has(d.criterionId);
-    const own = d.criterionId && ids.has(d.criterionId) ? true : otherTask ? false : cited;
+    // A defect that cites a real file:line is a concrete defect in the code under review and ALWAYS blocks, whatever
+    // requirement the reviewer filed it under (a security hole in this task's code must not pass because it was
+    // labelled with another task's NFR). Only uncited high-severity claims, or ones filed under another task's
+    // requirement without any citation, become notes.
+    const own = cited || (!!d.criterionId && ids.has(d.criterionId));
     if (own) blockingDefects.push(d);
     else {
       flagged = true;
