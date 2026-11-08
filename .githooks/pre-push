@@ -1,0 +1,3 @@
+#!/bin/sh
+# Local CI gate: GitHub Actions is off for this private repo. See scripts/ci-local.mjs.
+exec node scripts/ci-local.mjs --pre-push "$@"
