@@ -12,7 +12,7 @@ import type { Store } from '../queue/store.js';
  * A cursor makes delivery exactly-once across restarts (at-least-once for the webhook if the process dies mid-send).
  */
 const NOTIFY_TYPES =
-  /^(task\.escalated|qa\.escalated|workflow\.failed|workflow\.questions|backup\.failed|recovery\.orphan_worker_unresolved|supervisor\.fatal|provider\.auth_required|approval\.required)$/;
+  /^(task\.escalated|qa\.escalated|capacity\.escalated|workflow\.failed|workflow\.questions|backup\.failed|recovery\.orphan_worker_unresolved|supervisor\.fatal|provider\.auth_required|approval\.required)$/;
 
 export interface NotifyConfig {
   agentHome: string;

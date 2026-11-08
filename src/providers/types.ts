@@ -89,7 +89,9 @@ export interface ExecutionEvent {
     /** URLs a web tool was called with or returned (`data.urls`); research citations are checked against these. */
     | 'web_evidence'
     /** Watchdog variables observed in the worker's process environment (`data.vars`). */
-    | 'worker_env';
+    | 'worker_env'
+    /** The host was suspended (sleep/hibernate) for `data.suspendedMs`; not charged to the execution budget (A11). */
+    | 'host_resume';
   data: Record<string, unknown>;
 }
 

@@ -60,8 +60,20 @@ const schema = z
       .default(
         'Resume from the latest durable checkpoint. Inspect existing work, determine the next incomplete task, and continue implementation without repeating completed work.',
       ),
-    /** Optional ceiling on how long the supervisor lets a CLI worker sit in a usage-limit wait (0 = no ceiling). */
-    CLAUDE_CLI_MAX_CAPACITY_WAIT_MS: int(0, 0),
+    /**
+     * Longest a CLI worker process may sit in an in-process usage-limit wait before the wait is handed to the durable
+     * queue (process ends at a safe point, session kept, task WAITING_FOR_CAPACITY until the reset). 0 = no ceiling
+     * (v1 behaviour). A wait whose provider-reported reset is further away than this is handed off immediately.
+     */
+    CLAUDE_CLI_MAX_CAPACITY_WAIT_MS: int(1_800_000, 0),
+    /** After the provider-reported reset time + this grace, an in-process wait is ended and the session resumed (A10). */
+    CAPACITY_RESUME_GRACE_MS: int(60_000, 0),
+    /** A supervision-tick gap this much longer than the tick interval is treated as host sleep/suspension (A11). */
+    HOST_SUSPEND_THRESHOLD_MS: int(30_000, 1_000),
+    /** A task that has waited for capacity this long without progress is escalated (A12). 0 = never. */
+    CAPACITY_ESCALATE_AFTER_MS: int(86_400_000, 0),
+    /** notify: raise an owner notification and keep waiting. block: BLOCK the task for owner review. */
+    CAPACITY_ESCALATION: z.enum(['notify', 'block']).default('notify'),
     /** Without model output or a known capacity wait for this long, a CLI worker is treated as stalled. */
     CLAUDE_CLI_STALL_TIMEOUT_MS: int(900_000, 10_000),
 
@@ -176,7 +188,10 @@ export interface AppConfig {
     watchdogEnv: Record<string, string>;
     maxCapacityWaitMs: number;
     stallTimeoutMs: number;
+    resumeGraceMs: number;
+    suspendThresholdMs: number;
   };
+  capacity: { escalateAfterMs: number; escalation: 'notify' | 'block' };
   maxConcurrentWorkers: number;
   defaultMaxRetries: number;
   maxContinuations: number;
@@ -295,7 +310,10 @@ export function loadConfig(opts: LoadConfigOptions = {}): AppConfig {
       },
       maxCapacityWaitMs: c.CLAUDE_CLI_MAX_CAPACITY_WAIT_MS,
       stallTimeoutMs: c.CLAUDE_CLI_STALL_TIMEOUT_MS,
+      resumeGraceMs: c.CAPACITY_RESUME_GRACE_MS,
+      suspendThresholdMs: c.HOST_SUSPEND_THRESHOLD_MS,
     },
+    capacity: { escalateAfterMs: c.CAPACITY_ESCALATE_AFTER_MS, escalation: c.CAPACITY_ESCALATION },
     maxConcurrentWorkers: c.MAX_CONCURRENT_WORKERS,
     defaultMaxRetries: c.DEFAULT_MAX_RETRIES,
     maxContinuations: c.MAX_CONTINUATIONS,

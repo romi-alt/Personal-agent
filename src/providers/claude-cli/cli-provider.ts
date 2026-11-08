@@ -16,6 +16,7 @@ import type {
 import { classifyText, mapAssistantError, resetsAtToMs, type RateInfoLike } from '../claude/errors.js';
 import { buildWorkerEnv, compareVersions } from './env.js';
 import { killTree } from '../../workers/process-tree.js';
+import { ActiveTimeMeter } from '../../core/active-clock.js';
 import { WATCHDOG_VARS, type HookDecisionRecord, type HookPolicyFile } from './pretooluse-hook.js';
 
 const execFileP = promisify(execFile);
@@ -75,6 +76,10 @@ export interface CliDeps {
       watchdogEnv: Record<string, string>;
       maxCapacityWaitMs: number;
       stallTimeoutMs: number;
+      /** Grace after the provider-reported reset before an in-process wait is ended for resumption (A10). */
+      resumeGraceMs?: number;
+      /** Tick lateness treated as host suspension (A11). */
+      suspendThresholdMs?: number;
     };
   };
   /** Injectable for tests. Defaults to node's spawn. */
@@ -383,17 +388,32 @@ export class ClaudeCliProvider implements ExecutionProvider {
     let lastText = '';
     const webCalls = new Map<string, string>();
     let stderr = '';
-    let killedFor: 'timeout' | 'stall' | 'shutdown' | 'capacity_ceiling' | 'auth' | undefined;
+    let killedFor:
+      | 'timeout'
+      | 'stall'
+      | 'shutdown'
+      | 'capacity_ceiling'
+      | 'capacity_handoff'
+      | 'capacity_resume'
+      | 'auth'
+      | undefined;
     let waiting: { since: number; resetsAtMs?: number } | undefined;
+    const tickMs = this.d.tickMs ?? 1000;
+    // Active time excludes host sleep (A11): budget and stall are measured in awake time, not wall time.
+    const meter = new ActiveTimeMeter(() => this.now(), tickMs, cfg.claudeCli.suspendThresholdMs ?? 30_000);
     let lastOutputAt = this.now();
     let budgetStartedAt = this.now();
+    let budgetSuspendedAt = meter.suspendedMs();
+    let suspendedTotalMs = 0;
 
     const kill = (why: NonNullable<typeof killedFor>) => {
       if (killedFor) return;
       killedFor = why;
       (this.d.terminateFn ?? terminate)(child);
     };
+    let waitResetsAt: number | undefined; // last provider-reported reset seen during a wait (kept after it ends)
     const startWait = (reason: string, resetsAtMs?: number, recheck?: boolean) => {
+      if (resetsAtMs) waitResetsAt = resetsAtMs;
       if (!waiting) {
         waiting = { since: this.now(), resetsAtMs };
         const recheckMs = Number(
@@ -415,6 +435,7 @@ export class ClaudeCliProvider implements ExecutionProvider {
       req.onEvent({ type: 'capacity_wait', data: { waiting: false, waitedMs: this.now() - waiting.since } });
       waiting = undefined;
       budgetStartedAt = this.now(); // fresh execution budget after a capacity wait
+      budgetSuspendedAt = meter.suspendedMs();
     };
     const watchdogOn = cfg.claudeCli.watchdogEnv['CLAUDE_CODE_RETRY_WATCHDOG'] === '1';
 
@@ -549,20 +570,39 @@ export class ClaudeCliProvider implements ExecutionProvider {
     });
     child.stdin?.end(req.prompt);
 
-    // ---- supervision: shutdown, execution budget (paused while waiting), stall, optional capacity ceiling
+    // ---- supervision: shutdown, active-time execution budget (paused while waiting), stall, capacity policy
     const onAbort = () => kill('shutdown');
     if (req.signal.aborted) onAbort();
     else req.signal.addEventListener('abort', onAbort, { once: true });
+    const maxWait = cfg.claudeCli.maxCapacityWaitMs;
+    const grace = cfg.claudeCli.resumeGraceMs ?? 60_000;
     const tick = setInterval(() => {
+      const gap = meter.sample();
       const t = this.now();
+      if (gap) {
+        // Host slept: neither the budget nor the stall window may be charged for it.
+        suspendedTotalMs += gap.suspendedMs;
+        lastOutputAt += gap.suspendedMs;
+        req.onEvent({
+          type: 'host_resume',
+          data: { suspendedMs: gap.suspendedMs, waiting: !!waiting, resetsAtMs: waiting?.resetsAtMs },
+        });
+      }
       if (waiting) {
-        if (cfg.claudeCli.maxCapacityWaitMs > 0 && t - waiting.since > cfg.claudeCli.maxCapacityWaitMs)
-          kill('capacity_ceiling');
+        const resetsAt = waiting.resetsAtMs;
+        // A10: the CLI's own retry timer does not advance while the host sleeps, so after a reset it can keep
+        // waiting for hours. Once the provider-reported reset has passed on the wall clock, end the wait at this
+        // safe point (the session is persisted) and let the queue resume it immediately.
+        if (resetsAt !== undefined && t >= resetsAt + grace) kill('capacity_resume');
+        // A12: a reset further away than the in-process ceiling is waited out in the durable queue, not in a process.
+        else if (maxWait > 0 && resetsAt !== undefined && resetsAt - waiting.since > maxWait)
+          kill('capacity_handoff');
+        else if (maxWait > 0 && t - waiting.since > maxWait) kill('capacity_ceiling');
         return;
       }
-      if (t - budgetStartedAt > req.limits.timeoutMs) kill('timeout');
+      if (meter.activeSince(budgetStartedAt, budgetSuspendedAt) > req.limits.timeoutMs) kill('timeout');
       else if (t - lastOutputAt > cfg.claudeCli.stallTimeoutMs) kill('stall');
-    }, this.d.tickMs ?? 1000);
+    }, tickMs);
 
     const exitCode = await new Promise<number | null>((resolve) => {
       child.once('error', (err) => {
@@ -594,19 +634,37 @@ export class ClaudeCliProvider implements ExecutionProvider {
       return fail({ errorClass: 'AUTHENTICATION', message: authRefusal ?? 'credential source refused' });
     if (killedFor === 'shutdown')
       return fail({ errorClass: 'INTERRUPTED', message: 'execution interrupted by supervisor shutdown' });
+    const slept =
+      suspendedTotalMs > 0 ? `; host suspended ${Math.round(suspendedTotalMs / 1000)}s (not charged)` : '';
     if (killedFor === 'timeout')
-      return fail({ errorClass: 'TIMEOUT', message: 'execution exceeded worker timeout' });
+      return fail({
+        errorClass: 'TIMEOUT',
+        message: `execution exceeded worker timeout (${Math.round(req.limits.timeoutMs / 1000)}s active time${slept})`,
+      });
     if (killedFor === 'stall')
       return fail({
         errorClass: 'TIMEOUT',
-        message: `no output from Claude Code for ${Math.round(cfg.claudeCli.stallTimeoutMs / 1000)}s outside a capacity wait (stalled)`,
+        message: `no output from Claude Code for ${Math.round(cfg.claudeCli.stallTimeoutMs / 1000)}s of active time outside a capacity wait (stalled${slept})`,
+      });
+    const waitReset = waitResetsAt ?? resetsAtToMs(rate?.resetsAt);
+    if (killedFor === 'capacity_resume')
+      return fail({
+        errorClass: 'QUOTA_EXHAUSTED',
+        message: `provider-reported reset ${waitReset ? new Date(waitReset).toISOString() : ''} has passed; in-process wait ended at a safe point so the session resumes now${slept}`,
+        resetsAtMs: waitReset,
+      });
+    if (killedFor === 'capacity_handoff')
+      return fail({
+        errorClass: 'QUOTA_EXHAUSTED',
+        message: `usage-limit reset ${waitReset ? new Date(waitReset).toISOString() : ''} is beyond the in-process wait ceiling; waiting in the queue instead (session preserved)`,
+        resetsAtMs: waitReset,
       });
     if (killedFor === 'capacity_ceiling')
       return fail({
         errorClass: 'QUOTA_EXHAUSTED',
         message:
           'usage-limit wait exceeded CLAUDE_CLI_MAX_CAPACITY_WAIT_MS; the session is preserved for resumption',
-        resetsAtMs: resetsAtToMs(rate?.resetsAt),
+        resetsAtMs: waitReset,
       });
 
     if (!result) {

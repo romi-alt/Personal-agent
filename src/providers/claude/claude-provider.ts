@@ -8,6 +8,7 @@ import {
 import type { AppConfig } from '../../config/index.js';
 import { evaluateToolUse } from '../../security/policy.js';
 import { agentRepoRoot } from '../claude-cli/cli-provider.js';
+import { ActiveTimeMeter } from '../../core/active-clock.js';
 import type {
   AuthReadiness,
   ExecutionProvider,
@@ -137,10 +138,16 @@ export class ClaudeProvider implements ExecutionProvider {
     };
     if (req.signal.aborted) onExternalAbort();
     else req.signal.addEventListener('abort', onExternalAbort, { once: true });
-    const timer = setTimeout(() => {
-      timedOut = true;
-      abort.abort();
-    }, req.limits.timeoutMs);
+    // Active-time budget (A11): host sleep is not charged to the execution.
+    const meter = new ActiveTimeMeter(() => Date.now(), 1000, 30_000);
+    const startedAt = Date.now();
+    const timer = setInterval(() => {
+      meter.sample();
+      if (!timedOut && meter.activeSince(startedAt, 0) > req.limits.timeoutMs) {
+        timedOut = true;
+        abort.abort();
+      }
+    }, 1000);
 
     const denials: PermissionDenial[] = [];
     const workspace = req.cwd;
@@ -333,7 +340,7 @@ export class ClaudeProvider implements ExecutionProvider {
         denials: denials.length ? denials : undefined,
       };
     } finally {
-      clearTimeout(timer);
+      clearInterval(timer);
       req.signal.removeEventListener('abort', onExternalAbort);
       try {
         q.close?.();

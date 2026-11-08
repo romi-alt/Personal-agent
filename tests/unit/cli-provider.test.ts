@@ -203,7 +203,9 @@ describe('ClaudeCliProvider: launch contract', () => {
 
 describe('ClaudeCliProvider: capacity waits are not stalls and not completion', () => {
   it('a usage-limit wait suspends the execution timeout; the same process continues when capacity returns', async () => {
-    const resetsAt = Math.floor(Date.now() / 1000) + 3600;
+    // v2: a reset within the in-process ceiling (default 30 min) is waited out in the process; a further one is
+    // handed to the queue (see capacity-sleep.test.ts).
+    const resetsAt = Math.floor(Date.now() / 1000) + 600;
     const s = setup(
       async (c) => {
         c.emitLine(init());
