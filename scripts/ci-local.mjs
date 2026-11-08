@@ -76,6 +76,11 @@ const opt = (f) => { const i = args.indexOf(f); return i >= 0 ? args[i + 1] : un
 
 async function main() {
   const top = out('git rev-parse --show-toplevel') ?? fail('run this inside the repository');
+  // Switch the pre-push hook on (npm `prepare` may be skipped, e.g. by ignore-scripts=true in .npmrc).
+  if (existsSync(path.join(top, '.githooks', 'pre-push')) && out('git config --get core.hooksPath', { cwd: top }) !== '.githooks') {
+    sh('git config core.hooksPath .githooks', { cwd: top });
+    say('pre-push hook switched on for this clone (core.hooksPath=.githooks)');
+  }
   const gitDir = path.resolve(top, out('git rev-parse --git-common-dir', { cwd: top }));
   const cacheDir = path.join(gitDir, 'ci-local');
   mkdirSync(cacheDir, { recursive: true });

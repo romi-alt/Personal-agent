@@ -96,7 +96,7 @@ This repository is private and GitHub Actions is disabled for it (no paid Action
 checkout of the commit.
 
 - **Before pushing a branch that deploys (`main`), the full run must pass.** The pre-push hook in `.githooks/`
-  (switched on by `npm install` through the `prepare` script) runs it automatically; other branches get a quick check.
+  (switched on once per clone with `npm run hooks`, or automatically the first time you run `npm run ci:local`; `npm install` cannot do it because `.npmrc` has `ignore-scripts=true`) runs it automatically; other branches get a quick check.
   Running `npm run ci:local` by hand first is fine: a passed commit is remembered, so the push doesn't rerun it.
 - Needs Node 22. On Windows the `check-windows` job runs too.
 - Emergency only: `CI_LOCAL_SKIP=1 git push` (or `git push --no-verify`) skips it. Say so to the team.
