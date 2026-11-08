@@ -1,4 +1,5 @@
 import type Database from 'better-sqlite3';
+import { qaEvidenceKind } from '../verification/types.js';
 
 /**
  * Milestone and requirement status reconciliation (A4).
@@ -90,15 +91,11 @@ export function taskDelivery(db: Database.Database, taskId: string): TaskDeliver
     if (row) {
       if (row.status === 'PASSED') qa = 'passed';
       else if (row.status === 'OWNER_ACCEPTED') qa = 'accepted';
-    } else if (latest.get(QA_LEVEL)?.status === 'PASSED') {
-      let override = false;
-      try {
-        override = !!(JSON.parse(latest.get(QA_LEVEL)!.evidence) as { ownerOverride?: boolean })
-          .ownerOverride;
-      } catch {
-        /* malformed evidence JSON: a regular pass record */
-      }
-      qa = override ? 'accepted' : 'passed';
+    } else if (latest.get(QA_LEVEL)) {
+      // v2 OWNER_ACCEPTED rows and legacy PASSED+ownerOverride rows are both "accepted", never "passed".
+      const kind = qaEvidenceKind(latest.get(QA_LEVEL)!);
+      if (kind === 'verified') qa = 'passed';
+      else if (kind === 'owner_accepted') qa = 'accepted';
     }
     qaOk = qa !== 'none';
   }

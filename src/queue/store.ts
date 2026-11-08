@@ -689,7 +689,8 @@ export class Store {
         ).map(mapTask);
         const statusOf = this.db.prepare('SELECT status, verification_required FROM tasks WHERE id = ?');
         const reviewPassed = this.db.prepare(
-          `SELECT 1 FROM verification_evidence WHERE task_id = ? AND level = 'REQUIREMENTS_SATISFIED' AND status = 'PASSED' LIMIT 1`,
+          // Owner acceptance (v2: OWNER_ACCEPTED, not PASSED) also releases dependants: the owner decided so.
+          `SELECT 1 FROM verification_evidence WHERE task_id = ? AND level = 'REQUIREMENTS_SATISFIED' AND status IN ('PASSED','OWNER_ACCEPTED') LIMIT 1`,
         );
         const overBudget = new Map<string, boolean>();
         const chosen = candidates.find((t) => {
@@ -1317,7 +1318,7 @@ export class Store {
         .prepare(
           `SELECT COUNT(*) AS n FROM tasks t WHERE t.project_id = ? AND t.kind = 'CODING' AND t.status = 'COMPLETED'
              AND t.verification_required LIKE '%REQUIREMENTS_SATISFIED%'
-             AND NOT EXISTS (SELECT 1 FROM verification_evidence e WHERE e.task_id = t.id AND e.level = 'REQUIREMENTS_SATISFIED' AND e.status = 'PASSED')`,
+             AND NOT EXISTS (SELECT 1 FROM verification_evidence e WHERE e.task_id = t.id AND e.level = 'REQUIREMENTS_SATISFIED' AND e.status IN ('PASSED','OWNER_ACCEPTED'))`,
         )
         .get(projectId) as { n: number }
     ).n;

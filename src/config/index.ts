@@ -77,8 +77,13 @@ const schema = z
     /** Without model output or a known capacity wait for this long, a CLI worker is treated as stalled. */
     CLAUDE_CLI_STALL_TIMEOUT_MS: int(900_000, 10_000),
 
-    /** A9: below this much free RAM (MB) the supervisor starts no new work (0 = off). Running work is not killed. */
-    MIN_FREE_MEMORY_MB: int(300, 0),
+    /**
+     * A9 memory policy (owner decision 2026-11-09): new workers PAUSE when available RAM drops below
+     * MIN_FREE_MEMORY_MB and RESUME only once it is back above RESUME_FREE_MEMORY_MB (hysteresis, so the scheduler does
+     * not flap). 0 = off. Running work is never killed by this policy.
+     */
+    MIN_FREE_MEMORY_MB: int(1024, 0),
+    RESUME_FREE_MEMORY_MB: int(1536, 0),
     MAX_CONCURRENT_WORKERS: int(1, 1),
     DEFAULT_MAX_RETRIES: int(3, 0),
     MAX_CONTINUATIONS: int(25, 1),
@@ -195,6 +200,8 @@ export interface AppConfig {
   };
   capacity: { escalateAfterMs: number; escalation: 'notify' | 'block' };
   minFreeMemoryMb: number;
+  /** Resume threshold (>= minFreeMemoryMb). */
+  resumeFreeMemoryMb: number;
   maxConcurrentWorkers: number;
   defaultMaxRetries: number;
   maxContinuations: number;
@@ -318,6 +325,7 @@ export function loadConfig(opts: LoadConfigOptions = {}): AppConfig {
     },
     capacity: { escalateAfterMs: c.CAPACITY_ESCALATE_AFTER_MS, escalation: c.CAPACITY_ESCALATION },
     minFreeMemoryMb: c.MIN_FREE_MEMORY_MB,
+    resumeFreeMemoryMb: Math.max(c.RESUME_FREE_MEMORY_MB, c.MIN_FREE_MEMORY_MB),
     maxConcurrentWorkers: c.MAX_CONCURRENT_WORKERS,
     defaultMaxRetries: c.DEFAULT_MAX_RETRIES,
     maxContinuations: c.MAX_CONTINUATIONS,

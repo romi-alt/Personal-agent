@@ -261,30 +261,32 @@ export class Supervisor {
     if (!gate.open || this.stopping) return { claimed: 0, gate };
 
     // A9: do not START new work while the host is short of memory (the pilot supervisor's heartbeat went stale at
-    // 0.83 GB free under test-heavy load). Running workers are never killed for this; claiming resumes on recovery.
-    const minFree = config.minFreeMemoryMb * 1024 * 1024;
-    if (minFree > 0 && this.workers.size === 0) {
-      const free = (this.d.freeMemory ?? os.freemem)();
-      if (free < minFree) {
-        const low: GateResult = {
-          open: false,
-          reason: `low memory: ${Math.round(free / 1048576)} MB free < MIN_FREE_MEMORY_MB ${config.minFreeMemoryMb}; new work deferred`,
+    // 0.83 GB free under test-heavy load). Hysteresis: pause below MIN_FREE_MEMORY_MB, resume only above
+    // RESUME_FREE_MEMORY_MB. Running workers are never killed by this policy; only new claims wait.
+    if (config.minFreeMemoryMb > 0 && this.workers.size < config.maxConcurrentWorkers) {
+      const freeMb = Math.round((this.d.freeMemory ?? os.freemem)() / 1048576);
+      const was = this.memoryDeferred;
+      if (!was && freeMb < config.minFreeMemoryMb) this.memoryDeferred = true;
+      else if (was && freeMb >= config.resumeFreeMemoryMb) this.memoryDeferred = false;
+      if (this.memoryDeferred !== was) {
+        const payload = {
+          freeMb,
+          pauseBelowMb: config.minFreeMemoryMb,
+          resumeAboveMb: config.resumeFreeMemoryMb,
+          runningWorkers: this.workers.size,
         };
-        if (!this.memoryDeferred) {
-          this.memoryDeferred = true;
-          log.warn('supervisor.resource_deferred', {
-            freeMb: Math.round(free / 1048576),
-            minFreeMb: config.minFreeMemoryMb,
-          });
-          store.recordEvent({
-            type: 'supervisor.resource_deferred',
-            severity: 'warn',
-            payload: { freeMb: Math.round(free / 1048576), minFreeMb: config.minFreeMemoryMb },
-          });
-        }
-        return { claimed: 0, gate: low };
+        const type = this.memoryDeferred ? 'supervisor.resource_deferred' : 'supervisor.resource_resumed';
+        log[this.memoryDeferred ? 'warn' : 'info'](type, payload);
+        store.recordEvent({ type, severity: this.memoryDeferred ? 'warn' : 'info', payload });
       }
-      this.memoryDeferred = false;
+      if (this.memoryDeferred)
+        return {
+          claimed: 0,
+          gate: {
+            open: false,
+            reason: `low memory: ${freeMb} MB available (paused below ${config.minFreeMemoryMb} MB, resumes above ${config.resumeFreeMemoryMb} MB); new work deferred, running work continues`,
+          },
+        };
     }
 
     let claimed = 0;

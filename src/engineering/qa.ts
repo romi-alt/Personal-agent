@@ -59,6 +59,11 @@ const reviewReplySchema = z.object({
         line: z.number().int().positive().optional(),
         /** The criterion (AC id or owned requirement id) the defect violates. */
         criterionId: z.string().optional(),
+        /**
+         * Verifiable evidence other than a file:line: a reproducible test/command with its observed output, a log
+         * excerpt or a runtime observation. A high-severity defect needs this or a valid citation (v2 NEEDS_EVIDENCE).
+         */
+        reproduction: z.string().optional(),
       }),
     )
     .default([]),
@@ -114,12 +119,13 @@ export function criteriaFor(task: Task, ownedRequirements: { id: string; text: s
  * Check a review reply. Code, not the model, decides:
  *   - a must-pass criterion counts as met only with valid file:line citations inside the repository;
  *   - verdicts on requirements owned by OTHER tasks are informational notes ("covered by <task>"), never failures;
- *   - a high-severity defect blocks only when it is about this task: it names one of this task's criteria, or it
- *     names no criterion but cites a real file:line. A defect that names another task's requirement, or cites
- *     nothing, becomes a note.
- * A FAIL therefore always cites at least one of the task's own criteria or a concrete defect in its code; anything
- * else that the reviewer flagged is normalized to PASS-with-notes (`normalized: true`), so mis-mapped findings can
- * never create correction tasks.
+ *   - a high-severity defect WITH verifiable evidence (a real file:line in the repository, or a reproduction: test /
+ *     command + observed output, log excerpt, runtime observation) is CONFIRMED and fails the review, whatever
+ *     requirement it was filed under;
+ *   - a high-severity defect WITHOUT verifiable evidence is NEEDS_EVIDENCE: the review neither passes nor creates a
+ *     correction; the reviewer is asked for evidence (bounded), then the owner decides (owner decision 2026-11-09).
+ * A FAIL therefore always rests on an unmet own criterion or a confirmed defect; findings outside the task's scope are
+ * notes, and an unverifiable high-severity claim can neither silently pass nor trigger correction work.
  */
 export function checkReview(
   reply: ReviewReply,
@@ -130,8 +136,10 @@ export function checkReview(
   passed: boolean;
   unmet: { id: string; text: string; reason: string }[];
   defects: ReviewReply['defects'];
-  /** High-severity defects that fail the review. */
+  /** Confirmed high-severity defects (verifiable evidence) that fail the review. */
   blockingDefects: ReviewReply['defects'];
+  /** High-severity findings without verifiable evidence: the review cannot pass until resolved. */
+  needsEvidence: ReviewReply['defects'];
   notes: ReviewNote[];
   /** The reviewer flagged something that did not count against this task (passed => PASS-with-notes). */
   normalized: boolean;
@@ -188,31 +196,24 @@ export function checkReview(
       });
   }
   const blockingDefects: ReviewReply['defects'] = [];
+  const needsEvidence: ReviewReply['defects'] = [];
   for (const d of reply.defects.filter((x) => x.severity === 'high')) {
     const cited = !!d.file && !!d.line && validCite(d.file, d.line);
-    const otherTask = !!d.criterionId && others.has(d.criterionId);
-    // A defect that cites a real file:line is a concrete defect in the code under review and ALWAYS blocks, whatever
-    // requirement the reviewer filed it under (a security hole in this task's code must not pass because it was
-    // labelled with another task's NFR). Only uncited high-severity claims, or ones filed under another task's
-    // requirement without any citation, become notes.
-    const own = cited || (!!d.criterionId && ids.has(d.criterionId));
-    if (own) blockingDefects.push(d);
-    else {
-      flagged = true;
-      notes.push({
-        id: d.criterionId ?? '(none)',
-        kind: otherTask ? 'other_task_requirement' : 'uncited_defect',
-        note: `high-severity defect not attributable to this task: ${d.description}`,
-        coveredBy: otherTask ? ownerOf(d.criterionId!) : null,
-      });
-    }
+    const reproduced = (d.reproduction ?? '').trim().length >= 10;
+    // Confirmed (verifiable) high-severity defects ALWAYS block, whatever requirement they were filed under (a
+    // security hole in this task's code must not pass because it was labelled with another task's NFR).
+    if (cited || reproduced) blockingDefects.push(d);
+    // Unverifiable: neither a pass nor a correction; evidence is requested, then the owner decides.
+    else needsEvidence.push(d);
   }
-  const passed = errors.length === 0 && unmet.length === 0 && blockingDefects.length === 0;
+  const passed =
+    errors.length === 0 && unmet.length === 0 && blockingDefects.length === 0 && needsEvidence.length === 0;
   return {
     passed,
     unmet,
     defects: reply.defects,
     blockingDefects,
+    needsEvidence,
     notes,
     normalized: flagged,
     errors,
@@ -448,6 +449,41 @@ export class QaEngine {
         await this.startReview(task, row.round, { errors: all, repairs: row.repairs + 1 });
         return true;
       }
+      if (check.needsEvidence.length && !check.unmet.length && !check.blockingDefects.length) {
+        // NEEDS_EVIDENCE: the only obstacle is an unverifiable high-severity finding. Record it (never as a pass),
+        // ask the reviewer for evidence or a withdrawal (bounded by MAX_PLAN_REPAIRS), then escalate to the owner.
+        const asks = check.needsEvidence.map(
+          (d) =>
+            `high-severity finding without verifiable evidence: "${d.description}". Give a file:line inside the repository, or a "reproduction" (test or command plus its observed output, log excerpt, runtime observation), or withdraw the finding if it cannot be substantiated`,
+        );
+        this.db
+          .transaction(() => {
+            this.store.addEvidence({
+              projectId: task.projectId,
+              taskId: task.id,
+              level: 'REQUIREMENTS_SATISFIED',
+              status: 'NEEDS_EVIDENCE',
+              summary: `independent review round ${row.round}: ${check.needsEvidence.length} high-severity finding(s) need verifiable evidence; not passed`,
+              evidence: { needsEvidence: check.needsEvidence, reviewTaskId: review.id, repairs: row.repairs },
+            });
+            this.store.recordEvent({
+              type: 'qa.needs_evidence',
+              projectId: task.projectId,
+              taskId: task.id,
+              severity: 'warn',
+              payload: { round: row.round, findings: check.needsEvidence.map((d) => d.description) },
+            });
+          })
+          .immediate();
+        if (row.repairs >= this.cfg.maxReviewRepairs)
+          return this.escalate(
+            task,
+            row,
+            `${check.needsEvidence.length} high-severity finding(s) remain without verifiable evidence (NEEDS_EVIDENCE)`,
+          );
+        await this.startReview(task, row.round, { errors: asks, repairs: row.repairs + 1 });
+        return true;
+      }
       const passedWithNotes = check.passed && check.normalized;
       const ownIds = new Set(criteria.map((c) => c.id));
       const result = {
@@ -529,8 +565,9 @@ export class QaEngine {
               projectId: task.projectId,
               taskId: task.id,
               level: 'REQUIREMENTS_SATISFIED',
-              status: 'PASSED',
-              summary: `owner ${a.decidedBy ?? 'owner'} accepted the task despite the failed independent review`,
+              // Owner acceptance is NOT independent verification (v2): its own status, never PASSED.
+              status: 'OWNER_ACCEPTED',
+              summary: `owner ${a.decidedBy ?? 'owner'} accepted the task despite the failed independent review (accepted, not verified)`,
               evidence: { ownerOverride: true, approvalId: a.id },
             });
             this.store.advanceProjectAfterTerminalTask(task.projectId);
@@ -734,6 +771,7 @@ export function reviewTaskPrompt(
       '- A criterion is met only if you can cite the file and line that implements it (relative path from the repository root). Citations are checked automatically; a "met" verdict without a valid citation counts as NOT met.',
       '- Judge this task only against its own acceptance criteria and the requirements it owns. Work that the map assigns to another task is not this task\'s scope: mention it under observations ("covered by <task id>"), never as an unmet criterion or a defect.',
       "- Report defects (bugs, security problems, missing tests) in THIS task's work with severity and the criterion id they violate (criterionId) or a file:line; a high-severity defect in this task's work fails the review.",
+      '- Every HIGH-severity defect needs verifiable evidence: a file:line in the repository (checked automatically) or a "reproduction" (the test or command you ran and its observed output, a log excerpt, a runtime observation). Without it the finding is NEEDS_EVIDENCE: the review cannot pass, and you will be asked to substantiate or withdraw it.',
     ].join('\n'),
     repairErrors?.length
       ? `## REPAIR REQUIRED\nYour previous reply was rejected:\n${repairErrors.map((e) => `- ${e}`).join('\n')}`
@@ -756,6 +794,7 @@ export function reviewTaskPrompt(
             criterionId: 'optional (AC1 or an owned requirement id)',
             file: 'optional',
             line: 1,
+            reproduction: 'optional: test/command run + observed output, log excerpt or runtime observation',
           },
         ],
         observations: [{ id: 'requirement id owned by another task', note: 'string', coveredBy: 'tsk_...' }],

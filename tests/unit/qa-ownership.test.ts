@@ -35,7 +35,8 @@ describe('A1: checkReview distinguishes own criteria from requirements owned by 
           ...reply().criteria,
           { id: 'NFR-4', met: false, evidence: [], note: 'no UI here', coveredBy: 'tsk_web' },
         ],
-        defects: [{ severity: 'high', description: 'no loading states', criterionId: 'NFR-4' }],
+        // (an uncited HIGH defect here would be NEEDS_EVIDENCE - see below - so this case carries a medium one)
+        defects: [{ severity: 'medium', description: 'no loading states', criterionId: 'NFR-4' }],
       }),
       criteria,
       repo,
@@ -43,7 +44,6 @@ describe('A1: checkReview distinguishes own criteria from requirements owned by 
     );
     expect(r).toMatchObject({ passed: true, normalized: true, errors: [], unmet: [], blockingDefects: [] });
     expect(r.notes.map((n) => `${n.kind}:${n.id}:${n.coveredBy}`)).toEqual([
-      'other_task_requirement:NFR-4:tsk_web',
       'other_task_requirement:NFR-4:tsk_web',
     ]);
   });
@@ -64,7 +64,7 @@ describe('A1: checkReview distinguishes own criteria from requirements owned by 
     );
     expect(missingOwned.unmet.map((u) => u.id)).toEqual(['FR-1']);
     for (const d of [
-      { severity: 'high' as const, description: 'sql injection', criterionId: 'FR-1' },
+      { severity: 'high' as const, description: 'sql injection', criterionId: 'FR-1', file: 'a.ts', line: 1 },
       { severity: 'high' as const, description: 'sql injection', file: 'a.ts', line: 3 },
     ]) {
       const r = checkReview(reply({ defects: [d] }), criteria, repo, contributed);
@@ -86,14 +86,34 @@ describe('A1: checkReview distinguishes own criteria from requirements owned by 
     expect(r.blockingDefects).toEqual([d]);
   });
 
-  it('a high-severity defect with neither an own criterion nor a valid citation is a note, not a failure', () => {
-    const r = checkReview(
-      reply({ defects: [{ severity: 'high', description: 'something somewhere' }] }),
-      criteria,
-      repo,
-    );
-    expect(r).toMatchObject({ passed: true, normalized: true });
-    expect(r.notes[0]).toMatchObject({ kind: 'uncited_defect' });
+  it('v2 NEEDS_EVIDENCE: an unverifiable high-severity finding neither passes nor fails (whatever it is filed under)', () => {
+    for (const d of [
+      { severity: 'high' as const, description: 'something somewhere' },
+      { severity: 'high' as const, description: 'race in enrol', criterionId: 'FR-1' },
+      { severity: 'high' as const, description: 'no loading states', criterionId: 'NFR-4' },
+      { severity: 'high' as const, description: 'bad cite', file: 'missing.ts', line: 1 },
+      { severity: 'high' as const, description: 'too short', reproduction: 'saw it' },
+    ]) {
+      const r = checkReview(reply({ defects: [d] }), criteria, repo, contributed);
+      expect(r.passed, JSON.stringify(d)).toBe(false);
+      expect(r.needsEvidence, JSON.stringify(d)).toEqual([d]);
+      expect(r.blockingDefects).toEqual([]);
+      expect(r.unmet).toEqual([]);
+    }
+  });
+
+  it('a reproduction (test/command + observed output, log, runtime observation) confirms a high-severity defect', () => {
+    const d = {
+      severity: 'high' as const,
+      description: 'login accepts expired sessions',
+      reproduction: 'npm test -- auth.test.ts: "expired session" returned 200 instead of 401',
+    };
+    const r = checkReview(reply({ defects: [d] }), criteria, repo, contributed);
+    expect(r).toMatchObject({ passed: false, blockingDefects: [d], needsEvidence: [] });
+    // medium/low findings never need evidence and never block
+    expect(
+      checkReview(reply({ defects: [{ severity: 'medium', description: 'naming' }] }), criteria, repo).passed,
+    ).toBe(true);
   });
 
   it('unknown criterion ids are still reply errors (repair), and a clean pass is not "with notes"', () => {

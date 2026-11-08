@@ -8,6 +8,7 @@ import {
   type DeliveryReadiness,
   type EvidenceRecord,
   type EvidenceStatus,
+  qaEvidenceKind,
   TASK_VERIFIABLE_LEVELS,
   VERIFICATION_LEVELS,
   type VerificationLevel,
@@ -205,26 +206,40 @@ export function requirementCoverage(
       summary: 'no planned tasks with independent review: requirement coverage cannot be evaluated',
       evidence: { requirements: reqs.length },
     };
-  const latest = (taskId: string) =>
-    store.listEvidence({ taskId, level: 'REQUIREMENTS_SATISFIED' }).at(-1)?.status;
-  const reviewed = new Set(
-    links.filter((l) => l.status === 'COMPLETED' && latest(l.task_id) === 'PASSED').map((l) => l.task_id),
-  );
+  const kindOf = (taskId: string) => {
+    const e = store.listEvidence({ taskId, level: 'REQUIREMENTS_SATISFIED' }).at(-1);
+    return e ? qaEvidenceKind(e) : 'other';
+  };
+  const done = links.filter((l) => l.status === 'COMPLETED');
+  const verified = new Set(done.filter((l) => kindOf(l.task_id) === 'verified').map((l) => l.task_id));
+  const accepted = new Set(done.filter((l) => kindOf(l.task_id) === 'owner_accepted').map((l) => l.task_id));
   const byReq: Record<string, string[]> = {};
-  for (const r of reqs)
-    byReq[r.req_id] = links
-      .filter(
-        (l) => (JSON.parse(l.requirement_ids) as string[]).includes(r.req_id) && reviewed.has(l.task_id),
-      )
-      .map((l) => l.task_id);
+  const acceptedOnly: Record<string, string[]> = {};
+  for (const r of reqs) {
+    const linked = links.filter((l) => (JSON.parse(l.requirement_ids) as string[]).includes(r.req_id));
+    byReq[r.req_id] = linked.filter((l) => verified.has(l.task_id)).map((l) => l.task_id);
+    if (!byReq[r.req_id]!.length) {
+      const acc = linked.filter((l) => accepted.has(l.task_id)).map((l) => l.task_id);
+      if (acc.length) acceptedOnly[r.req_id] = acc;
+    }
+  }
   const missing = Object.entries(byReq)
-    .filter(([, t]) => t.length === 0)
+    .filter(([id, t]) => t.length === 0 && !acceptedOnly[id])
     .map(([id]) => id);
-  return missing.length
+  if (missing.length)
+    return {
+      status: 'FAILED',
+      summary: `${missing.length} of ${reqs.length} requirement(s) without an independently verified implementation: ${missing.join(', ')}`,
+      evidence: { byRequirement: byReq, acceptedOnly, missing },
+    };
+  // Owner acceptance is never independent verification (v2): requirements covered only by owner-accepted tasks keep
+  // the project level at OWNER_ACCEPTED (acceptance then needs an explicit acknowledgement), not PASSED.
+  const acc = Object.keys(acceptedOnly);
+  return acc.length
     ? {
-        status: 'FAILED',
-        summary: `${missing.length} of ${reqs.length} requirement(s) without an independently verified implementation: ${missing.join(', ')}`,
-        evidence: { byRequirement: byReq, missing },
+        status: 'OWNER_ACCEPTED',
+        summary: `${reqs.length - acc.length} of ${reqs.length} requirement(s) independently verified; ${acc.length} covered only by owner-accepted tasks (accepted, not verified): ${acc.join(', ')}`,
+        evidence: { byRequirement: byReq, acceptedOnly },
       }
     : {
         status: 'PASSED',

@@ -192,12 +192,22 @@ describe('Phase 3: independent QA of completed tasks', () => {
     env.store.decideApproval(approval.id, 'APPROVED', 'owner');
     await settle(env);
     const t1 = coding(project.id).find((t) => t.title === 'Scaffold project and auth')!;
+    // v2: owner acceptance is its own status, never an independent pass (it still releases the dependants)
     expect(env.store.listEvidence({ taskId: t1.id, level: 'REQUIREMENTS_SATISFIED' }).at(-1)).toMatchObject({
-      status: 'PASSED',
+      status: 'OWNER_ACCEPTED',
       evidence: { ownerOverride: true },
     });
     expect(env.mock!.runs.some((r) => r.taskTitle === 'Attendance module')).toBe(true);
     expect(env.store.getProject(project.id)!.lifecycle).toBe('VERIFYING');
+    // Project level: requirements covered only by the owner-accepted task are ACCEPTED, not verified.
+    const v = await verifyProject(
+      { store: env.store, timeoutMs: 60_000 },
+      env.store.getProject(project.id)!,
+      project.repoPath,
+    );
+    const req = v.evidence.find((e) => e.level === 'REQUIREMENTS_SATISFIED')!;
+    expect(req.status).toBe('OWNER_ACCEPTED');
+    expect(req.summary).toMatch(/covered only by owner-accepted tasks \(accepted, not verified\)/);
   });
 
   it('assigns a bounded specialist role to every planned task and puts its brief in the worker prompt', async () => {

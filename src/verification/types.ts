@@ -27,7 +27,33 @@ export type EvidenceStatus =
   | 'FAILED'
   | 'NOT_EVALUATED' // the verifier does not exist yet (honest "we do not know")
   | 'NOT_CONFIGURED' // verifier exists but the project has no command/config for it
-  | 'PENDING'; // awaiting a human (owner approval)
+  | 'PENDING' // awaiting a human (owner approval)
+  /** v2: a high-severity review finding has no verifiable evidence yet; never a pass. */
+  | 'NEEDS_EVIDENCE'
+  /** v2: the owner accepted the task despite a failed/unconfirmed review. Unblocks dependants; NEVER a verification. */
+  | 'OWNER_ACCEPTED';
+
+/**
+ * How a task-level REQUIREMENTS_SATISFIED evidence row counts (v2, owner decision 2026-11-09).
+ * Legacy rows (v1) recorded owner overrides as PASSED with `ownerOverride: true`; they are read as owner-accepted,
+ * never as independently verified. History is not rewritten.
+ */
+export function qaEvidenceKind(e: {
+  status: string;
+  evidence: Record<string, unknown> | string;
+}): 'verified' | 'owner_accepted' | 'other' {
+  const ev = typeof e.evidence === 'string' ? safeJson(e.evidence) : e.evidence;
+  if (e.status === 'OWNER_ACCEPTED') return 'owner_accepted';
+  if (e.status === 'PASSED') return ev['ownerOverride'] === true ? 'owner_accepted' : 'verified';
+  return 'other';
+}
+function safeJson(s: string): Record<string, unknown> {
+  try {
+    return JSON.parse(s) as Record<string, unknown>;
+  } catch {
+    return {};
+  }
+}
 
 export interface EvidenceRecord {
   id: string;

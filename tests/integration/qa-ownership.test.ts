@@ -58,6 +58,14 @@ describe('A1: QA judges a task only on its own criteria and the requirements it 
                 [{ severity: 'high', description: 'no RBAC on enrollment routes yet', criterionId: 'NFR-1' }],
               ),
             ],
+            // v2 NEEDS_EVIDENCE: the uncited high finding is sent back for evidence; the reviewer withdraws it.
+            'Review: Scaffold project and auth (repair 1)': [
+              verdict([
+                ['AC1', true, 'src/auth.ts', 2],
+                ['AC2', true, 'src/auth.ts', 3],
+                ['NFR-1', false],
+              ]),
+            ],
             'Enrollment module': [code('src/enroll.ts')],
             'Review: Enrollment module': [
               verdict([
@@ -121,10 +129,16 @@ describe('A1: QA judges a task only on its own criteria and the requirements it 
     expect(r1['unmet']).toEqual([]);
     expect(
       (r1['notes'] as { id: string; coveredBy: string | null }[]).map((n) => `${n.id}:${n.coveredBy}`),
-    ).toEqual([`NFR-1:${enroll.id}`, `NFR-1:${enroll.id}`]);
-    expect(
-      env.store.listEvidence({ taskId: scaffold.id, level: 'REQUIREMENTS_SATISFIED' }).at(-1)!.summary,
-    ).toMatch(/passed with notes/);
+    ).toEqual([`NFR-1:${enroll.id}`]);
+    // v2: the uncited high finding was NEEDS_EVIDENCE first (never a pass), the reviewer was asked for evidence and
+    // withdrew it; only then did the round pass (with notes).
+    const ev = env.store.listEvidence({ taskId: scaffold.id, level: 'REQUIREMENTS_SATISFIED' });
+    expect(ev.map((e) => e.status)).toEqual(['NEEDS_EVIDENCE', 'PASSED']);
+    expect(ev.at(-1)!.summary).toMatch(/passed with notes/);
+    const repairPrompt = env.mock!.runs.find(
+      (r) => r.taskTitle === 'Review: Scaffold project and auth (repair 1)',
+    )!.prompt;
+    expect(repairPrompt).toMatch(/without verifiable evidence: "no RBAC on enrollment routes yet"/);
     expect(env.store.listApprovals('PENDING').filter((a) => a.actionType === 'qa_escalation')).toEqual([]);
 
     // Genuine failure of the task's own criterion: a correction task, then a passing round 2.

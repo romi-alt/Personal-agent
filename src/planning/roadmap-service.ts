@@ -1,4 +1,5 @@
 import type { Store } from '../queue/store.js';
+import { qaEvidenceKind } from '../verification/types.js';
 import type { WorkflowRepository } from '../workflows/repository.js';
 import { criticalPath, isDelivered, progress, type ProgressTask } from './roadmap.js';
 
@@ -17,7 +18,11 @@ export function projectRoadmap(store: Store, repo: WorkflowRepository, projectId
   const tasks = links.map((l) => {
     const t = store.requireTask(l.taskId);
     const evidence = store.listEvidence({ taskId: l.taskId });
-    const passed = [...new Set(evidence.filter((e) => e.status === 'PASSED').map((e) => e.level as string))];
+    // "Verified progress" counts only independent verification; owner overrides (legacy PASSED+ownerOverride or v2
+    // OWNER_ACCEPTED) are acceptance, not verification.
+    const passed = [
+      ...new Set(evidence.filter((e) => qaEvidenceKind(e) === 'verified').map((e) => e.level as string)),
+    ];
     return {
       taskId: l.taskId,
       key: l.planKey,

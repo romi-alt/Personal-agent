@@ -136,6 +136,32 @@ describe('cleanScratchDir', () => {
     expect(existsSync(path.join(outside, '.qa-inner'))).toBe(true);
   });
 
+  it('owner decision B: never a general-purpose recursive delete (only .qa-*/.scratch-*/.tmp-* names, bounded size)', () => {
+    for (const d of [
+      'src',
+      'node_modules',
+      'build',
+      'dist',
+      'data',
+      '.git',
+      'qa-mut',
+      '.qa',
+      '.tmpx',
+      'test',
+    ]) {
+      mkdirSync(path.join(ws, d), { recursive: true });
+      const r = cleanScratchDir(req(d));
+      expect(r.status, d).toBe('refused');
+      expect(existsSync(path.join(ws, d)), d).toBe(true);
+    }
+    mkdirSync(path.join(ws, '.qa-big'));
+    for (let i = 0; i < 6; i++) writeFileSync(path.join(ws, '.qa-big', `f${i}`), 'x');
+    const big = cleanScratchDir(req('.qa-big', { maxEntries: 5 }));
+    expect(big.status).toBe('refused');
+    expect(big.reason).toMatch(/more than 5 entries/);
+    expect(existsSync(path.join(ws, '.qa-big', 'f0'))).toBe(true);
+  });
+
   it('v2 (A8): a link inside the tree is removed as a link, never followed; its outside target is untouched', () => {
     mkdirSync(path.join(ws, '.qa-mut', 'deep'), { recursive: true });
     dirLink(outside, path.join(ws, '.qa-mut', 'deep', 'escape'));
