@@ -129,7 +129,7 @@ async function runAll(top, sha, jobs) {
   const results = [];
   const wt = mkdtempSync(path.join(os.tmpdir(), `ci-${path.basename(top).slice(0, 12)}-`));
   const cleanup = [];
-  const stopAll = () => { for (const f of cleanup.splice(0).reverse()) { try { f(); } catch {} } };
+  const stopAll = () => { for (const f of cleanup.splice(0).reverse()) { try { f(); } catch { /* best effort */ } } };
   process.on('SIGINT', () => { stopAll(); process.exit(130); });
   say(`commit ${sha.slice(0, 12)} in a clean temporary checkout (${wt})`);
   if (sh(`git worktree add --detach "${wt}" ${sha}`, { cwd: top }).status !== 0) fail('git worktree add failed');
@@ -182,7 +182,7 @@ const fill = (env, vars) => { for (const k of Object.keys(env)) if (typeof env[k
 
 async function startServices(job, env, wt, cleanup) {
   const stops = [];
-  const svc = { stop: () => { for (const f of stops.splice(0)) { try { f(); } catch {} } } };
+  const svc = { stop: () => { for (const f of stops.splice(0)) { try { f(); } catch { /* best effort */ } } } };
   cleanup.push(svc.stop);
   const vars = {};
   const m = job.services?.mariadb;
@@ -241,7 +241,7 @@ async function prepareDb(job, svc, wt) {
   const u = new URL(svc.adminUrl);
   const cfg = { host: u.hostname, port: Number(u.port || 3306), user: decodeURIComponent(u.username), password: decodeURIComponent(u.password), multipleStatements: true };
   try { conn = await req('mariadb').createConnection(cfg); } catch (e1) {
-    try { conn = await req('mysql2/promise').createConnection(cfg); } catch (e2) { fail(`cannot reach MariaDB as admin (${e1.message})`); }
+    try { conn = await req('mysql2/promise').createConnection(cfg); } catch { fail(`cannot reach MariaDB as admin (${e1.message})`); }
   }
   const [ver] = await conn.query('SELECT VERSION() AS v');
   const v = (ver.v ?? ver[0]?.v ?? '') + '';
@@ -294,7 +294,7 @@ if (flag('--install-hook')) {
   try {
     const top = out('git rev-parse --show-toplevel');
     if (top && existsSync(path.join(top, '.githooks', 'pre-push'))) sh('git config core.hooksPath .githooks', { cwd: top });
-  } catch {}
+  } catch { /* best effort */ }
   process.exit(0);
 }
 if (flag('--post-pending')) await postPending(opt('--post-pending'));
