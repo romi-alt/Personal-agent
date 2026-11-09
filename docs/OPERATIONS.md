@@ -8,7 +8,7 @@ npm run build              # compiles to dist/ (used by the service scripts)
 cp .env.example .env       # then edit; keep it untracked
 npm run agent -- doctor
 npm run agent -- project:add --name "Demo School ERP"
-npm run agent -- task:add --project demo-school-erp --title "Scaffold" --instructions "Create a README"
+npm run agent -- task:add --project demo-school-erp --title "Scaffold" --instructions "Create a README" --criteria "README.md exists and describes setup"
 npm run agent -- start     # foreground; or: start --detach
 ```
 
@@ -280,3 +280,24 @@ all Claude Code sessions, `stop --hold` the agent, run `claude update`, then `st
 subscription login lives in `%USERPROFILE%\.claude` and is not touched by an update.
 `claude auth status`: logged in, `claude.ai`, Max. `loginExpiresAt` = 2026-12-04 - check `claude auth status` before
 that date; an expired login stops all CLI workers (`provider:status` reports it).
+
+# v2 addendum (2026-11-09) - reliability release candidate
+
+- **Capacity and sleep (A10-A12).**
+  - Worker budgets count active time only. Host sleep is logged as `provider.host_resume` and is not charged.
+  - An in-process usage-limit wait ends once the reported reset has passed; the same session then resumes from the queue.
+  - Resets more than `CLAUDE_CLI_MAX_CAPACITY_WAIT_MS` (30 min) away are waited out as `WAITING_FOR_CAPACITY`. No retry is consumed.
+  - After `CAPACITY_ESCALATE_AFTER_MS` (24 h) a `capacity.escalated` notification is raised once per streak.
+- **Memory policy (A9).**
+  - New work pauses below `MIN_FREE_MEMORY_MB` (1024) and resumes above `RESUME_FREE_MEMORY_MB` (1536). Events: `supervisor.resource_deferred` / `supervisor.resource_resumed`.
+  - Running work is never killed.
+  - Choose these values for the host. A machine that usually has about 1 GB available will pause often at the defaults.
+- **Verification after intake (A5/A7):**
+  `npm run agent -- assignment:set-verification <project> --by <you> --reason "<why>" --build "npm run build" --test "npm test" --browser-test "npm run test:e2e"`
+- **Manual tasks (A6).**
+  - `task:add` needs `--criteria`, and the task is reviewed independently like a planned task.
+  - To waive the review: `--no-review --reason "<why>"` (audited).
+- **Workers and the agent CLI.**
+  - Coding workers cannot run state-changing agent commands. The policy hook hard-denies them, and the CLI refuses owner-only commands when `ELEVARIQ_WORKER=1`.
+  - This is a guardrail, not a sandbox (see SECURITY.md).
+- **Database migration v10** (additive) applies when v2 first opens a database. Rollback means restoring a backup taken before the upgrade, with v1's `restore`. See `docs/V2_RELEASE_REPORT.md`, where the rollback is rehearsed.

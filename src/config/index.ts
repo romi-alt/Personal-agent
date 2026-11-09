@@ -69,7 +69,9 @@ const schema = z
     /** After the provider-reported reset time + this grace, an in-process wait is ended and the session resumed (A10). */
     CAPACITY_RESUME_GRACE_MS: int(60_000, 0),
     /** A supervision-tick gap this much longer than the tick interval is treated as host sleep/suspension (A11). */
-    HOST_SUSPEND_THRESHOLD_MS: int(30_000, 1_000),
+    // 120 s (not lower): real host sleeps last minutes, while a briefly blocked event loop must not be mistaken
+    // for one (v2 review LOW finding: a block > threshold would otherwise be excluded from the budget).
+    HOST_SUSPEND_THRESHOLD_MS: int(120_000, 1_000),
     /** A task that has waited for capacity this long without progress is escalated (A12). 0 = never. */
     CAPACITY_ESCALATE_AFTER_MS: int(86_400_000, 0),
     /** notify: raise an owner notification and keep waiting. block: BLOCK the task for owner review. */

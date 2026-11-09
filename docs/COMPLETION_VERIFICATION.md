@@ -17,6 +17,20 @@ Principle: **"Claude reports that it is done" is a claim, not evidence.** Each r
 Evidence statuses: `PASSED`, `FAILED`, `NOT_EVALUATED` (verifier does not exist yet), `NOT_CONFIGURED` (verifier exists, no command), `PENDING`.
 Unknown is never silently treated as pass.
 
+**v2 changes (2026-11-09; this table above is the v1 baseline).**
+- `BUILD_PASSES` / `TESTS_PASS`:
+  - Commands can be set after intake with `assignment:set-verification <project> --by NAME --reason R [--build] [--test] [--browser-test] [--clear ...] [--derive]`. Each change is audited as `assignment.verification_changed`.
+  - When none is configured, they are derived from `package.json` at intake (existing repositories) and at `project:verify`. Derivation never overrides an owner decision, including a full `--clear`.
+  - `TESTS_PASS` runs the browser suite as well when one is configured. Every command's exit code, duration and output tail is evidence (`runs[]`, `notRun[]`).
+- `REQUIREMENTS_SATISFIED`:
+  - At task level, this is the independent QA review (`src/engineering/qa.ts`).
+  - At project level, it is PASSED only when every requirement was judged met, with cited evidence, by a passing review that had that requirement among its own criteria.
+- Two new evidence statuses:
+  - `NEEDS_EVIDENCE`: a high-severity review finding without verifiable evidence (file:line or reproduction). It is never a pass. The reviewer is asked to substantiate or withdraw the finding, then the owner decides.
+  - `OWNER_ACCEPTED`: the owner accepted a task despite a failed or unconfirmed review. It releases dependants but is never counted as independent verification. Legacy rows (`PASSED` with `ownerOverride: true`) are read the same way (`qaEvidenceKind`).
+- Requirement and milestone statuses are derived (`src/planning/status-reconcile.ts`). The progression is OPEN → IN_PROGRESS → IMPLEMENTED (no review) → REVIEWED (review passed, machine checks not configured) → VERIFIED (review passed and checks confirmed). ACCEPTED (owner override) is kept separate and never counts as verified.
+- `task:add` creates the same independently reviewed coding task as planning does. It requires `--criteria`; waiving review needs `--no-review --reason R` and is audited.
+
 ## Interfaces (`src/verification/types.ts`)
 
 ```ts
