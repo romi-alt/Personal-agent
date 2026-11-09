@@ -10,6 +10,7 @@
  *
  * The policy file is written by the provider per execution, outside the project workspace, and contains no secrets.
  */
+import { createHash } from 'node:crypto';
 import { appendFileSync, existsSync, readFileSync } from 'node:fs';
 import { evaluateToolUse } from '../../security/policy.js';
 
@@ -93,6 +94,18 @@ function denyJson(reason: string): string {
   });
 }
 
+/**
+ * V2.1 (M4): the provider passes the sha256 of the policy it wrote on the hook's command line, which the worker cannot
+ * change during the session. A policy file rewritten by the worker (e.g. to add approved categories) no longer
+ * matches and the hook FAILS CLOSED: every tool call is blocked for the rest of the execution.
+ */
+export function verifyPolicyIntegrity(policyText: string, expectedSha256: string | undefined): void {
+  if (!expectedSha256) return; // pre-V2.1 hook command line (no hash): unchanged behaviour
+  const actual = createHash('sha256').update(policyText).digest('hex');
+  if (actual !== expectedSha256.toLowerCase())
+    throw new Error('policy file integrity check failed (policy was modified after launch)');
+}
+
 async function readStdin(): Promise<string> {
   const chunks: Buffer[] = [];
   for await (const c of process.stdin) chunks.push(c as Buffer);
@@ -102,7 +115,9 @@ async function readStdin(): Promise<string> {
 async function main(): Promise<void> {
   const policyPath = process.argv[2];
   if (!policyPath) throw new Error('policy file argument missing');
-  const policy = JSON.parse(readFileSync(policyPath, 'utf8')) as HookPolicyFile;
+  const policyText = readFileSync(policyPath, 'utf8');
+  verifyPolicyIntegrity(policyText, process.argv[3]);
+  const policy = JSON.parse(policyText) as HookPolicyFile;
   const payload = JSON.parse(await readStdin()) as { tool_name?: unknown; tool_input?: unknown };
   const { record, stdout } = decide(policy, payload);
   // Recording is best-effort evidence; the decision itself must still be enforced if it fails.

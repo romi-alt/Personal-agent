@@ -192,8 +192,20 @@ describe('shell normalizer', () => {
 });
 
 describe('Write/Edit content is not a shell command', () => {
-  const dangerous =
-    'rm -rf / && passwd root && git push --force && DROP TABLE users; sendgrid; npm run agent -- approve apr_abcdefgh12';
+  // V2.1: content is still never matched against the APPROVAL (command) rules, but content that plants an
+  // agent-control action (agent CLI approve, apr_ ids, agent.db, credentials, ELEVARIQ_ guard) is now denied
+  // (tests/unit/policy-v21-hardening.test.ts), so that part was moved out of this fixture.
+  const dangerous = 'rm -rf / && passwd root && git push --force && DROP TABLE users; sendgrid';
+  it('V2.1: file content planting an agent-control action is denied', () => {
+    expect(
+      evaluateToolUse(
+        'Write',
+        { file_path: 'test/a.test.js', content: 'npm run agent -- approve apr_abcdefgh12' },
+        ws,
+        {},
+      ).allow,
+    ).toBe(false);
+  });
   it('file content never triggers command rules; the path is still checked', () => {
     expect(evaluateToolUse('Write', { file_path: 'test/a.test.js', content: dangerous }, ws, {}).allow).toBe(
       true,

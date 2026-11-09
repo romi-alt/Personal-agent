@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { spawnSync, type ChildProcess } from 'node:child_process';
 import { EventEmitter } from 'node:events';
 import { mkdtempSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import os, { tmpdir } from 'node:os';
+import { createHash } from 'node:crypto';
 import path from 'node:path';
 import { PassThrough, Writable } from 'node:stream';
 import { loadConfig } from '../../src/config/index.js';
@@ -163,11 +164,17 @@ describe('ClaudeCliProvider: launch contract', () => {
     const orig = s.calls.push.bind(s.calls);
     s.calls.push = (...items) => {
       const args = items[0]!.args;
-      const settings = JSON.parse(readFileSync(args[args.indexOf('--settings') + 1]!, 'utf8')) as {
+      // V2.1: settings are passed inline (no settings file) and the hook command carries the policy sha256.
+      const settings = JSON.parse(args[args.indexOf('--settings') + 1]!) as {
         hooks: { PreToolUse: { hooks: { command: string }[] }[] };
       };
-      const pf = /"([^"]+\.policy\.json)"$/.exec(settings.hooks.PreToolUse[0]!.hooks[0]!.command)![1]!;
-      policy = JSON.parse(readFileSync(pf, 'utf8')) as Record<string, unknown>;
+      const m = /"([^"]+\.policy\.json)" ([0-9a-f]{64})$/.exec(
+        settings.hooks.PreToolUse[0]!.hooks[0]!.command,
+      )!;
+      const pf = m[1]!;
+      const text = readFileSync(pf, 'utf8');
+      expect(createHash('sha256').update(text).digest('hex')).toBe(m[2]);
+      policy = JSON.parse(text) as Record<string, unknown>;
       try {
         writeFileSync(pf, '{}', { flag: 'r+' });
       } catch {
@@ -177,7 +184,11 @@ describe('ClaudeCliProvider: launch contract', () => {
     };
     await s.provider.run(s.req());
     expect(writable).toBe(false);
-    expect(policy['protectedPaths']).toEqual([home, path.resolve(__dirname, '../..')]);
+    expect(policy['protectedPaths']).toEqual([
+      home,
+      path.resolve(__dirname, '../..'),
+      path.join(os.homedir(), '.claude'),
+    ]);
     const env = s.calls[0]!.env;
     expect(Object.values(env).some((v) => v.endsWith('.policy.json'))).toBe(false);
     if (env['ELEVARIQ_SCRATCH_CLEAN']) {

@@ -1,8 +1,10 @@
 import { type ChildProcess, execFile, spawn } from 'node:child_process';
 import { createHash, randomUUID } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { redactString } from '../../security/redact.js';
 import { promisify } from 'node:util';
 import type {
   AuthReadiness,
@@ -276,30 +278,34 @@ export class ClaudeCliProvider implements ExecutionProvider {
       readOnly: !!req.readOnly,
       allowWeb: !!req.allowWeb,
       decisionsFile,
-      protectedPaths: [cfg.agentHome, agentRepoRoot()],
+      // V2.1: the owner's Claude login directory is protected too (credential exposure, class K).
+      protectedPaths: [cfg.agentHome, agentRepoRoot(), path.join(os.homedir(), '.claude')],
     };
     // Read-only: a worker must not be able to widen its own policy by rewriting this file (guardrail; it is also
     // outside the workspace and commands naming *.policy.json are denied).
-    writeFileSync(policyFile, JSON.stringify(policy), { mode: 0o444 });
-    writeFileSync(
-      settingsFile,
-      JSON.stringify({
-        hooks: {
-          PreToolUse: [
-            {
-              matcher: '*',
-              hooks: [
-                {
-                  type: 'command',
-                  command: `${hookCommand()} "${policyFile.replace(/\\/g, '/')}"`,
-                  timeout: 60,
-                },
-              ],
-            },
-          ],
-        },
-      }),
-    );
+    const policyJson = JSON.stringify(policy);
+    writeFileSync(policyFile, policyJson, { mode: 0o444 });
+    // V2.1 (M4): the hook command carries the policy's sha256, so a rewritten policy file makes the hook fail closed
+    // (every tool call blocked) instead of silently widening permissions. The settings are passed INLINE to
+    // `--settings` (no settings file a worker could rewrite while the session runs).
+    const policySha = createHash('sha256').update(policyJson).digest('hex');
+    const settingsJson = JSON.stringify({
+      hooks: {
+        PreToolUse: [
+          {
+            matcher: '*',
+            hooks: [
+              {
+                type: 'command',
+                command: `${hookCommand()} "${policyFile.replace(/\\/g, '/')}" ${policySha}`,
+                timeout: 60,
+              },
+            ],
+          },
+        ],
+      },
+    });
+    void settingsFile;
 
     // New sessions get their id BEFORE launch: it is persisted first, so even a crash before the first output
     // leaves a resumable reference (and never two sessions for one execution).
@@ -334,7 +340,7 @@ export class ClaudeCliProvider implements ExecutionProvider {
       '',
       '--strict-mcp-config',
       '--settings',
-      settingsFile,
+      settingsJson,
       '--max-turns',
       String(req.limits.maxTurns),
       '--append-system-prompt',
@@ -524,7 +530,16 @@ export class ClaudeCliProvider implements ExecutionProvider {
             lastText = block.text;
             req.onEvent({ type: 'assistant_text', data: { chars: block.text.length } });
           } else if (block.type === 'tool_use') {
-            req.onEvent({ type: 'tool_use', data: { tool: block.name, id: block.id } });
+            // V2.1 (audit): the supervisor records WHAT the worker asked to run from its own view of the stream, so
+            // the evidence does not depend on the hook's decisions file, which the worker's OS identity can rewrite.
+            req.onEvent({
+              type: 'tool_use',
+              data: {
+                tool: block.name,
+                id: block.id,
+                input: redactString(JSON.stringify(block.input ?? {}).slice(0, 2000)),
+              },
+            });
             if ((block.name === 'WebFetch' || block.name === 'WebSearch') && block.id) {
               webCalls.set(block.id, block.name);
               const url = block.input?.['url'];

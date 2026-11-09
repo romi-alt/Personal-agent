@@ -7,8 +7,14 @@ import type { VerificationLevel, Verifier, VerifierResult, VerifyContext } from 
 function sanitizedEnv(): NodeJS.ProcessEnv {
   const env = { ...process.env };
   for (const k of Object.keys(env)) {
-    if (/^(ANTHROPIC_|CLAUDE_CODE_|ELEVARIQ_.*TOKEN)/i.test(k)) delete env[k];
+    // V2.1: also the Claude login directory and every ELEVARIQ_* control variable of the supervisor.
+    if (/^(ANTHROPIC_|CLAUDE_CODE_|CLAUDE_CONFIG_DIR$|CLAUDECODE$|ELEVARIQ_)/i.test(k)) delete env[k];
   }
+  // V2.1 (M2): verification commands execute WORKER-WRITTEN code (package.json scripts, tests). Mark them as worker
+  // processes so the agent CLI's owner-only guard applies here too (it was absent: defence in depth only, the guard
+  // is an environment variable and therefore advisory against a hostile script).
+  env['ELEVARIQ_WORKER'] = '1';
+  env['ELEVARIQ_VERIFIER'] = '1';
   return env;
 }
 
