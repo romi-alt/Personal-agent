@@ -1,13 +1,17 @@
-import { describe, expect, it } from 'vitest';
+﻿import { describe, expect, it } from 'vitest';
 import { spawnSync, type ChildProcess } from 'node:child_process';
 import { EventEmitter } from 'node:events';
 import { mkdtempSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
-import os, { tmpdir } from 'node:os';
+import { tmpdir } from 'node:os';
 import { createHash } from 'node:crypto';
 import path from 'node:path';
 import { PassThrough, Writable } from 'node:stream';
 import { loadConfig } from '../../src/config/index.js';
-import { ClaudeCliProvider, type CliDeps } from '../../src/providers/claude-cli/cli-provider.js';
+import {
+  ClaudeCliProvider,
+  ownerCredentialDirs,
+  type CliDeps,
+} from '../../src/providers/claude-cli/cli-provider.js';
 import { buildWorkerEnv, compareVersions } from '../../src/providers/claude-cli/env.js';
 import { decide } from '../../src/providers/claude-cli/pretooluse-hook.js';
 import type { ExecutionEvent, RunRequest } from '../../src/providers/types.js';
@@ -187,7 +191,7 @@ describe('ClaudeCliProvider: launch contract', () => {
     expect(policy['protectedPaths']).toEqual([
       home,
       path.resolve(__dirname, '../..'),
-      path.join(os.homedir(), '.claude'),
+      ...ownerCredentialDirs(),
     ]);
     const env = s.calls[0]!.env;
     expect(Object.values(env).some((v) => v.endsWith('.policy.json'))).toBe(false);
@@ -363,7 +367,7 @@ describe('ClaudeCliProvider: authentication and failures', () => {
 
   it('classifies a not-logged-in exit as AUTHENTICATION and a silent crash as PROCESS_CRASH', async () => {
     const a = setup((c) => {
-      c.stderr.write('Not logged in · Please run /login\n');
+      c.stderr.write('Not logged in Â· Please run /login\n');
       c.exit(1);
     });
     expect(await a.provider.run(a.req())).toMatchObject({

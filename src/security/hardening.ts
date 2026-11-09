@@ -64,7 +64,8 @@ const HARD_DENY_RULES: { cls: string; reason: string; re: RegExp }[] = [
     cls: 'V',
     reason:
       'a command whose name is computed at run time (command substitution in command position) cannot be verified',
-    re: /(^|[;&|(]|&&|\|\|)\s*(\$\(|`)/,
+    // PR #5 review fix (finding 2): an optional opening quote before the substitution (`"$(tr …)" -rf`).
+    re: /(^|[;&|(]|&&|\|\|)\s*["']?\s*(\$\(|`)/,
   },
   {
     cls: 'W',
@@ -74,15 +75,34 @@ const HARD_DENY_RULES: { cls: string; reason: string; re: RegExp }[] = [
   {
     cls: 'K',
     reason: 'reading credentials, credential stores or dumping the environment is not permitted',
-    re: /(\.credentials(\.json)?\b|(~|\$HOME|\$\{HOME\}|%USERPROFILE%|\$env:USERPROFILE|\$USERPROFILE|[a-z]:[\\/]+users[\\/]+[^\\/\s'"]+|\/[a-z]\/users\/[^/\s'"]+|\/home\/[^/\s'"]+|\/root)[\\/]+\.claude\b|\bCLAUDE_CODE_OAUTH_TOKEN\b|\bCLAUDE_CONFIG_DIR\b|\bANTHROPIC_(API_KEY|AUTH_TOKEN)\b|\.git-credentials\b|\bgit\s+credential\b|\bcmdkey(\.exe)?\b|\bvaultcmd(\.exe)?\b|\bGet-StoredCredential\b|(^|[;&|(]|&&|\|\|)\s*(printenv|env|set|export\s+-p|declare\s+-x|(Get-ChildItem|gci|dir|ls)\s+env:\\?)\s*($|[;&|>)]))/i,
+    // PR #5 review fix (finding 4): every common per-user credential store, not only Claude's.
+    re: /(\.credentials(\.json)?\b|(~|\$HOME|\$\{HOME\}|%USERPROFILE%|\$env:USERPROFILE|\$USERPROFILE|[a-z]:[\\/]+users[\\/]+[^\\/'"]+?|\/[a-z]\/users\/[^/'"]+?|\/home\/[^/\s'"]+|\/root)[\\/]+(\.claude|\.ssh|\.npmrc|\.yarnrc(\.yml)?|\.pypirc|\.netrc|_netrc|\.git-credentials|\.aws|\.azure|\.kube|\.gnupg|\.docker[\\/]+config\.json|\.config[\\/]+gh|AppData[\\/]+Roaming[\\/]+GitHub CLI|AppData[\\/]+Roaming[\\/]+npm[\\/]+etc)\b|\bid_(rsa|ed25519|ecdsa|dsa)\b|\bCLAUDE_CODE_OAUTH_TOKEN\b|\bCLAUDE_CONFIG_DIR\b|\bANTHROPIC_(API_KEY|AUTH_TOKEN)\b|\.git-credentials\b|\bgit\s+credential\b|\bcmdkey(\.exe)?\b|\bvaultcmd(\.exe)?\b|\bGet-StoredCredential\b|(^|[;&|(]|&&|\|\|)\s*(printenv|env|set|export\s+-p|declare\s+-x|(Get-ChildItem|gci|dir|ls)\s+env:\\?)\s*($|[;&|>)]))/i,
   },
 ];
 
 /** Hard denials added by V2.1 (never approvable). Checked against raw, expanded and de-escaped command text. */
-export function hardDenyV21(command: string): HardDeny | null {
-  const views = [command, expandIndirection(command), stripEscapes(expandIndirection(command))];
+export function hardDenyV21(command: string, dataStripped?: string): HardDeny | null {
+  const expanded = expandIndirection(command);
+  const views = [command, expanded, stripEscapes(expanded)];
+  // PR #5 review fix (finding 6): credential rule K ignores quoted multi-word DATA (commit messages, echo text):
+  // it sees the normalized view, which keeps every executed word and switches to raw whenever text may execute.
+  const messageless = (v: string) =>
+    v.replace(/((?:^|\s)(?:echo|printf|-m|--message)(?:=|\s+))("[^"$`]*"|'[^']*')/g, '$1__MSG__');
+  const kViews = dataStripped !== undefined ? [dataStripped, ...views.map(messageless)] : views;
   for (const r of HARD_DENY_RULES)
-    if (views.some((v) => r.re.test(v))) return { cls: r.cls, reason: r.reason };
+    if ((r.cls === 'K' ? kViews : views).some((v) => r.re.test(v))) return { cls: r.cls, reason: r.reason };
+  // PR #5 review fix (finding 2): a variable assigned from a substitution and then used as the command name
+  // (`x=$(printf '\x72\x6d'); $x -rf /tmp/x`).
+  const computed = [...command.matchAll(/(?:^|[\s;&|(])([A-Za-z_]\w*)=["']?(\$\(|`)/g)].map((m) => m[1]!);
+  for (const v of computed) {
+    const use = new RegExp(`(^|[;&|(]|&&|\\|\\|)\\s*["']?\\$\\{?${v}\\}?(?![\\w])`);
+    if (use.test(command))
+      return {
+        cls: 'V',
+        reason:
+          'a command whose name is computed at run time (variable assigned from a substitution) cannot be verified',
+      };
+  }
   return null;
 }
 
@@ -108,10 +128,19 @@ export const V21_APPROVAL_RULES: { type: string; description: string; re: RegExp
   },
 ];
 
-export function approvalV21(text: string): { type: string; description: string } | null {
+/**
+ * PR #5 review fix (finding 1): returns EVERY matching V2.1 category. The first version returned only the first
+ * match, which re-created the approval short-circuit for commands combining two V2.1-only categories
+ * (`rm --recursive x && git -c alias.p=push p` was allowed once destructive_delete had been approved).
+ */
+export function approvalsV21(text: string): { type: string; description: string }[] {
   const views = [text, stripEscapes(text)];
-  for (const r of V21_APPROVAL_RULES) if (views.some((v) => r.re.test(v))) return r;
-  return null;
+  return V21_APPROVAL_RULES.filter((r) => views.some((v) => r.re.test(v)));
+}
+
+/** @deprecated first match only; use approvalsV21. Kept for callers/tests of the PR #5 API. */
+export function approvalV21(text: string): { type: string; description: string } | null {
+  return approvalsV21(text)[0] ?? null;
 }
 
 // ---------------------------------------------------------------------------------------------------------------
@@ -172,16 +201,30 @@ function literalPrefixInside(p: string, dir: string): boolean {
   return prefix === d || prefix.startsWith(`${d}/`);
 }
 
+/**
+ * Shell-like word splitting. PR #5 review fix (finding 3): quoted words and backslash-escaped spaces stay one
+ * word, so protected paths containing spaces (`"/c/Users/John Smith/.cla*"`, `John\ Smith`) are resolved whole.
+ */
 function tokens(segment: string): string[] {
-  return segment
-    .split(/[\s<>()]+/)
-    .map((t) =>
-      t
-        .replace(/^["'@]+|["']+$/g, '')
-        .replace(/^--?[\w-]+=/, '')
-        .replace(/^@/, ''),
-    )
-    .filter(Boolean);
+  const out: string[] = [];
+  let cur = '';
+  let q: string | null = null;
+  for (let i = 0; i < segment.length; i++) {
+    const c = segment[i]!;
+    if (q) {
+      if (c === q) q = null;
+      else cur += c;
+    } else if (c === '"' || c === "'") q = c;
+    else if (c === '\\' && segment[i + 1] === ' ') {
+      cur += ' ';
+      i++;
+    } else if (/[\s<>()]/.test(c)) {
+      if (cur) out.push(cur);
+      cur = '';
+    } else cur += c;
+  }
+  if (cur) out.push(cur);
+  return out.map((t) => t.replace(/^--?[\w-]+=/, '').replace(/^@/, '')).filter(Boolean);
 }
 
 /**

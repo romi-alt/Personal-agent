@@ -1,8 +1,8 @@
-import path from 'node:path';
+﻿import path from 'node:path';
 import { isPathInside } from '../workspaces/paths.js';
 import { analyzeShellCommand } from './shell-normalize.js';
 import {
-  approvalV21,
+  approvalsV21,
   contentHardDeny,
   expandIndirection,
   hardDenyV21,
@@ -287,7 +287,7 @@ export function evaluateToolUse(
         reason:
           'Commands that operate on the agent itself (approvals, owner token, agent database, policy) are not permitted',
       };
-    const hard = hardDenyV21(command);
+    const hard = hardDenyV21(command, toolName === 'Bash' ? commandTextForRules(expanded) : undefined);
     if (hard) return { allow: false, reason: `${hard.reason} (V2.1 class ${hard.cls})` };
     if (
       options.protectedPaths?.length &&
@@ -311,8 +311,8 @@ export function evaluateToolUse(
     // V2.1 fix (approval short-circuit): EVERY matching category must be approved. V2 returned "allow" on the first
     // approved match, so `git push origin main && rm -rf ~` passed once only protected_branch_push had been approved.
     const matched: { type: string; description: string }[] = [];
-    const v21 = approvalV21(toolName === 'Bash' ? commandTextForRules(expanded) : expanded);
-    if (v21) matched.push(v21);
+    for (const r of approvalsV21(toolName === 'Bash' ? commandTextForRules(expanded) : expanded))
+      matched.push(r);
     // Normalized view only for the Bash tool; PowerShell quoting/here-strings differ, so it keeps the raw text.
     const ruleTexts =
       toolName === 'Bash'

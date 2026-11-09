@@ -1,4 +1,4 @@
-import { type ChildProcess, execFile, spawn } from 'node:child_process';
+﻿import { type ChildProcess, execFile, spawn } from 'node:child_process';
 import { createHash, randomUUID } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
@@ -146,6 +146,16 @@ export function scratchCleanEnv(
   };
 }
 
+/**
+ * Owner credential stores a worker shell command must not reference (PR #5 review fix, finding 4). Guardrail only:
+ * the OS-level worker identity (V2.2) is what actually denies access.
+ */
+export function ownerCredentialDirs(home = os.homedir()): string[] {
+  return ['.claude', '.ssh', '.aws', '.azure', '.kube', '.gnupg', '.docker', path.join('.config', 'gh')].map(
+    (d) => path.join(home, d),
+  );
+}
+
 /** Root of this agent's own repository/installation (two levels above src|dist/providers/claude-cli). */
 export function agentRepoRoot(): string {
   return path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
@@ -279,7 +289,7 @@ export class ClaudeCliProvider implements ExecutionProvider {
       allowWeb: !!req.allowWeb,
       decisionsFile,
       // V2.1: the owner's Claude login directory is protected too (credential exposure, class K).
-      protectedPaths: [cfg.agentHome, agentRepoRoot(), path.join(os.homedir(), '.claude')],
+      protectedPaths: [cfg.agentHome, agentRepoRoot(), ...ownerCredentialDirs()],
     };
     // Read-only: a worker must not be able to widen its own policy by rewriting this file (guardrail; it is also
     // outside the workspace and commands naming *.policy.json are denied).
@@ -537,7 +547,8 @@ export class ClaudeCliProvider implements ExecutionProvider {
               data: {
                 tool: block.name,
                 id: block.id,
-                input: redactString(JSON.stringify(block.input ?? {}).slice(0, 2000)),
+                // PR #5 review fix (finding 5): redact BEFORE truncating, so a secret cut at the limit cannot leave a fragment.
+                input: redactString(JSON.stringify(block.input ?? {})).slice(0, 2000),
               },
             });
             if ((block.name === 'WebFetch' || block.name === 'WebSearch') && block.id) {
