@@ -1,5 +1,34 @@
 # ELEVARIQ Personal Agent v2: Release Candidate Report
 
+> **Current release candidate: `050bd73` (2026-11-09 05:20–05:41 PKT).** The verification of record for the candidate is
+> [`V2_EVIDENCE_MATRIX.md`](V2_EVIDENCE_MATRIX.md). Everything there was re-run against a clean clone of `050bd73` and its packaged artifact:
+> - CI-equivalent checks;
+> - 562/562 vitest tests;
+> - browser 9/9 ×3;
+> - staging from the artifact: fresh install, synthetic v1 upgrade, pilot-copy upgrade and rollback.
+>
+> Artifact: `E:\Agent\v2-staging\rc\elevariq-agent-v2-050bd73.zip`, SHA-256 `b61205ace474172262db415101cfcdfa9e6a9558f2d3e761563123a006ca653f`.
+>
+> `050bd73` differs from `f4eed90` by a configuration default (`HOST_SUSPEND_THRESHOLD_MS` 30 s → 120 s) and documentation. Sections 3 and 7 below therefore describe the earlier run (`a6604f8` / `f4eed90`) and are kept as history.
+>
+> **Production rollout from the artifact** (each step needs owner authorization):
+> 1. Verify the checksum and extract to a new directory, for example `E:\Agent\Personal-agent-v2-release`.
+> 2. `npm ci --omit=dev` there.
+> 3. Copy production `.env` into it, choosing `MIN_FREE_MEMORY_MB` / `RESUME_FREE_MEMORY_MB` deliberately.
+> 4. Take a v1 `backup` of the live DB.
+> 5. `stop --hold` v1 (see OPERATIONS "Production scheduled task").
+> 6. Point the scheduled task's repository path at the new directory and start it. Migration v10 applies.
+> 7. Check `health`, `status`, `projects` and history counts against the backup.
+> 8. Run one small `smoke:live` task.
+>
+> **Rollback:**
+> 1. Stop.
+> 2. Point the task back at `E:\Agent\Personal-agent`.
+> 3. v1 `restore <backup> --reason ...`.
+> 4. Start.
+>
+> The rollback was rehearsed in staging twice: once from the worktree build and once from the artifact. Both times the database came back to its exact pre-upgrade state and v1 ran normally on it.
+
 - **Release candidate:** branch `feat/agent-v2-reliability` @ **`f4eed90`**, worktree `E:\Agent\Personal-agent-v2`.
 - **Not pushed, not merged, not deployed.**
 - **Production (v1):** `E:\Agent\Personal-agent` @ `1b07468`, scheduled task `ElevariqPersonalAgent` Running, supervisor pid 21040 healthy. Production was not modified at any point.
