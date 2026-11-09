@@ -102,8 +102,20 @@ describe('CLI commands', () => {
     );
     // Regression (found on a real Windows runner): CRLF line endings must not break the markdown title parse.
     const crlf = path.join(home, 'crlf-task.md');
-    writeFileSync(crlf, '# CRLF titled task\r\n\r\nDo the thing carefully.\r\n');
+    // v2 (A6): coding tasks need acceptance criteria; the CRLF file carries an "Acceptance:" line too, which proves
+    // the criteria line also parses with CRLF endings (no trailing \r stored).
+    writeFileSync(
+      crlf,
+      '# CRLF titled task\r\n\r\nDo the thing carefully.\r\nAcceptance: the thing is done\r\n',
+    );
     expect(ok('task:add', '--project', 'cli-demo', '--file', crlf)).toContain('CRLF titled task');
+    {
+      const s = store();
+      expect(s.listTasks({}).find((t) => t.title === 'CRLF titled task')!.acceptanceCriteria).toBe(
+        'the thing is done',
+      );
+      s.db.close();
+    }
     expect(ok('tasks', '--project', 'cli-demo')).toMatch(/First\s+QUEUED\s+3/);
     expect(ok('tasks', '--status', 'queued')).toContain('First');
     expect(run('tasks', '--status', 'nonsense').status).toBe(1);
