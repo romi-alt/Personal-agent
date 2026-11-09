@@ -10,7 +10,7 @@ import type { EvidenceRecord, EvidenceStatus, VerificationLevel } from '../verif
 import type { Db } from '../database/connection.js';
 import { newId } from '../core/ids.js';
 import type { Logger } from '../logging/logger.js';
-import { redactValue } from '../security/redact.js';
+import { redactNullable, redactString, redactValue } from '../security/redact.js';
 import { reconcileProjectStatus } from '../planning/status-reconcile.js';
 import {
   type ActivityEvent,
@@ -607,9 +607,12 @@ export class Store {
     if (p.nextEligibleAt !== undefined) set('next_eligible_at', 'nea', p.nextEligibleAt);
     if (p.scheduledStart !== undefined) set('scheduled_start', 'ss', p.scheduledStart);
     if (p.lastErrorClass !== undefined) set('last_error_class', 'lec', p.lastErrorClass);
-    if (p.lastErrorMessage !== undefined) set('last_error_message', 'lem', p.lastErrorMessage);
+    // V2.1 Phase C: free-text columns are redacted at the persistence boundary (provider errors, worker claims).
+    if (p.lastErrorMessage !== undefined)
+      set('last_error_message', 'lem', redactNullable(p.lastErrorMessage));
     if (p.lastCheckpointId !== undefined) set('last_checkpoint_id', 'lcp', p.lastCheckpointId);
-    if (p.completionEvidence !== undefined) set('completion_evidence', 'ce', p.completionEvidence);
+    if (p.completionEvidence !== undefined)
+      set('completion_evidence', 'ce', redactNullable(p.completionEvidence));
     if (p.sessionId !== undefined) set('session_id', 'sid', p.sessionId);
     if (p.incrementAttempt) sets.push('attempt_count = attempt_count + 1');
     if (p.incrementContinuation) sets.push('continuation_count = continuation_count + 1');
@@ -634,7 +637,7 @@ export class Store {
       .prepare(
         'INSERT INTO task_transitions(task_id,from_status,to_status,reason,execution_id,at) VALUES (?,?,?,?,?,?)',
       )
-      .run(taskId, current.status, to, opts.reason, opts.executionId ?? null, now);
+      .run(taskId, current.status, to, redactString(opts.reason), opts.executionId ?? null, now);
     this.db
       .prepare('UPDATE projects SET last_activity_at = ?, updated_at = ? WHERE id = ?')
       .run(now, now, current.projectId);
@@ -879,11 +882,11 @@ export class Store {
         this.clock.now(),
         patch.outcome,
         patch.errorClass ?? null,
-        patch.retryReason ?? null,
+        redactNullable(patch.retryReason ?? null),
         patch.usage ? JSON.stringify(redactValue(patch.usage)) : null,
         patch.costUsdEstimate ?? null,
         patch.costUsdBilled ?? null,
-        patch.summary ?? null,
+        redactNullable(patch.summary ?? null),
         id,
       );
   }
@@ -897,7 +900,15 @@ export class Store {
   }
 
   // ----------------------------------------------------------- checkpoints
-  addCheckpoint(input: Omit<Checkpoint, 'id' | 'createdAt' | 'integrity'>): Checkpoint {
+  addCheckpoint(raw: Omit<Checkpoint, 'id' | 'createdAt' | 'integrity'>): Checkpoint {
+    // V2.1 Phase C: redact BEFORE the integrity hash, so stored text and hash agree.
+    const input = {
+      ...raw,
+      completedSummary: redactNullable(raw.completedSummary),
+      outstandingSummary: redactNullable(raw.outstandingSummary),
+      testResults: redactNullable(raw.testResults),
+      nextAction: redactNullable(raw.nextAction),
+    };
     const id = newId('chk');
     const now = this.clock.now();
     this.db.transaction(() => {
@@ -1015,7 +1026,7 @@ export class Store {
          ON CONFLICT(provider) DO UPDATE SET status=@status, blocked_until=@blockedUntil, reason=@reason, error_class=@errorClass,
            consecutive_failures=@consecutiveFailures, credential_fingerprint=@credentialFingerprint, updated_at=@now`,
       )
-      .run({ ...s, now: this.clock.now() });
+      .run({ ...s, reason: redactNullable(s.reason), now: this.clock.now() });
   }
 
   // ------------------------------------------------------------ supervisor
@@ -1071,7 +1082,7 @@ export class Store {
       .prepare(
         `UPDATE supervisor_state SET heartbeat_at = ?, status = ?, current_task_id = ?, last_error = COALESCE(?, last_error) WHERE id = 1 AND instance_id = ?`,
       )
-      .run(this.clock.now(), status, currentTaskId, lastError ?? null, instanceId);
+      .run(this.clock.now(), status, currentTaskId, redactNullable(lastError ?? null), instanceId);
     const r = this.db
       .prepare('SELECT stop_requested, instance_id FROM supervisor_state WHERE id = 1')
       .get() as Row | undefined;
@@ -1099,6 +1110,7 @@ export class Store {
     payload?: Record<string, unknown>;
   }): Approval {
     const id = newId('apr');
+    input = { ...input, description: redactString(input.description) };
     this.db
       .prepare(
         `INSERT INTO approvals(id,project_id,task_id,action_type,description,status,requested_at,payload) VALUES (?,?,?,?,?,'PENDING',?,?)`,
@@ -1276,7 +1288,7 @@ export class Store {
           .prepare(
             'INSERT INTO project_transitions(project_id,from_lifecycle,to_lifecycle,reason,at) VALUES (?,?,?,?,?)',
           )
-          .run(projectId, p.lifecycle, to, reason, now);
+          .run(projectId, p.lifecycle, to, redactString(reason), now);
         this.recordEvent({
           type: 'project.lifecycle',
           projectId,
@@ -1397,7 +1409,7 @@ export class Store {
         input.taskId ?? null,
         input.level,
         input.status,
-        input.summary.slice(0, 2000),
+        redactString(input.summary).slice(0, 2000),
         JSON.stringify(redactValue(input.evidence ?? {})),
         now,
       );
@@ -1494,7 +1506,7 @@ export class Store {
       .prepare(
         'INSERT OR REPLACE INTO task_outputs(task_id,execution_id,content,created_at) VALUES (?,?,?,?)',
       )
-      .run(taskId, executionId, content.slice(0, 512 * 1024), this.clock.now());
+      .run(taskId, executionId, redactString(content).slice(0, 512 * 1024), this.clock.now());
   }
 
   /** Latest stored output of a task, or null. */

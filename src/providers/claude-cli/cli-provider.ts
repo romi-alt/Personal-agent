@@ -1,8 +1,10 @@
-import { type ChildProcess, execFile, spawn } from 'node:child_process';
+﻿import { type ChildProcess, execFile, spawn } from 'node:child_process';
 import { createHash, randomUUID } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { redactString, redactValue } from '../../security/redact.js';
 import { promisify } from 'node:util';
 import type {
   AuthReadiness,
@@ -144,6 +146,34 @@ export function scratchCleanEnv(
   };
 }
 
+/**
+ * Owner credential stores a worker shell command must not reference (PR #5 review fix, finding 4). Guardrail only:
+ * the OS-level worker identity (V2.2) is what actually denies access.
+ */
+export function ownerCredentialDirs(home = os.homedir()): string[] {
+  return [
+    '.claude',
+    '.ssh',
+    '.aws',
+    '.azure',
+    '.kube',
+    '.gnupg',
+    '.docker',
+    path.join('.config', 'gh'),
+    // Phase B/D: per-user credential FILES and Windows per-user credential stores as well.
+    '.npmrc',
+    '.yarnrc.yml',
+    '.pypirc',
+    '.netrc',
+    '_netrc',
+    '.git-credentials',
+    path.join('AppData', 'Roaming', 'GitHub CLI'),
+    path.join('AppData', 'Roaming', 'Microsoft', 'Credentials'),
+    path.join('AppData', 'Local', 'Microsoft', 'Credentials'),
+    path.join('AppData', 'Roaming', 'Microsoft', 'Protect'),
+  ].map((d) => path.join(home, d));
+}
+
 /** Root of this agent's own repository/installation (two levels above src|dist/providers/claude-cli). */
 export function agentRepoRoot(): string {
   return path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
@@ -276,30 +306,34 @@ export class ClaudeCliProvider implements ExecutionProvider {
       readOnly: !!req.readOnly,
       allowWeb: !!req.allowWeb,
       decisionsFile,
-      protectedPaths: [cfg.agentHome, agentRepoRoot()],
+      // V2.1: the owner's Claude login directory is protected too (credential exposure, class K).
+      protectedPaths: [cfg.agentHome, agentRepoRoot(), ...ownerCredentialDirs()],
     };
     // Read-only: a worker must not be able to widen its own policy by rewriting this file (guardrail; it is also
     // outside the workspace and commands naming *.policy.json are denied).
-    writeFileSync(policyFile, JSON.stringify(policy), { mode: 0o444 });
-    writeFileSync(
-      settingsFile,
-      JSON.stringify({
-        hooks: {
-          PreToolUse: [
-            {
-              matcher: '*',
-              hooks: [
-                {
-                  type: 'command',
-                  command: `${hookCommand()} "${policyFile.replace(/\\/g, '/')}"`,
-                  timeout: 60,
-                },
-              ],
-            },
-          ],
-        },
-      }),
-    );
+    const policyJson = JSON.stringify(policy);
+    writeFileSync(policyFile, policyJson, { mode: 0o444 });
+    // V2.1 (M4): the hook command carries the policy's sha256, so a rewritten policy file makes the hook fail closed
+    // (every tool call blocked) instead of silently widening permissions. The settings are passed INLINE to
+    // `--settings` (no settings file a worker could rewrite while the session runs).
+    const policySha = createHash('sha256').update(policyJson).digest('hex');
+    const settingsJson = JSON.stringify({
+      hooks: {
+        PreToolUse: [
+          {
+            matcher: '*',
+            hooks: [
+              {
+                type: 'command',
+                command: `${hookCommand()} "${policyFile.replace(/\\/g, '/')}" ${policySha}`,
+                timeout: 60,
+              },
+            ],
+          },
+        ],
+      },
+    });
+    void settingsFile;
 
     // New sessions get their id BEFORE launch: it is persisted first, so even a crash before the first output
     // leaves a resumable reference (and never two sessions for one execution).
@@ -334,7 +368,7 @@ export class ClaudeCliProvider implements ExecutionProvider {
       '',
       '--strict-mcp-config',
       '--settings',
-      settingsFile,
+      settingsJson,
       '--max-turns',
       String(req.limits.maxTurns),
       '--append-system-prompt',
@@ -524,12 +558,26 @@ export class ClaudeCliProvider implements ExecutionProvider {
             lastText = block.text;
             req.onEvent({ type: 'assistant_text', data: { chars: block.text.length } });
           } else if (block.type === 'tool_use') {
-            req.onEvent({ type: 'tool_use', data: { tool: block.name, id: block.id } });
+            // V2.1 (audit): the supervisor records WHAT the worker asked to run from its own view of the stream, so
+            // the evidence does not depend on the hook's decisions file, which the worker's OS identity can rewrite.
+            req.onEvent({
+              type: 'tool_use',
+              data: {
+                tool: block.name,
+                id: block.id,
+                // PR #5 review fix (finding 5): redact BEFORE truncating, so a secret cut at the limit cannot leave a fragment.
+                // Phase C: key-name redaction too (redactValue), not only token formats in the serialized text.
+                input: JSON.stringify(redactValue(block.input ?? {})).slice(0, 2000),
+              },
+            });
             if ((block.name === 'WebFetch' || block.name === 'WebSearch') && block.id) {
               webCalls.set(block.id, block.name);
               const url = block.input?.['url'];
               if (typeof url === 'string')
-                req.onEvent({ type: 'web_evidence', data: { tool: block.name, urls: [url.slice(0, 500)] } });
+                req.onEvent({
+                  type: 'web_evidence',
+                  data: { tool: block.name, urls: [redactString(url).slice(0, 500)] },
+                });
             }
           }
         }
@@ -779,7 +827,9 @@ function readDenials(file: string, result?: Record<string, unknown>): Permission
     tool_input: Record<string, unknown>;
   }[];
   for (const d of fromResult) {
-    if (!out.some((o) => o.tool === d.tool_name && JSON.stringify(o.input) === JSON.stringify(d.tool_input)))
+    // The hook records redacted input (Phase C); compare like with like so one denial is not reported twice.
+    const same = JSON.stringify(redactValue(d.tool_input));
+    if (!out.some((o) => o.tool === d.tool_name && JSON.stringify(o.input) === same))
       out.push({ tool: d.tool_name, reason: 'denied by permission system', input: d.tool_input });
   }
   return out;

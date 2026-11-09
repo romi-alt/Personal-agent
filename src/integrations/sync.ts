@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import type { ProjectAssignmentInput } from '../assignments/schema.js';
 import { newId } from '../core/ids.js';
 import type { Store } from '../queue/store.js';
+import { redactString } from '../security/redact.js';
 import type { ErpSyncSource, Page } from './contracts.js';
 import { IntegrationError, type ErpProjectDetails, type ErpTeamMember } from './types.js';
 
@@ -135,7 +136,7 @@ export class SyncEngine {
       }
     } catch (err) {
       r.status = 'failed';
-      r.error = err instanceof IntegrationError ? `${err.code}: ${err.message}` : String(err);
+      r.error = redactString(err instanceof IntegrationError ? `${err.code}: ${err.message}` : String(err));
     }
     this.db
       .prepare(

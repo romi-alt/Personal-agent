@@ -1,6 +1,17 @@
+﻿import os from 'node:os';
 import path from 'node:path';
 import { isPathInside } from '../workspaces/paths.js';
 import { analyzeShellCommand } from './shell-normalize.js';
+import {
+  approvalsV21,
+  contentHardDeny,
+  expandIndirection,
+  hardDenyV21,
+  packageScriptBodies,
+  reachesProtectedPath,
+  stripEscapes,
+  stripHeredocBodies,
+} from './hardening.js';
 
 /**
  * Tool-permission policy for unattended coding workers.
@@ -214,6 +225,8 @@ export interface PolicyOptions {
   alsoRequire?: readonly string[];
   /** Agent-owned directories (AGENT_HOME, the agent repository) a shell command must not reference. */
   protectedPaths?: readonly string[];
+  /** Internal: recursion depth while evaluating package.json script bodies (V2.1 class N). */
+  scriptDepth?: number;
 }
 
 export function evaluateToolUse(
@@ -238,43 +251,95 @@ export function evaluateToolUse(
     for (const key of pathKeys) {
       const raw = input[key];
       if (typeof raw !== 'string' || raw === '') continue;
-      const abs = path.isAbsolute(raw) ? raw : path.resolve(workspace, raw);
+      // Phase D: a leading `~` names the user's home (fail safe: if the tool expands it, the check must too).
+      const exp = /^~(?=[\\/]|$)/.test(raw) ? path.join(os.homedir(), raw.slice(1)) : raw;
+      const abs = path.isAbsolute(exp) ? exp : path.resolve(workspace, exp);
       const readOnly = toolName === 'Read' || toolName === 'Glob' || toolName === 'Grep';
       const roots = readOnly ? [workspace, ...extraReadable] : [workspace];
       if (!roots.some((r) => isPathInside(abs, r))) {
         return { allow: false, reason: `Path ${raw} is outside the project workspace` };
       }
     }
+    // V2.1: content planted by Write/Edit must not reference the agent itself or credentials (class P/K/W).
+    const written = [
+      input['content'],
+      input['new_string'],
+      ...(Array.isArray(input['edits'])
+        ? (input['edits'] as Record<string, unknown>[]).map((e) => e?.['new_string'])
+        : []),
+    ].filter((c): c is string => typeof c === 'string');
+    for (const c of written) {
+      const d = contentHardDeny(c, workspace, options.protectedPaths ?? []);
+      if (d) return { allow: false, reason: d.reason };
+      if (AGENT_CONTROL_PATTERN.test(c) || invokesAgentCli(c))
+        return {
+          allow: false,
+          reason: 'file content operates on the agent itself (approvals, token, database, policy)',
+        };
+    }
     return { allow: true, reason: 'file access inside workspace' };
   }
   if (toolName === 'Bash' || toolName === 'PowerShell') {
     const command = String(input['command'] ?? '');
+    // V2.1 (class V/E): every hard check also sees the variable-expanded and de-escaped command.
+    const expanded = expandIndirection(command);
+    const views = [command, expanded, stripEscapes(expanded)];
     // Agent-control, agent-CLI and protected-path checks ALWAYS use the raw command (never relaxed by A2).
-    if (AGENT_CONTROL_PATTERN.test(command) || invokesAgentCli(command))
+    if (views.some((v) => AGENT_CONTROL_PATTERN.test(v) || invokesAgentCli(v)))
       return {
         allow: false,
         reason:
           'Commands that operate on the agent itself (approvals, owner token, agent database, policy) are not permitted',
       };
-    if (options.protectedPaths?.length && mentionsProtectedPath(command, workspace, options.protectedPaths))
+    const hard = hardDenyV21(command, toolName === 'Bash' ? commandTextForRules(expanded) : undefined);
+    if (hard) return { allow: false, reason: `${hard.reason} (V2.1 class ${hard.cls})` };
+    // Phase G: heredoc bodies the analyzer classifies as data are not path arguments (the literal-substring check
+    // below still sees them, so a heredoc naming the agent home verbatim stays denied).
+    const pathText =
+      toolName === 'Bash' && !analyzeShellCommand(command).useRaw ? stripHeredocBodies(command) : command;
+    if (
+      options.protectedPaths?.length &&
+      (views.some((v) => mentionsProtectedPath(v, workspace, options.protectedPaths!)) ||
+        reachesProtectedPath(pathText, workspace, options.protectedPaths) !== null)
+    )
       return {
         allow: false,
         reason:
           'Commands that reference the agent home or the agent repository outside the project workspace are not permitted',
       };
-    // Normalized view only for the Bash tool; PowerShell quoting/here-strings differ, so it keeps the raw text.
-    const ruleText = toolName === 'Bash' ? commandTextForRules(command) : command;
-    for (const rule of APPROVAL_RULES) {
-      if (rule.pattern.test(rule.view === 'raw' ? command : ruleText)) {
-        if (options.approvedTypes?.includes(rule.type))
-          return { allow: true, reason: `${rule.description} approved by owner` };
-        return {
-          allow: false,
-          approvalType: rule.type,
-          reason: `${rule.description} requires owner approval`,
-        };
-      }
+    // V2.1 (class N): package-manager scripts are evaluated by their package.json bodies as well.
+    const depth = options.scriptDepth ?? 0;
+    for (const s of depth < 3 ? packageScriptBodies(expanded, workspace) : []) {
+      const d = evaluateToolUse('Bash', { command: s.body }, workspace, {
+        ...options,
+        scriptDepth: depth + 1,
+      });
+      if (!d.allow) return { ...d, reason: `package script "${s.name}": ${d.reason}` };
     }
+    // V2.1 fix (approval short-circuit): EVERY matching category must be approved. V2 returned "allow" on the first
+    // approved match, so `git push origin main && rm -rf ~` passed once only protected_branch_push had been approved.
+    const matched: { type: string; description: string }[] = [];
+    for (const r of approvalsV21(toolName === 'Bash' ? commandTextForRules(expanded) : expanded))
+      matched.push(r);
+    // Normalized view only for the Bash tool; PowerShell quoting/here-strings differ, so it keeps the raw text.
+    const ruleTexts =
+      toolName === 'Bash'
+        ? [commandTextForRules(command), commandTextForRules(expanded)]
+        : [command, expanded];
+    for (const rule of APPROVAL_RULES) {
+      const texts = rule.view === 'raw' ? [command, expanded] : ruleTexts;
+      if (texts.some((t) => rule.pattern.test(t)) && !matched.some((m) => m.type === rule.type))
+        matched.push({ type: rule.type, description: rule.description });
+    }
+    const missing = matched.find((m) => !options.approvedTypes?.includes(m.type));
+    if (missing)
+      return {
+        allow: false,
+        approvalType: missing.type,
+        reason: `${missing.description} requires owner approval`,
+      };
+    if (matched.length)
+      return { allow: true, reason: `${matched.map((m) => m.description).join('; ')} approved by owner` };
     return { allow: true, reason: 'command permitted by workspace policy' };
   }
   if (toolName === 'WebFetch' || toolName === 'WebSearch') {

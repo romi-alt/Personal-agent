@@ -7,7 +7,7 @@ import {
 } from '@anthropic-ai/claude-agent-sdk';
 import type { AppConfig } from '../../config/index.js';
 import { evaluateToolUse } from '../../security/policy.js';
-import { agentRepoRoot } from '../claude-cli/cli-provider.js';
+import { agentRepoRoot, ownerCredentialDirs } from '../claude-cli/cli-provider.js';
 import { ActiveTimeMeter } from '../../core/active-clock.js';
 import type {
   AuthReadiness,
@@ -151,10 +151,12 @@ export class ClaudeProvider implements ExecutionProvider {
 
     const denials: PermissionDenial[] = [];
     const workspace = req.cwd;
-    // Same agent-path protection as the CLI provider's policy hook (AGENT_HOME, this agent's repository).
+    // Same agent-path protection as the CLI provider's policy hook (AGENT_HOME, this agent's repository) and, since
+    // Phase D, the same owner credential stores (the SDK provider previously protected only the agent paths).
     const protectedPaths = [
       ...(this.deps.config.agentHome ? [this.deps.config.agentHome] : []),
       agentRepoRoot(),
+      ...ownerCredentialDirs(),
     ];
 
     const preToolUseHook: HookCallback = async (hookInput) => {
