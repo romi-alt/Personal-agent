@@ -53,6 +53,7 @@ export async function startHarness(): Promise<Harness> {
       PLAN_APPROVAL: 'required',
       INDEPENDENT_REVIEW: 'false',
       BACKUP_INTERVAL_HOURS: '0',
+      MIN_FREE_MEMORY_MB: '0', // host memory must not decide UI-test outcomes (the gate has its own test)
       POLL_INTERVAL_MS: '100',
       HEARTBEAT_INTERVAL_MS: '500',
     },
