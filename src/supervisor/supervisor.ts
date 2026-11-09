@@ -1,4 +1,5 @@
 import { randomBytes } from 'node:crypto';
+import os from 'node:os';
 import path from 'node:path';
 import type { AppConfig } from '../config/index.js';
 import type { Logger } from '../logging/logger.js';
@@ -10,6 +11,9 @@ import { TaskRunner } from '../workers/runner.js';
 import type { WorkspaceRegistry } from '../workspaces/registry.js';
 import type { ExecutionRecord, Task } from '../types/index.js';
 import type { WorkflowEngine } from '../workflows/engine.js';
+import type { QaEngine } from '../engineering/qa.js';
+import { createBackup, listBackups, pruneBackups } from '../ops/backup.js';
+import { Notifier } from '../ops/notify.js';
 import { ProgressTracker } from '../progress/snapshots.js';
 
 export interface SupervisorDeps {
@@ -22,6 +26,10 @@ export interface SupervisorDeps {
   rng?: () => number;
   /** Planning-workflow orchestrator; advanced on every tick (local SQL only). */
   workflows?: WorkflowEngine;
+  /** Independent QA (Phase 3): reviews completed coding tasks, creates corrections, escalates. */
+  qa?: QaEngine;
+  /** Injectable free-memory probe (bytes) for tests; defaults to os.freemem. */
+  freeMemory?: () => number;
 }
 
 export interface GateResult {
@@ -44,6 +52,7 @@ export class Supervisor {
   private readonly runner: TaskRunner;
   private readonly progress?: ProgressTracker;
   private lastGate = '';
+  private memoryDeferred = false;
   private lastRetentionRun = 0;
   private done: Promise<void> | null = null;
 
@@ -111,6 +120,7 @@ export class Supervisor {
       runner: this.runner,
       registry: this.d.registry,
       providerName: this.d.provider.name,
+      workerImage: this.d.provider.workerImage,
       isLocallyActive: (id) => this.workers.has(id),
     });
   }
@@ -194,6 +204,45 @@ export class Supervisor {
     }
   }
 
+  private lastMaintenance = 0;
+  private notifier?: Notifier;
+  /**
+   * Periodic operations (at most once a minute): scheduled online backup with retention, owner notifications.
+   * Failures are recorded as error events (which are themselves notified) and never stop the supervisor.
+   */
+  private async maintenance(): Promise<void> {
+    const { store, config, log } = this.d;
+    const now = Date.now();
+    if (now - this.lastMaintenance < 60_000) return;
+    this.lastMaintenance = now;
+    if (config.backup.intervalHours > 0) {
+      try {
+        const newest = listBackups(config.backup.dir).at(-1);
+        if (!newest || now - newest.createdAt >= config.backup.intervalHours * 3_600_000) {
+          const m = await createBackup(store.db, config.backup.dir);
+          const removed = pruneBackups(config.backup.dir, config.backup.retention);
+          store.recordEvent({
+            type: 'backup.created',
+            payload: { file: m.file, bytes: m.bytes, removed: removed.length },
+          });
+        }
+      } catch (err) {
+        log.error('backup.failed', { error: err });
+        store.recordEvent({ type: 'backup.failed', severity: 'error', payload: { error: String(err) } });
+      }
+    }
+    try {
+      this.notifier ??= new Notifier(
+        store,
+        { agentHome: config.agentHome, webhookUrl: config.notifyWebhookUrl },
+        log,
+      );
+      await this.notifier.flush();
+    } catch (err) {
+      log.warn('notify.failed', { error: err });
+    }
+  }
+
   /** One scheduling pass. Exposed for deterministic tests. */
   async tick(): Promise<{ claimed: number; gate: GateResult }> {
     const { store, config, log, provider } = this.d;
@@ -201,6 +250,12 @@ export class Supervisor {
     // Workflow orchestration is pure database work, so it also runs while the provider gate is closed
     // (e.g. creating the next planning task or recording an owner's answer).
     this.d.workflows?.advanceAll();
+    try {
+      await this.d.qa?.tick();
+    } catch (err) {
+      this.d.log.error('qa.tick_error', { error: err });
+    }
+    await this.maintenance();
     this.progress?.sweep(); // evidence-based progress snapshots (append-only, only on change)
     const gate = await this.gate();
     if (gate.reason !== this.lastGate) {
@@ -208,6 +263,35 @@ export class Supervisor {
       log.info('supervisor.gate', { open: gate.open, reason: gate.reason });
     }
     if (!gate.open || this.stopping) return { claimed: 0, gate };
+
+    // A9: do not START new work while the host is short of memory (the pilot supervisor's heartbeat went stale at
+    // 0.83 GB free under test-heavy load). Hysteresis: pause below MIN_FREE_MEMORY_MB, resume only above
+    // RESUME_FREE_MEMORY_MB. Running workers are never killed by this policy; only new claims wait.
+    if (config.minFreeMemoryMb > 0 && this.workers.size < config.maxConcurrentWorkers) {
+      const freeMb = Math.round((this.d.freeMemory ?? os.freemem)() / 1048576);
+      const was = this.memoryDeferred;
+      if (!was && freeMb < config.minFreeMemoryMb) this.memoryDeferred = true;
+      else if (was && freeMb >= config.resumeFreeMemoryMb) this.memoryDeferred = false;
+      if (this.memoryDeferred !== was) {
+        const payload = {
+          freeMb,
+          pauseBelowMb: config.minFreeMemoryMb,
+          resumeAboveMb: config.resumeFreeMemoryMb,
+          runningWorkers: this.workers.size,
+        };
+        const type = this.memoryDeferred ? 'supervisor.resource_deferred' : 'supervisor.resource_resumed';
+        log[this.memoryDeferred ? 'warn' : 'info'](type, payload);
+        store.recordEvent({ type, severity: this.memoryDeferred ? 'warn' : 'info', payload });
+      }
+      if (this.memoryDeferred)
+        return {
+          claimed: 0,
+          gate: {
+            open: false,
+            reason: `low memory: ${freeMb} MB available (paused below ${config.minFreeMemoryMb} MB, resumes above ${config.resumeFreeMemoryMb} MB); new work deferred, running work continues`,
+          },
+        };
+    }
 
     let claimed = 0;
     while (this.workers.size < config.maxConcurrentWorkers && !this.stopping) {

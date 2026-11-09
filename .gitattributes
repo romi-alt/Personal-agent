@@ -1,0 +1,8 @@
+# Keep LF in the working tree on every OS (git for Windows defaults to core.autocrlf=true, which checks out CRLF and
+# makes Prettier, shell scripts and line-based parsers misbehave). PowerShell scripts stay CRLF for Windows tooling.
+* text=auto eol=lf
+*.ps1 text eol=crlf
+*.png binary
+*.jpg binary
+*.ico binary
+*.db binary

@@ -1,12 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { type ChildProcess, spawn, spawnSync } from 'node:child_process';
 import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
-import { removeDir } from '../helpers/fs.js';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { openDatabase } from '../../src/database/connection.js';
 import { Store } from '../../src/queue/store.js';
 import { waitFor } from '../helpers/env.js';
+import { removeTempDir } from '../helpers/fs.js';
 
 /**
  * End-to-end: REAL supervisor processes (spawned via the CLI), a REAL SQLite file, REAL SIGKILL.
@@ -50,6 +50,8 @@ beforeEach(() => {
     AGENT_ENV_FILE: path.join(home, 'no.env'),
     LOG_TO_CONSOLE: 'false',
     EXECUTION_PROVIDER: 'mock',
+    MIN_FREE_MEMORY_MB: '0', // spawned supervisors: host memory must not decide outcomes (gate tested in resource-gate)
+    INDEPENDENT_REVIEW: 'false', // recovery scenario; QA has its own suite (v2 task:add enables review by default)
     MOCK_SCENARIO_FILE: path.join(home, 'scenario.json'),
     POLL_INTERVAL_MS: '100',
     HEARTBEAT_INTERVAL_MS: '200',
@@ -60,11 +62,13 @@ beforeEach(() => {
     NODE_NO_WARNINGS: '1',
   };
 });
-afterEach(() => {
-  for (const p of procs) if (p.exitCode === null) p.kill('SIGKILL');
+afterEach(async () => {
+  const alive = procs.filter((p) => p.exitCode === null && p.signalCode === null);
+  for (const p of alive) p.kill('SIGKILL');
+  await Promise.all(alive.map(exited));
   procs.length = 0;
   for (const s of opened.splice(0)) s.db.close(); // Windows cannot delete a database file that is still open
-  removeDir(home);
+  removeTempDir(home);
 });
 
 describe('E2E: three tasks, capacity exhaustion, supervisor killed and restarted', () => {

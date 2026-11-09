@@ -12,6 +12,10 @@ import type { ExecutionRecord, Task } from '../types/index.js';
 import { verifyTask } from '../verification/service.js';
 import { commitExists, gitState, treeFingerprint } from '../workspaces/git.js';
 import type { WorkspaceRegistry } from '../workspaces/registry.js';
+import { processIdentity } from './process-tree.js';
+import { ActiveTimeMeter } from '../core/active-clock.js';
+import { capacityEscalation } from '../recovery/capacity-escalation.js';
+import { type Role, roleBrief } from '../engineering/roles.js';
 
 export interface RunnerDeps {
   config: AppConfig;
@@ -165,8 +169,31 @@ export class TaskRunner {
     ].filter((x): x is number => x !== undefined);
     const attemptIndex = store.listExecutions(task.id).length; // includes this execution => 1-based
 
-    const hardTimer = setTimeout(() => abort.abort(), config.workerTimeoutMs + 10_000);
+    // Hard ceiling on one execution. Suspended while the provider reports an official capacity wait (the worker is
+    // alive and waiting for a usage reset, which can take hours); re-armed with a fresh budget when the wait ends.
+    // Measured in ACTIVE time (A11): a plain setTimeout charges host sleep to the execution.
+    const hardTickMs = 1000;
+    const hardMeter = new ActiveTimeMeter(() => Date.now(), hardTickMs, config.claudeCli.suspendThresholdMs);
+    let hardArmedAt: number | undefined = Date.now();
+    let hardSuspendedAt = hardMeter.suspendedMs();
+    const hardTimer = setInterval(() => {
+      hardMeter.sample();
+      if (
+        hardArmedAt !== undefined &&
+        hardMeter.activeSince(hardArmedAt, hardSuspendedAt) > config.workerTimeoutMs + 10_000
+      )
+        abort.abort();
+    }, hardTickMs);
+    hardTimer.unref?.();
+    const suspendHardTimer = () => {
+      hardArmedAt = undefined;
+    };
+    const rearmHardTimer = () => {
+      hardArmedAt = Date.now();
+      hardSuspendedAt = hardMeter.suspendedMs();
+    };
     execLog.append({ kind: 'start', mode, attemptIndex, resumeSessionId: task.sessionId, integrityNotes });
+    let lastActivityWrite = 0;
     let outcome: RunOutcome;
     try {
       outcome = await provider.run({
@@ -174,8 +201,9 @@ export class TaskRunner {
         taskId: task.id,
         taskTitle: task.title,
         prompt,
-        systemAppend: task.readOnly ? PLANNING_APPEND : SYSTEM_APPEND,
+        systemAppend: task.readOnly ? PLANNING_APPEND : SYSTEM_APPEND + roleBrief(task.role as Role | null),
         readOnly: task.readOnly,
+        allowWeb: task.readOnly && task.allowWeb,
         cwd,
         resumeSessionId: task.sessionId ?? undefined,
         approvedActionTypes,
@@ -191,9 +219,54 @@ export class TaskRunner {
           store.recordSession(execution.id, task.id, id);
           execLog.append({ kind: 'session', sessionId: id });
         },
+        onProcess: (pid) => {
+          store.setExecutionWorkerPid(execution.id, pid);
+          if (pid === null) return;
+          // Record the OS identity (image + creation time) so recovery can prove an orphan is this worker.
+          void processIdentity(pid)
+            .then((id) => {
+              if (id) store.setExecutionWorkerIdentity(execution.id, id);
+            })
+            .catch(() => undefined);
+        },
         onEvent: (ev) => {
           execLog.append({ kind: ev.type, ...ev.data });
-          if (ev.type === 'permission_denied' || ev.type === 'rate_limit' || ev.type === 'retry') {
+          const t = store.clock.now();
+          if (t - lastActivityWrite > 5_000) {
+            lastActivityWrite = t;
+            store.touchExecutionActivity(execution.id);
+          }
+          if (ev.type === 'capacity_wait') {
+            const waiting = ev.data['waiting'] === true;
+            if (waiting) suspendHardTimer();
+            else rearmHardTimer();
+            store.setExecutionCapacityWait(
+              execution.id,
+              waiting
+                ? {
+                    since: store.clock.now(),
+                    reason: String(ev.data['reason'] ?? 'usage limit'),
+                    resetsAt: typeof ev.data['resetsAtMs'] === 'number' ? ev.data['resetsAtMs'] : null,
+                    recheckAt: typeof ev.data['recheckAtMs'] === 'number' ? ev.data['recheckAtMs'] : null,
+                  }
+                : null,
+            );
+            store.recordEvent({
+              type: waiting ? 'provider.capacity_wait_started' : 'provider.capacity_wait_ended',
+              projectId,
+              taskId: task.id,
+              executionId: execution.id,
+              severity: waiting ? 'warn' : 'info',
+              payload: ev.data,
+            });
+            return;
+          }
+          if (
+            ev.type === 'permission_denied' ||
+            ev.type === 'rate_limit' ||
+            ev.type === 'retry' ||
+            ev.type === 'host_resume'
+          ) {
             store.recordEvent({
               type: `provider.${ev.type}`,
               projectId,
@@ -208,7 +281,8 @@ export class TaskRunner {
     } catch (err) {
       outcome = { kind: 'failed', failure: toFailure(err) };
     } finally {
-      clearTimeout(hardTimer);
+      clearInterval(hardTimer);
+      store.setExecutionCapacityWait(execution.id, null);
     }
 
     if (isLeaseLost() && outcome.kind === 'failed' && outcome.failure.errorClass === 'INTERRUPTED') {
@@ -395,7 +469,47 @@ export class TaskRunner {
       throw err;
     }
     execLog.append({ kind: 'checkpoint_written' });
+    if (decision.next === 'WAITING_FOR_CAPACITY')
+      this.capacityPolicy(task.id, project.id, execution.id, decision);
     this.applyDecision(task.id, project.id, execution.id, provider.name, outcome, decision, summary);
+  }
+
+  /**
+   * A12: escalate a capacity streak that has lasted longer than CAPACITY_ESCALATE_AFTER_MS. Raised once per streak
+   * (on the execution that crosses the threshold). `notify` keeps the task waiting; `block` hands it to the owner.
+   */
+  private capacityPolicy(taskId: string, projectId: string, executionId: string, decision: Decision): void {
+    const { store, config } = this.d;
+    const { escalateAfterMs, escalation } = config.capacity;
+    const execs = store.listExecutions(taskId);
+    const now = store.clock.now();
+    const esc = capacityEscalation(execs, now, escalateAfterMs);
+    if (!esc) return;
+    const prev = execs.length >= 2 ? execs[execs.length - 2]! : undefined;
+    const alreadyRaised =
+      prev?.endedAt != null &&
+      prev.startedAt >= esc.since &&
+      capacityEscalation(execs.slice(0, -1), prev.endedAt, escalateAfterMs) !== null;
+    if (alreadyRaised && escalation === 'notify') return;
+    store.recordEvent({
+      type: 'capacity.escalated',
+      projectId,
+      taskId,
+      executionId,
+      severity: 'warn',
+      payload: {
+        reason: `waiting for subscription capacity for ${Math.round(esc.waitedMs / 60_000)} min (limit ${Math.round(escalateAfterMs / 60_000)} min); policy ${escalation}`,
+        since: esc.since,
+        waitedMs: esc.waitedMs,
+        policy: escalation,
+      },
+    });
+    if (escalation === 'block') {
+      decision.next = 'BLOCKED';
+      decision.nextEligibleAt = null;
+      decision.escalated = true;
+      decision.reason = `capacity wait exceeded ${Math.round(escalateAfterMs / 60_000)} min; owner review (CAPACITY_ESCALATION=block)`;
+    }
   }
 
   /**

@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import path from 'node:path';
 import { ClaudeProvider } from '../../src/providers/claude/claude-provider.js';
 import { mapAssistantError, resetsAtToMs, classifyThrown } from '../../src/providers/claude/errors.js';
 import type { RunRequest } from '../../src/providers/types.js';
@@ -269,6 +270,17 @@ describe('ClaudeProvider run mapping', () => {
       'allow',
     );
     expect((await cap.options.canUseTool('Bash', { command: 'git push' }, sig)).behavior).toBe('deny');
+    // Agent-control guard and protected agent repository path, same as the CLI provider.
+    const repo = path.resolve(__dirname, '../..');
+    for (const command of ['npm run agent -- approve apr_abcdefgh12', `cat "${path.join(repo, '.env')}"`]) {
+      expect((await cap.options.canUseTool('Bash', { command }, sig)).behavior, command).toBe('deny');
+      const hook = await cap.options.hooks.PreToolUse[0].hooks[0]({
+        hook_event_name: 'PreToolUse',
+        tool_name: 'Bash',
+        tool_input: { command },
+      });
+      expect(JSON.stringify(hook), command).toContain('deny');
+    }
   });
   it('classifies thrown errors: crash, network, timeout, shutdown, invalid session', async () => {
     const thrower = (e: Error) =>

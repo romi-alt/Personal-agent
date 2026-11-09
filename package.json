@@ -19,6 +19,7 @@
     "test:unit": "vitest run tests/unit",
     "test:integration": "vitest run tests/integration",
     "test:e2e": "vitest run tests/e2e",
+    "test:browser": "playwright test",
     "check": "npm run typecheck && npm run lint && npm run test",
     "smoke:live": "tsx scripts/live-smoke.ts",
     "smoke:live-recovery": "tsx scripts/live-recovery-smoke.ts",
@@ -32,6 +33,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@playwright/test": "1.65.0",
     "@types/better-sqlite3": "^9.6.0",
     "@types/node": "^26.6.6",
     "eslint": "^10.14.0",

@@ -1,4 +1,6 @@
 import { getAssignment } from '../assignments/register.js';
+import type { ProjectAssignment } from '../assignments/schema.js';
+import { ensureDerivedCommands } from '../assignments/verification-config.js';
 import type { Store } from '../queue/store.js';
 import type { Project, Task } from '../types/index.js';
 import { defaultVerifiers } from './verifiers.js';
@@ -6,6 +8,7 @@ import {
   type DeliveryReadiness,
   type EvidenceRecord,
   type EvidenceStatus,
+  qaEvidenceKind,
   TASK_VERIFIABLE_LEVELS,
   VERIFICATION_LEVELS,
   type VerificationLevel,
@@ -16,10 +19,18 @@ export interface VerificationDeps {
   store: Store;
   timeoutMs: number;
   verifiers?: Partial<Record<VerificationLevel, Verifier>>;
+  /** project:verify derives missing commands from package.json (default true). */
+  deriveCommands?: boolean;
 }
 
 const verifierFor = (deps: VerificationDeps, level: VerificationLevel): Verifier | undefined =>
   deps.verifiers?.[level] ?? (defaultVerifiers() as Partial<Record<VerificationLevel, Verifier>>)[level];
+
+const commandsOf = (a: ProjectAssignment | null) => ({
+  build: a?.verification.buildCommand,
+  test: a?.verification.testCommand,
+  browserTest: a?.verification.browserTestCommand,
+});
 
 /**
  * Task-level gate run by the worker AFTER the provider claims success. Only FAILED evidence blocks completion;
@@ -45,7 +56,7 @@ export async function verifyTask(
       taskId: task.id,
       cwd,
       baseline: level === 'CHANGES_EXIST' ? (store.taskBaseline(task.id) ?? undefined) : undefined,
-      commands: { build: assignment?.verification.buildCommand, test: assignment?.verification.testCommand },
+      commands: commandsOf(assignment),
       timeoutMs: deps.timeoutMs,
     });
     all.push(
@@ -97,6 +108,9 @@ export async function verifyProject(
   cwd: string,
 ): Promise<{ readiness: DeliveryReadiness; evidence: EvidenceRecord[] }> {
   const { store } = deps;
+  // A5: a project whose assignment configures no command gets them derived from package.json (audited, persisted),
+  // so the run records real execution evidence instead of NOT_CONFIGURED. Owner-set commands are never overridden.
+  if (deps.deriveCommands !== false) ensureDerivedCommands(store, project.id, cwd, 'project:verify');
   const assignment = getAssignment(store, project.id);
   const evidence: EvidenceRecord[] = [];
   const tasks = store.listTasks({ projectId: project.id });
@@ -121,12 +135,15 @@ export async function verifyProject(
     'SECURITY_CHECKS_PASS',
   ] as const) {
     const v = verifierFor(deps, level)!;
-    const res = await v.verify({
-      projectId: project.id,
-      cwd,
-      commands: { build: assignment?.verification.buildCommand, test: assignment?.verification.testCommand },
-      timeoutMs: deps.timeoutMs,
-    });
+    const res =
+      level === 'REQUIREMENTS_SATISFIED' && !deps.verifiers?.REQUIREMENTS_SATISFIED
+        ? requirementCoverage(store, project.id)
+        : await v.verify({
+            projectId: project.id,
+            cwd,
+            commands: commandsOf(assignment),
+            timeoutMs: deps.timeoutMs,
+          });
     evidence.push(
       store.addEvidence({
         projectId: project.id,
@@ -159,6 +176,101 @@ export async function verifyProject(
     }
   }
   return { readiness, evidence };
+}
+
+/**
+ * Project-level REQUIREMENTS_SATISFIED: every planned requirement must be implemented by at least one task whose
+ * latest independent review (task-level REQUIREMENTS_SATISFIED evidence, src/engineering/qa.ts) PASSED.
+ * Without independent reviews the answer is NOT_EVALUATED - never an implicit pass.
+ */
+export function requirementCoverage(
+  store: Store,
+  projectId: string,
+): { status: EvidenceStatus; summary: string; evidence: Record<string, unknown> } {
+  const reqs = store.db.prepare('SELECT req_id FROM requirements WHERE project_id = ?').all(projectId) as {
+    req_id: string;
+  }[];
+  const links = store.db
+    .prepare(
+      `SELECT p.task_id, p.requirement_ids, t.status, t.verification_required FROM plan_tasks p JOIN tasks t ON t.id = p.task_id WHERE t.project_id = ?`,
+    )
+    .all(projectId) as {
+    task_id: string;
+    requirement_ids: string;
+    status: string;
+    verification_required: string;
+  }[];
+  if (!reqs.length || !links.some((l) => l.verification_required.includes('REQUIREMENTS_SATISFIED')))
+    return {
+      status: 'NOT_EVALUATED',
+      summary: 'no planned tasks with independent review: requirement coverage cannot be evaluated',
+      evidence: { requirements: reqs.length },
+    };
+  const kindOf = (taskId: string) => {
+    const e = store.listEvidence({ taskId, level: 'REQUIREMENTS_SATISFIED' }).at(-1);
+    return e ? qaEvidenceKind(e) : 'other';
+  };
+  const done = links.filter((l) => l.status === 'COMPLETED');
+  const verified = new Set(done.filter((l) => kindOf(l.task_id) === 'verified').map((l) => l.task_id));
+  const accepted = new Set(done.filter((l) => kindOf(l.task_id) === 'owner_accepted').map((l) => l.task_id));
+  // v2 review fix (A1 interplay): since contributing tasks no longer judge requirements they only contribute to, a
+  // requirement is verified only by a task whose latest PASSED review judged THAT id met as one of its own criteria
+  // (normally the owner task) - not by any passing linked task.
+  const judgedMet = (taskId: string): Set<string> => {
+    const row = store.db
+      .prepare(
+        "SELECT result FROM qa_reviews WHERE task_id = ? AND status = 'PASSED' ORDER BY round DESC LIMIT 1",
+      )
+      .get(taskId) as { result: string | null } | undefined;
+    const out = new Set<string>();
+    try {
+      const res = JSON.parse(row?.result ?? '{}') as {
+        criteria?: { id: string; met: boolean }[];
+        unmet?: { id: string }[];
+      };
+      const unmet = new Set((res.unmet ?? []).map((u) => u.id));
+      for (const c of res.criteria ?? []) if (c.met && !unmet.has(c.id)) out.add(c.id);
+    } catch {
+      /* no usable review result: judges nothing */
+    }
+    return out;
+  };
+  const judged = new Map([...verified].map((t) => [t, judgedMet(t)]));
+  const byReq: Record<string, string[]> = {};
+  const acceptedOnly: Record<string, string[]> = {};
+  for (const r of reqs) {
+    const linked = links.filter((l) => (JSON.parse(l.requirement_ids) as string[]).includes(r.req_id));
+    byReq[r.req_id] = linked
+      .filter((l) => verified.has(l.task_id) && judged.get(l.task_id)!.has(r.req_id))
+      .map((l) => l.task_id);
+    if (!byReq[r.req_id]!.length) {
+      const acc = linked.filter((l) => accepted.has(l.task_id)).map((l) => l.task_id);
+      if (acc.length) acceptedOnly[r.req_id] = acc;
+    }
+  }
+  const missing = Object.entries(byReq)
+    .filter(([id, t]) => t.length === 0 && !acceptedOnly[id])
+    .map(([id]) => id);
+  if (missing.length)
+    return {
+      status: 'FAILED',
+      summary: `${missing.length} of ${reqs.length} requirement(s) without an independently verified implementation: ${missing.join(', ')}`,
+      evidence: { byRequirement: byReq, acceptedOnly, missing },
+    };
+  // Owner acceptance is never independent verification (v2): requirements covered only by owner-accepted tasks keep
+  // the project level at OWNER_ACCEPTED (acceptance then needs an explicit acknowledgement), not PASSED.
+  const acc = Object.keys(acceptedOnly);
+  return acc.length
+    ? {
+        status: 'OWNER_ACCEPTED',
+        summary: `${reqs.length - acc.length} of ${reqs.length} requirement(s) independently verified; ${acc.length} covered only by owner-accepted tasks (accepted, not verified): ${acc.join(', ')}`,
+        evidence: { byRequirement: byReq, acceptedOnly },
+      }
+    : {
+        status: 'PASSED',
+        summary: `all ${reqs.length} requirement(s) implemented by independently reviewed tasks`,
+        evidence: { byRequirement: byReq },
+      };
 }
 
 export class AcceptanceRefusedError extends Error {

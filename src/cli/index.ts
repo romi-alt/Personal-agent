@@ -1,19 +1,36 @@
 #!/usr/bin/env node
 import { spawn, execFile } from 'node:child_process';
-import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { accessSync, constants, mkdirSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
+import { cleanScratchDir } from '../workspaces/scratch-cleanup.js';
 import { promisify } from 'node:util';
 import { ConfigError } from '../config/index.js';
 import { createApp, type App } from '../core/app.js';
+import { readTextFile } from '../core/text.js';
 import { createIntegrations, EVENT_MAPPING } from '../integrations/index.js';
 import { MEMORY_SECTIONS } from '../memory/context.js';
 import { reconcileOrphans } from '../recovery/reconcile.js';
 import { registerAssignment, getAssignment } from '../assignments/register.js';
 import { AssignmentValidationError } from '../assignments/schema.js';
+import {
+  COMMAND_KEYS,
+  type CommandKey,
+  deriveVerificationCommands,
+  setVerificationCommands,
+  VerificationConfigError,
+} from '../assignments/verification-config.js';
+import { manualTaskPolicy } from '../verification/task-policy.js';
+import { inferRole } from '../engineering/roles.js';
 import { buildProjectContext } from '../assignments/context.js';
+import { readAttachments, submitIntake } from '../assignments/intake.js';
+import { decideApproval, taskAction, type TaskAction } from '../control/owner-actions.js';
+import { ensureOwnerToken, tokenFile } from '../dashboard/auth.js';
+import { startDashboard } from '../dashboard/server.js';
+import { createBackup, listBackups, restoreBackup, verifyBackup } from '../ops/backup.js';
+import { projectRoadmap } from '../planning/roadmap-service.js';
 import {
   acceptProject,
   AcceptanceRefusedError,
@@ -26,6 +43,7 @@ import { buildInbox } from '../progress/inbox.js';
 import { listSnapshots, recordSnapshotIfChanged } from '../progress/snapshots.js';
 import type { Plan } from '../planning/schemas.js';
 import { EnvCredentialSource } from '../providers/claude/credentials.js';
+import { strippedVariableNames } from '../providers/claude-cli/env.js';
 import { Supervisor } from '../supervisor/supervisor.js';
 import { startHealthServer } from '../supervisor/health.js';
 import { buildStatus } from '../supervisor/status.js';
@@ -74,25 +92,41 @@ const OPTIONS = {
   question: { type: 'string' },
   text: { type: 'string' },
   assume: { type: 'boolean' },
+  attach: { type: 'string', multiple: true },
+  port: { type: 'string' },
+  rotate: { type: 'boolean' },
+  hold: { type: 'boolean' },
+  'dry-run': { type: 'boolean' },
+  build: { type: 'string' },
+  test: { type: 'string' },
+  'browser-test': { type: 'string' },
+  clear: { type: 'string' },
+  derive: { type: 'boolean' },
+  'no-review': { type: 'boolean' },
+  verify: { type: 'string' },
   history: { type: 'boolean' },
 } as const;
 
-const HELP = `ELEVARIQ Personal Agent - Phase 1
+const HELP = `ELEVARIQ Personal Agent
 
 Usage: npm run agent -- <command> [options]
 
   doctor                      Verify environment, configuration and provider readiness
   start [--detach]            Run the supervisor (foreground, or detached background process)
-  stop [--wait <ms>]          Request graceful shutdown of the running supervisor
+  stop [--wait <ms>] [--hold]  Graceful shutdown; --hold also stops background restarts until the next explicit start
   status [--json]             Supervisor, worker, queue, waiting tasks, checkpoint, auth and provider state
   health                      Exit 0 only if the supervisor is live, the DB is healthy and auth is ready
   projects                    List projects
   project:add --name N [--description D] [--path P --allow-dirty] [--priority N]
   workspaces                  List approved workspace roots
   workspace:approve <path>    Explicitly approve an existing directory as a workspace root
+  scratch:clean <project> <dir> [--dry-run]   Delete ONE generated scratch dir (.qa-*/.scratch-*/.tmp-*) inside the
+                              project workspace; refuses links, traversal, roots; audited in logs/scratch-cleanup.jsonl
   tasks [--project P] [--status S]
-  task:add --project P (--title T --instructions I | --file F.json|F.md) [--criteria C] [--depends id,id]
-           [--priority N] [--max-retries N] [--key K] [--start-at ISO]
+  task:add --project P (--title T --instructions I | --file F.json|F.md) --criteria C [--depends id,id]
+           [--priority N] [--max-retries N] [--key K] [--start-at ISO] [--verify L1,L2]
+           [--no-review --reason R]   Coding tasks get the same independent QA as planned tasks; acceptance
+                                      criteria are required unless review is explicitly waived (audited)
   task:show <id>              Task details, state transitions, executions and checkpoints
   task:pause|task:resume|task:cancel|task:retry|task:unblock <id>
   approvals                   List approval requests;   approve <id> [--by name] | deny <id>
@@ -100,8 +134,25 @@ Usage: npm run agent -- <command> [options]
   recovery [--run]            Show recovery state; --run reconciles orphaned tasks (only if no supervisor is live)
   integrations                ERP/CRM adapter health (mock adapters in Phase 1) and event-mapping spec
   memory:set <project> <section> <text> | memory:get <project> [section]
+  intake "<assignment text>" [--name N] [--attach FILE]... [--path DIR [--allow-dirty]]
+                                           Natural-language project assignment -> structured contract -> planning
+  research:show <project> [--json]         Research findings: verified (citation retrieved) vs assumption, sources, dates
+  adr:list <project> [--json]              Architecture Decision Records (status, significance, files)
+  architecture:show <project> [--json]     Architecture specification per area (+ diagrams in docs/architecture)
+  roadmap <project> [--json]               Milestones, epics, tasks, dependencies, critical path, VERIFIED progress
+  review:show <project> [--json]           Planning review rounds (deterministic + independent model review)
+  qa [project] [--json]                    Independent QA reviews of completed tasks: rounds, corrections, escalations
+  dashboard [--port N]                     Owner command center (local-only web UI, owner-token login)
+  dashboard:token [--rotate]               Show (or rotate) the command-center owner token
+  backup [--path DIR]                      Online database backup + verification (the supervisor also backs up on BACKUP_INTERVAL_HOURS)
+  backup:list | backup:verify [file]       List backups / restore drill (checksum, integrity_check, row counts)
+  restore <file> --reason R                Restore a verified backup (supervisor must be stopped; old DB is kept)
   assignment:add --file assignment.json    Validate + register a project assignment (see examples/assignment.example.json)
   assignment:show <project>                Persisted assignment contract
+  assignment:set-verification <project> --by NAME --reason R [--build CMD] [--test CMD] [--browser-test CMD]
+                              [--clear build,test,browser-test] [--derive]
+                                           Owner-only, audited: set verification commands after intake
+                                           (--derive: take them from the workspace package.json scripts)
   project:status <project>                 Lifecycle, task progress, spend and delivery readiness
   project:verify <project>                 Run independent verification (changes/build/tests); records evidence
   project:accept <project> [--acknowledge-unverified "why"]   Owner acceptance (never automatic)
@@ -118,6 +169,34 @@ Usage: npm run agent -- <command> [options]
   provider:verify --access                 Non-billable API key check (GET /v1/models); records API_ACCESS_VERIFIED
 `;
 
+const OWNER_ONLY_COMMANDS = new Set([
+  'approve',
+  'deny',
+  'project:accept',
+  'project:deliver',
+  'project:verify',
+  'project:add',
+  'assignment:add',
+  'assignment:set-verification',
+  'task:add',
+  'task:unblock',
+  'task:retry',
+  'task:cancel',
+  'task:pause',
+  'task:resume',
+  'restore',
+  'workspace:approve',
+  'dashboard:token',
+  'memory:set',
+  'plan:start',
+  'workflow:answer',
+  'workflow:resume',
+  'workflow:cancel',
+  'intake',
+  'start',
+  'stop',
+]);
+
 function fail(msg: string, code = 1): never {
   process.stderr.write(`error: ${msg}\n`);
   process.exit(code);
@@ -131,6 +210,10 @@ async function main(): Promise<void> {
     strict: true,
   });
   const [cmd, ...rest] = positionals;
+  // Defense in depth (v2 review): owner-only commands refuse to run inside a coding worker's environment. The policy
+  // hook already hard-denies agent CLI invocations by workers; this catches invocations that slipped past text rules.
+  if (cmd && process.env['ELEVARIQ_WORKER'] === '1' && OWNER_ONLY_COMMANDS.has(cmd))
+    fail(`"${cmd}" is an owner-only command and cannot be run from a coding worker`, 2);
   if (!cmd || values.help || cmd === 'help') {
     process.stdout.write(HELP);
     return;
@@ -180,10 +263,12 @@ async function main(): Promise<void> {
           add('git', 'FAIL', 'git not found on PATH');
         }
         try {
-          const { stdout } = await execFileP('claude', ['--version'], {
-            timeout: 15000,
-            shell: process.platform === 'win32',
-          });
+          // Windows needs a shell to resolve claude.cmd/.exe; pass one constant command string (no args array:
+          // Node 24+ deprecates args with shell=true, DEP0190).
+          const { stdout } =
+            process.platform === 'win32'
+              ? await execFileP('claude --version', [], { timeout: 15000, shell: true })
+              : await execFileP('claude', ['--version'], { timeout: 15000 });
           add('claude code cli', 'OK', stdout.trim());
         } catch {
           add('claude code cli', 'WARN', 'not found (optional: used only for diagnostics)');
@@ -205,6 +290,8 @@ async function main(): Promise<void> {
         break;
       }
       case 'start': {
+        // An explicit start ends a `stop --hold` (wrappers check the marker before ever launching `start`).
+        rmSync(path.join(config.agentHome, 'STOP-HOLD'), { force: true });
         if (values.detach) {
           const child = spawn(
             process.execPath,
@@ -222,6 +309,7 @@ async function main(): Promise<void> {
           registry,
           log: app.log,
           workflows: app.workflows,
+          qa: app.qa,
         });
         const onSignal = (sig: string) => sup.requestStop(`received ${sig}`);
         for (const s of ['SIGINT', 'SIGTERM', 'SIGBREAK'] as const) process.on(s, () => onSignal(s));
@@ -247,6 +335,14 @@ async function main(): Promise<void> {
         break;
       }
       case 'stop': {
+        if (values.hold) {
+          // Background wrappers (Task Scheduler keepalive/logon) honour this marker and do not restart the agent.
+          writeFileSync(
+            path.join(config.agentHome, 'STOP-HOLD'),
+            `held by owner at ${new Date().toISOString()}\n`,
+          );
+          out(`STOP-HOLD set: background restarts are suspended until "start" is run explicitly`);
+        }
         const sup = store.getSupervisorState();
         if (!sup || !store.supervisorIsLive(sup, config.leaseTtlMs)) {
           out('no live supervisor');
@@ -386,6 +482,23 @@ async function main(): Promise<void> {
         out(`approved workspace ${w.path}`);
         break;
       }
+      case 'scratch:clean': {
+        if (!rest[0] || !rest[1]) fail('usage: scratch:clean <project> <dir> [--dry-run]');
+        const p = resolveProject(rest[0]);
+        const managed = registry.root;
+        const r = cleanScratchDir({
+          agentHome: config.agentHome,
+          workspace: p.repoPath,
+          allowedRoots: [managed],
+          approvedWorkspaces: registry.approvedRoots().filter((w) => w !== managed),
+          target: rest[1],
+          actor: values.by ?? 'owner-cli',
+          dryRun: !!values['dry-run'],
+        });
+        out(`${r.status}: ${r.reason}${r.resolved ? ` (${r.resolved})` : ''}`);
+        if (r.status === 'refused') process.exitCode = 1;
+        break;
+      }
       case 'tasks': {
         const statuses = values.status ? ([values.status.toUpperCase()] as TaskStatus[]) : undefined;
         if (statuses?.some((s) => !TASK_STATUSES.includes(s)))
@@ -421,7 +534,7 @@ async function main(): Promise<void> {
           : [];
         let priority = values.priority ? Number(values.priority) : 0;
         if (values.file) {
-          const text = readFileSync(values.file, 'utf8');
+          const text = readTextFile(values.file);
           if (values.file.endsWith('.json')) {
             const j = JSON.parse(text) as {
               title?: string;
@@ -440,11 +553,28 @@ async function main(): Promise<void> {
             const m = text.replace(/\r\n/g, '\n').match(/^#\s+(.+)\n([\s\S]*)$/);
             title ??= m?.[1]?.trim() ?? path.basename(values.file);
             instructions ??= (m?.[2] ?? text).trim();
+            // Acceptance criteria: an "## Acceptance criteria" section or an "Acceptance: ..." line (A6).
+            const acc =
+              /^#{2,}\s*acceptance(?:\s+criteria)?\s*\r?\n([\s\S]*?)(?=\r?\n#|$(?![\s\S]))/im.exec(
+                text,
+              )?.[1] ?? /^acceptance(?:\s+criteria)?\s*:\s*(.+)$/im.exec(text)?.[1];
+            criteria ||= acc?.trim() ?? '';
           }
         }
         if (!title || !instructions) fail('task needs --title and --instructions (or --file)');
+        const asg = getAssignment(store, p.id);
+        const policy = manualTaskPolicy({
+          independentReview: config.independentReview,
+          criteria,
+          noReview: values['no-review'],
+          reason: values.reason,
+          verify: values.verify,
+          commands: { build: asg?.verification.buildCommand, test: asg?.verification.testCommand },
+        });
+        if (!policy.ok) fail(policy.error, 2);
         const { task, created } = store.enqueueTask({
           projectId: p.id,
+          kind: 'CODING',
           title,
           instructions,
           acceptanceCriteria: criteria,
@@ -453,10 +583,24 @@ async function main(): Promise<void> {
           maxRetries: values['max-retries'] ? Number(values['max-retries']) : config.defaultMaxRetries,
           scheduledStart: values['start-at'] ? Date.parse(values['start-at']) : null,
           dedupeKey: values.key,
+          verificationRequired: policy.verificationRequired,
+          role: inferRole(`${title}\n${instructions}`),
         });
+        if (created)
+          store.recordEvent({
+            type: 'task.verification_policy',
+            projectId: p.id,
+            taskId: task.id,
+            payload: {
+              source: 'task:add',
+              verificationRequired: policy.verificationRequired,
+              independentReview: policy.review,
+              reviewWaivedReason: policy.waived,
+            },
+          });
         out(
           created
-            ? `queued task ${task.id}: ${task.title}`
+            ? `queued task ${task.id}: ${task.title}\n  verification: ${policy.verificationRequired.join(', ')}${policy.review ? ' (independent review)' : ` (review WAIVED: ${policy.waived ?? 'INDEPENDENT_REVIEW=false'})`}`
             : `duplicate ignored; existing task ${task.id} (${task.status})`,
         );
         break;
@@ -530,23 +674,11 @@ async function main(): Promise<void> {
       case 'task:cancel':
       case 'task:retry':
       case 'task:unblock': {
-        const t = store.getTask(rest[0] ?? '');
-        if (!t) fail(`unknown task ${rest[0] ?? ''}`);
-        const map: Record<string, [TaskStatus, string]> = {
-          'task:pause': ['PAUSED', 'paused by owner'],
-          'task:resume': ['READY', 'resumed by owner'],
-          'task:cancel': ['CANCELLED', 'cancelled by owner'],
-          'task:retry': ['QUEUED', 'manual retry by owner'],
-          'task:unblock': ['READY', 'unblocked by owner'],
-        };
-        const [to, reason] = map[cmd]!;
-        const patch =
-          cmd === 'task:retry'
-            ? { resetAttempts: true, nextEligibleAt: null, lastErrorClass: null, lastErrorMessage: null }
-            : cmd === 'task:unblock'
-              ? { nextEligibleAt: null, resetInterruptions: true, providerFailureStreak: 0 }
-              : { nextEligibleAt: null };
-        const r = store.transition(t.id, to, { reason, patch });
+        if (!store.getTask(rest[0] ?? '')) fail(`unknown task ${rest[0] ?? ''}`);
+        const r = taskAction(store, rest[0]!, cmd.slice('task:'.length) as TaskAction, {
+          by: values.by ?? 'owner',
+          channel: 'cli',
+        });
         out(`task ${r.id} -> ${r.status}`);
         break;
       }
@@ -567,22 +699,13 @@ async function main(): Promise<void> {
         break;
       case 'approve':
       case 'deny': {
-        const a = store.decideApproval(
+        const a = decideApproval(
+          store,
           rest[0] ?? '',
           cmd === 'approve' ? 'APPROVED' : 'DENIED',
-          values.by ?? 'owner-cli',
+          { by: values.by ?? 'owner-cli', channel: 'cli' },
+          values.reason,
         );
-        if (a.taskId) {
-          const open = store.listApprovals('PENDING').filter((x) => x.taskId === a.taskId);
-          const t = store.requireTask(a.taskId);
-          if (t.status === 'WAITING_FOR_APPROVAL' && open.length === 0) {
-            store.transition(t.id, cmd === 'approve' ? 'READY' : 'BLOCKED', {
-              reason:
-                cmd === 'approve' ? 'owner approved requested action(s)' : 'owner denied requested action',
-              patch: { nextEligibleAt: null },
-            });
-          }
-        }
         out(`${a.id} ${a.status}`);
         break;
       }
@@ -651,6 +774,7 @@ async function main(): Promise<void> {
             runner,
             registry,
             providerName: provider.name,
+            workerImage: provider.workerImage,
           });
           out(
             acts.length
@@ -993,11 +1117,285 @@ async function main(): Promise<void> {
         }
         break;
       }
+      case 'intake': {
+        // Natural-language assignment: `intake "Build a complete educational ERP ..." [--attach spec.md ...]`
+        const text = values.text ?? rest.join(' ');
+        if (!text.trim())
+          fail(
+            'usage: intake "<assignment in your own words>" [--name N] [--attach FILE ...] [--path DIR [--allow-dirty]]',
+          );
+        try {
+          const { project, run } = await submitIntake(store, registry, app.workflows, provider.name, {
+            text,
+            name: values.name,
+            attachments: readAttachments(values.attach ?? []),
+            existing: values.path ? { path: values.path, allowDirty: !!values['allow-dirty'] } : undefined,
+            priority: values.priority ? Number(values.priority) : undefined,
+          });
+          out(`project ${project.id} (${project.slug}) at ${project.repoPath}`);
+          out(`planning run ${run.id} started at the intake step; the running supervisor executes it.`);
+          out(`Follow it: npm run agent -- workflow:show ${run.id}`);
+        } catch (e) {
+          fail((e as Error).message);
+        }
+        break;
+      }
+      case 'research:show': {
+        const p = resolveProject(rest[0]);
+        const f = app.workflows.repo.listFindings(p.id);
+        if (values.json) {
+          out(JSON.stringify(f, null, 2));
+          break;
+        }
+        out(
+          table(
+            f.map((x) => ({
+              id: x.findingId,
+              area: x.area,
+              kind: x.kind + (x.claimedKind !== x.kind ? ` (claimed ${x.claimedKind})` : ''),
+              conf: x.confidence,
+              citation: x.citationCheck,
+              sources: x.sources.map((s) => s.url).join(' ') || '-',
+              statement: x.statement.slice(0, 70),
+            })),
+            ['id', 'area', 'kind', 'conf', 'citation', 'sources', 'statement'],
+          ),
+        );
+        break;
+      }
+      case 'adr:list': {
+        const p = resolveProject(rest[0]);
+        const adrs = app.workflows.repo.listAdrs(p.id);
+        if (values.json) {
+          out(JSON.stringify(adrs, null, 2));
+          break;
+        }
+        out(
+          table(
+            adrs.map((a) => ({
+              no: String(a.number).padStart(4, '0'),
+              id: a.adrId,
+              status: a.status,
+              significant: a.significant ? 'yes' : '',
+              date: fmtTime(a.decidedAt),
+              title: a.title,
+              file: a.filePath ?? '-',
+            })),
+            ['no', 'id', 'status', 'significant', 'date', 'title', 'file'],
+          ),
+        );
+        break;
+      }
+      case 'architecture:show': {
+        const p = resolveProject(rest[0]);
+        const spec = app.workflows.repo.latestSpec(p.id);
+        if (!spec) fail('no architecture has been produced for this project yet');
+        if (values.json) {
+          out(JSON.stringify(spec, null, 2));
+          break;
+        }
+        for (const [k, v] of Object.entries(spec.sections)) out(`## ${k}\n${v || '(not specified)'}\n`);
+        out(
+          `Diagrams: ${spec.diagrams.map((d) => d.title).join(', ') || 'none'}  (rendered in docs/architecture/ARCHITECTURE.md)`,
+        );
+        break;
+      }
+      case 'roadmap': {
+        const p = resolveProject(rest[0]);
+        const r = projectRoadmap(store, app.workflows.repo, p.id);
+        if (values.json) {
+          out(JSON.stringify(r, null, 2));
+          break;
+        }
+        const pct = (x: number) => `${Math.round(x * 100)}%`;
+        out(
+          `Verified progress: ${r.progress.overall.delivered}/${r.progress.overall.total} tasks delivered (${pct(r.progress.overall.ratio)} by size)`,
+        );
+        out(
+          `Critical path (remaining): ${r.criticalPath.path.join(' -> ') || '-'}  weight ${r.criticalPath.weight}`,
+        );
+        out(
+          '\nMilestones:\n' +
+            table(
+              r.milestones.map((m) => {
+                const g = r.progress.milestones.find((x) => x.key === m.key);
+                return {
+                  key: m.key,
+                  title: m.title,
+                  delivered: `${g?.delivered ?? 0}/${g?.total ?? 0}`,
+                  progress: pct(g?.ratio ?? 0),
+                };
+              }),
+              ['key', 'title', 'delivered', 'progress'],
+            ),
+        );
+        if (r.epics.length)
+          out(
+            '\nEpics:\n' +
+              table(
+                r.epics.map((e) => {
+                  const g = r.progress.epics.find((x) => x.key === e.key);
+                  return { key: e.key, title: e.title, delivered: `${g?.delivered ?? 0}/${g?.total ?? 0}` };
+                }),
+                ['key', 'title', 'delivered'],
+              ),
+          );
+        out(
+          '\nTasks:\n' +
+            table(
+              r.tasks.map((t) => ({
+                key: t.key,
+                milestone: t.milestone,
+                epic: t.epic ?? '-',
+                size: t.size,
+                status: t.status,
+                verified: t.delivered ? 'yes' : `${t.passed.length}/${t.required.length}`,
+                depends: t.dependsOn.join(',') || '-',
+                critical: r.criticalPath.path.includes(t.key) ? '*' : '',
+                title: t.title.slice(0, 50),
+              })),
+              ['key', 'milestone', 'epic', 'size', 'status', 'verified', 'depends', 'critical', 'title'],
+            ),
+        );
+        break;
+      }
+      case 'dashboard': {
+        const port = values.port ? Number(values.port) : config.dashboard.port;
+        const server = await startDashboard(app, { ...config.dashboard, port });
+        out(
+          `ELEVARIQ command center on http://${config.dashboard.host === '::1' ? '[::1]' : config.dashboard.host}:${port}/`,
+        );
+        out(
+          `Sign in with the owner token in ${tokenFile(config.agentHome)} (show it: npm run agent -- dashboard:token)`,
+        );
+        await new Promise<void>((resolve) => {
+          for (const s of ['SIGINT', 'SIGTERM', 'SIGBREAK'] as const)
+            process.on(s, () => server.close(() => resolve()));
+        });
+        break;
+      }
+      case 'backup': {
+        const m = await createBackup(app.db, values.path ?? config.backup.dir);
+        const v = verifyBackup(path.join(values.path ?? config.backup.dir, m.file));
+        out(
+          `backup ${m.file} (${m.bytes} bytes, schema v${m.schemaVersion}) ${v.ok ? 'verified' : 'VERIFY FAILED: ' + v.problems.join('; ')}`,
+        );
+        out(
+          `counts: ${Object.entries(m.counts)
+            .map(([k, n]) => `${k}=${n}`)
+            .join(' ')}`,
+        );
+        if (!v.ok) process.exitCode = 1;
+        break;
+      }
+      case 'backup:list': {
+        out(
+          table(
+            listBackups(config.backup.dir).map((m) => ({
+              file: m.file,
+              created: fmtTime(m.createdAt),
+              bytes: m.bytes,
+              schema: m.schemaVersion,
+              tasks: m.counts['tasks'] ?? '-',
+            })),
+            ['file', 'created', 'bytes', 'schema', 'tasks'],
+          ),
+        );
+        break;
+      }
+      case 'backup:verify': {
+        const f = rest[0]
+          ? path.resolve(rest[0])
+          : (() => {
+              const l = listBackups(config.backup.dir).at(-1);
+              return l ? path.join(config.backup.dir, l.file) : '';
+            })();
+        if (!f) fail('no backup found');
+        const v = verifyBackup(f);
+        out(v.ok ? `OK ${f}` : `FAILED ${f}\n  ${v.problems.join('\n  ')}`);
+        if (!v.ok) process.exitCode = 1;
+        break;
+      }
+      case 'restore': {
+        if (!rest[0]) fail('usage: restore <backup-file> --reason "why"   (supervisor must be stopped)');
+        const sup = store.getSupervisorState();
+        if (sup && store.supervisorIsLive(sup, config.leaseTtlMs))
+          fail('a supervisor is live: stop it first (npm run agent -- stop)');
+        if (!values.reason) fail('restore replaces the database: pass --reason "..." to confirm');
+        app.close();
+        const r = restoreBackup(path.resolve(rest[0]), config.databasePath);
+        out(`restored ${rest[0]} -> ${config.databasePath}`);
+        if (r.previous) out(`previous database kept at ${r.previous}`);
+        const after = createApp();
+        after.store.recordEvent({
+          type: 'backup.restored',
+          severity: 'warn',
+          payload: { file: path.basename(rest[0]), previous: r.previous, reason: values.reason },
+        });
+        after.close();
+        return;
+      }
+      case 'dashboard:token': {
+        const t = ensureOwnerToken(config.agentHome, !!values.rotate);
+        out(
+          values.rotate
+            ? 'owner token rotated (restart the dashboard to end existing sessions):'
+            : 'owner token:',
+        );
+        out(t);
+        out(`stored in ${tokenFile(config.agentHome)}`);
+        break;
+      }
+      case 'qa': {
+        const p = values.project ? resolveProject(values.project) : rest[0] ? resolveProject(rest[0]) : null;
+        const rows = app.qa.rows().filter((r) => !p || store.getTask(r.taskId)?.projectId === p.id);
+        if (values.json) {
+          out(
+            JSON.stringify(
+              rows.map((r) => ({ ...r, result: app.qa.result(r.taskId, r.round) })),
+              null,
+              2,
+            ),
+          );
+          break;
+        }
+        out(
+          table(
+            rows.map((r) => ({
+              task: r.taskId,
+              title: (store.getTask(r.taskId)?.title ?? '').slice(0, 40),
+              round: r.round,
+              status: r.status,
+              review: r.reviewTaskId ?? '-',
+              correction: r.correctionTaskId ?? '-',
+              approval: r.approvalId ?? '-',
+            })),
+            ['task', 'title', 'round', 'status', 'review', 'correction', 'approval'],
+          ),
+        );
+        break;
+      }
+      case 'review:show': {
+        const p = resolveProject(rest[0]);
+        const run = app.workflows.repo.listRuns({ projectId: p.id }).at(-1);
+        if (!run) fail('no planning run for this project');
+        const reviews = app.workflows.repo.listReviews(run.id);
+        if (values.json) {
+          out(JSON.stringify(reviews, null, 2));
+          break;
+        }
+        for (const r of reviews) {
+          out(`Round ${r.round} ${r.source}: ${r.verdict}`);
+          for (const i of r.issues) out(`  [${i.severity}] ${i.category} ${i.id}: ${i.description}`);
+        }
+        if (!reviews.length) out('(no review yet)');
+        break;
+      }
       case 'assignment:add': {
         if (!values.file) fail('usage: assignment:add --file assignment.json');
         let raw: unknown;
         try {
-          raw = JSON.parse(readFileSync(values.file, 'utf8'));
+          raw = JSON.parse(readTextFile(values.file));
         } catch (e) {
           fail(`cannot read ${values.file}: ${(e as Error).message}`);
         }
@@ -1021,6 +1419,43 @@ async function main(): Promise<void> {
         const p = resolveProject(rest[0]);
         const a = getAssignment(store, p.id);
         out(a ? JSON.stringify(a, null, 2) : '(no assignment registered for this project)');
+        break;
+      }
+      case 'assignment:set-verification': {
+        const p = resolveProject(rest[0]);
+        const changes: Partial<Record<CommandKey, string | null>> = {};
+        if (values.derive) Object.assign(changes, deriveVerificationCommands(p.repoPath));
+        if (values.build !== undefined) changes.buildCommand = values.build;
+        if (values.test !== undefined) changes.testCommand = values.test;
+        if (values['browser-test'] !== undefined) changes.browserTestCommand = values['browser-test'];
+        const names: Record<string, CommandKey> = {
+          build: 'buildCommand',
+          test: 'testCommand',
+          'browser-test': 'browserTestCommand',
+        };
+        for (const c of (values.clear ?? '')
+          .split(',')
+          .map((s) => s.trim())
+          .filter(Boolean)) {
+          if (!names[c]) fail(`--clear takes build, test and/or browser-test (got "${c}")`, 2);
+          changes[names[c]] = null;
+        }
+        if (!Object.keys(changes).length)
+          fail('nothing to set: give --build/--test/--browser-test, --clear or --derive', 2);
+        try {
+          const r = setVerificationCommands(store, p.id, changes, {
+            by: values.by ?? '',
+            reason: values.reason ?? '',
+            source: 'owner',
+          });
+          out(`verification commands for ${p.slug} updated (audited as assignment.verification_changed)`);
+          for (const k of COMMAND_KEYS)
+            out(`  ${k.padEnd(19)} ${r.before[k] ?? '(none)'}  ->  ${r.after[k] ?? '(none)'}`);
+        } catch (e) {
+          if (e instanceof VerificationConfigError || e instanceof AssignmentValidationError)
+            fail(e.message, 2);
+          throw e;
+        }
         break;
       }
       case 'project:status': {
@@ -1101,6 +1536,32 @@ async function main(): Promise<void> {
         break;
       }
       case 'provider:status': {
+        if (config.provider === 'claude-cli') {
+          // Native CLI: local checks only (version, stored login state); no model request is made.
+          const pre = await app.provider.preflight();
+          const rep = {
+            provider: 'claude-cli',
+            ready: pre.ready,
+            detail: pre.detail,
+            missing: pre.missing,
+            minVersion: config.claudeCli.minVersion,
+            injectedEnv: config.claudeCli.watchdogEnv,
+            strippedFromWorkerEnv: strippedVariableNames(process.env),
+          };
+          if (values.json) out(JSON.stringify(rep, null, 2));
+          else {
+            out(
+              `Provider: claude-cli (native Claude Code, subscription login)   ready: ${pre.ready ? 'YES' : 'NO'}`,
+            );
+            out(`  ${pre.detail}`);
+            for (const m of pre.missing) out(`  missing: ${m}`);
+            out('  injected into every worker:');
+            for (const [k, v] of Object.entries(config.claudeCli.watchdogEnv)) out(`    ${k}=${v}`);
+            out(`  removed from worker env (names only): ${rep.strippedFromWorkerEnv.join(', ') || 'none'}`);
+          }
+          if (!pre.ready) process.exitCode = 1;
+          break;
+        }
         const rep = await providerReadiness(config, store, new EnvCredentialSource(config.envFile));
         if (values.json) {
           out(JSON.stringify(rep, null, 2));

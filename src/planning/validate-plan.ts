@@ -1,4 +1,4 @@
-import type { Analysis, Architecture, Plan } from './schemas.js';
+import type { Analysis, Architecture, Plan, Research } from './schemas.js';
 
 /**
  * Deterministic validators. Every property a plan must have is checked HERE, in code - never by asking the model
@@ -61,7 +61,43 @@ export function validateArchitecture(a: Architecture, requirementIds: string[]):
     if (dec.has(d.id)) errors.push(`duplicate decision id "${d.id}"`);
     dec.add(d.id);
   }
+  for (const g of a.diagrams ?? []) {
+    if (
+      !/^\s*(graph|flowchart|sequenceDiagram|classDiagram|erDiagram|stateDiagram|C4Context|journey|gantt)/.test(
+        g.mermaid,
+      )
+    )
+      errors.push(
+        `diagram "${g.title}" is not a Mermaid diagram (must start with e.g. "flowchart", "erDiagram", "sequenceDiagram")`,
+      );
+  }
   return result(errors);
+}
+
+/**
+ * Research citation check. A finding may only stay "verified" if the research session demonstrably retrieved every
+ * cited URL (it appears in the web tool evidence recorded from the provider stream). Otherwise it is downgraded to an
+ * assumption, never silently trusted. Pure and deterministic.
+ */
+export function checkCitations(
+  r: Research,
+  evidenceUrls: string[],
+  webAllowed: boolean,
+): { findings: (Research['findings'][number] & { claimedKind: string; citationCheck: string })[] } {
+  const norm = (u: string) => u.trim().replace(/#.*$/, '').replace(/\/+$/, '').toLowerCase();
+  const seen = new Set(evidenceUrls.map(norm));
+  return {
+    findings: r.findings.map((f) => {
+      if (f.kind !== 'verified')
+        return { ...f, claimedKind: f.kind, citationCheck: f.sources.length ? 'not_required' : 'none' };
+      if (!webAllowed)
+        return { ...f, claimedKind: 'verified', kind: 'assumption' as const, citationCheck: 'no_web_access' };
+      const ok = f.sources.length > 0 && f.sources.every((s) => seen.has(norm(s.url)));
+      return ok
+        ? { ...f, claimedKind: 'verified', citationCheck: 'observed' }
+        : { ...f, claimedKind: 'verified', kind: 'assumption' as const, citationCheck: 'not_observed' };
+    }),
+  };
 }
 
 /** Topological order of task keys (Kahn). Returns null if the dependency graph has a cycle. */
@@ -139,6 +175,13 @@ export function validatePlan(
       if (!known.has(id)) errors.push(`task "${t.key}" references unknown requirement "${id}"`);
       else byRequirement[id]!.push(t.key);
     }
+    for (const id of t.ownsRequirementIds ?? []) {
+      if (!t.requirementIds.includes(id))
+        errors.push(`task "${t.key}" owns requirement "${id}" but does not list it in requirementIds`);
+      const other = plan.tasks.find((o) => o !== t && (o.ownsRequirementIds ?? []).includes(id));
+      if (other && plan.tasks.indexOf(other) > plan.tasks.indexOf(t))
+        errors.push(`requirement "${id}" has more than one owner task ("${t.key}", "${other.key}")`);
+    }
     if (!t.verify.includes('CHANGES_EXIST')) {
       errors.push(
         `task "${t.key}" must require CHANGES_EXIST verification (every planned task changes the repository)`,
@@ -147,6 +190,14 @@ export function validatePlan(
   }
   for (const m of plan.milestones) {
     if (!milestoneUse.get(m.key)) errors.push(`milestone "${m.key}" has no tasks`);
+  }
+  const epicKeys = new Set<string>();
+  for (const e of plan.epics ?? []) {
+    if (epicKeys.has(e.key)) errors.push(`duplicate epic key "${e.key}"`);
+    epicKeys.add(e.key);
+  }
+  for (const t of plan.tasks) {
+    if (t.epic && !epicKeys.has(t.epic)) errors.push(`task "${t.key}" uses unknown epic "${t.epic}"`);
   }
   const uncovered = requirementIds.filter((id) => byRequirement[id]!.length === 0);
   for (const id of uncovered) errors.push(`requirement "${id}" is not implemented by any task`);

@@ -3,6 +3,7 @@ import { parseEnv } from 'node:util';
 import { homedir } from 'node:os';
 import path from 'node:path';
 import { z } from 'zod';
+import { normalizeText } from '../core/text.js';
 
 export class ConfigError extends Error {
   constructor(
@@ -32,11 +33,59 @@ const schema = z
     LOG_MAX_FILE_MB: int(20, 1),
     LOG_TO_CONSOLE: bool(true),
 
-    EXECUTION_PROVIDER: z.enum(['mock', 'claude']).default('mock'),
+    EXECUTION_PROVIDER: z.enum(['mock', 'claude', 'claude-cli']).default('mock'),
     MOCK_SCENARIO_FILE: optStr,
     CLAUDE_MODEL: optStr,
     CLAUDE_CLI_PATH: optStr,
 
+    // --- native Claude Code CLI provider (subscription login) ---
+    /** Oldest Claude Code version on which the retry-watchdog variables below were verified to exist. */
+    CLAUDE_CLI_MIN_VERSION: z
+      .string()
+      .regex(/^\d+\.\d+\.\d+$/)
+      .default('2.1.319'),
+    /** Injected into every CLI worker (never into the supervisor's own environment). */
+    CLAUDE_CODE_RETRY_WATCHDOG: bool(true),
+    // Documented range 60000..10800000; outside it Claude Code silently disables the recheck.
+    CLAUDE_CODE_RETRY_WATCHDOG_USAGE_LIMIT_RECHECK_MS: z.coerce
+      .number()
+      .int()
+      .min(60_000)
+      .max(10_800_000)
+      .default(300_000),
+    CLAUDE_CODE_RESUME_INTERRUPTED_TURN: bool(true),
+    CLAUDE_CODE_RESUME_PROMPT: z
+      .string()
+      .min(1)
+      .default(
+        'Resume from the latest durable checkpoint. Inspect existing work, determine the next incomplete task, and continue implementation without repeating completed work.',
+      ),
+    /**
+     * Longest a CLI worker process may sit in an in-process usage-limit wait before the wait is handed to the durable
+     * queue (process ends at a safe point, session kept, task WAITING_FOR_CAPACITY until the reset). 0 = no ceiling
+     * (v1 behaviour). A wait whose provider-reported reset is further away than this is handed off immediately.
+     */
+    CLAUDE_CLI_MAX_CAPACITY_WAIT_MS: int(1_800_000, 0),
+    /** After the provider-reported reset time + this grace, an in-process wait is ended and the session resumed (A10). */
+    CAPACITY_RESUME_GRACE_MS: int(60_000, 0),
+    /** A supervision-tick gap this much longer than the tick interval is treated as host sleep/suspension (A11). */
+    // 120 s (not lower): real host sleeps last minutes, while a briefly blocked event loop must not be mistaken
+    // for one (v2 review LOW finding: a block > threshold would otherwise be excluded from the budget).
+    HOST_SUSPEND_THRESHOLD_MS: int(120_000, 1_000),
+    /** A task that has waited for capacity this long without progress is escalated (A12). 0 = never. */
+    CAPACITY_ESCALATE_AFTER_MS: int(86_400_000, 0),
+    /** notify: raise an owner notification and keep waiting. block: BLOCK the task for owner review. */
+    CAPACITY_ESCALATION: z.enum(['notify', 'block']).default('notify'),
+    /** Without model output or a known capacity wait for this long, a CLI worker is treated as stalled. */
+    CLAUDE_CLI_STALL_TIMEOUT_MS: int(900_000, 10_000),
+
+    /**
+     * A9 memory policy (owner decision 2026-11-09): new workers PAUSE when available RAM drops below
+     * MIN_FREE_MEMORY_MB and RESUME only once it is back above RESUME_FREE_MEMORY_MB (hysteresis, so the scheduler does
+     * not flap). 0 = off. Running work is never killed by this policy.
+     */
+    MIN_FREE_MEMORY_MB: int(1024, 0),
+    RESUME_FREE_MEMORY_MB: int(1536, 0),
     MAX_CONCURRENT_WORKERS: int(1, 1),
     DEFAULT_MAX_RETRIES: int(3, 0),
     MAX_CONTINUATIONS: int(25, 1),
@@ -48,6 +97,25 @@ const schema = z
     PLAN_APPROVAL: z.enum(['required', 'auto']).default('required'),
     MAX_PLAN_TASKS: int(60, 1),
     MAX_PLAN_REPAIRS: int(2, 0),
+    /** Research step may use read-only WebSearch/WebFetch (never when a project requires web_access approval). */
+    RESEARCH_WEB_ACCESS: bool(true),
+    /** Write ADRs / architecture / research / review documents into the project repository. */
+    WRITE_PLAN_DOCS: bool(true),
+    /** Phase 3: planned coding tasks need an independent review before dependants run. */
+    INDEPENDENT_REVIEW: bool(true),
+    /** Owner command center (Phase 5). Loopback only unless DASHBOARD_ALLOW_REMOTE=true. */
+    DASHBOARD_HOST: z.string().default('127.0.0.1'),
+    DASHBOARD_PORT: int(4317, 1),
+    DASHBOARD_ALLOW_REMOTE: bool(false),
+    DASHBOARD_ALLOWED_HOSTS: z.string().default(''),
+    DASHBOARD_SECURE_COOKIES: bool(false),
+    /** Phase 6: online database backups by the supervisor (0 = off), kept BACKUP_RETENTION deep. */
+    BACKUP_DIR: optStr,
+    BACKUP_INTERVAL_HOURS: int(24, 0),
+    BACKUP_RETENTION: int(14, 1),
+    /** Optional owner-configured webhook for error/approval notifications (off when empty). */
+    NOTIFY_WEBHOOK_URL: optStr,
+    MAX_CORRECTION_ROUNDS: int(2, 0),
 
     BACKOFF_BASE_MS: int(30_000, 1),
     BACKOFF_MAX_MS: int(3_600_000, 1),
@@ -119,10 +187,23 @@ export interface AppConfig {
   logRetentionDays: number;
   logMaxFileBytes: number;
   logToConsole: boolean;
-  provider: 'mock' | 'claude';
+  provider: 'mock' | 'claude' | 'claude-cli';
   mockScenarioFile?: string;
   claudeModel?: string;
   claudeCliPath?: string;
+  claudeCli: {
+    minVersion: string;
+    /** Exact variables injected into each worker process. */
+    watchdogEnv: Record<string, string>;
+    maxCapacityWaitMs: number;
+    stallTimeoutMs: number;
+    resumeGraceMs: number;
+    suspendThresholdMs: number;
+  };
+  capacity: { escalateAfterMs: number; escalation: 'notify' | 'block' };
+  minFreeMemoryMb: number;
+  /** Resume threshold (>= minFreeMemoryMb). */
+  resumeFreeMemoryMb: number;
   maxConcurrentWorkers: number;
   defaultMaxRetries: number;
   maxContinuations: number;
@@ -137,6 +218,19 @@ export interface AppConfig {
   planApproval: 'required' | 'auto';
   maxPlanTasks: number;
   maxPlanRepairs: number;
+  researchWeb: boolean;
+  writePlanDocs: boolean;
+  independentReview: boolean;
+  dashboard: {
+    host: string;
+    port: number;
+    allowRemote: boolean;
+    allowedHosts: string[];
+    secureCookies: boolean;
+  };
+  backup: { dir: string; intervalHours: number; retention: number };
+  notifyWebhookUrl: string | undefined;
+  maxCorrectionRounds: number;
   backoff: { baseMs: number; maxMs: number; jitter: number; quotaMinWaitMs: number; resetMarginMs: number };
   workerTimeoutMs: number;
   heartbeatIntervalMs: number;
@@ -173,7 +267,7 @@ export function defaultAgentHome(env: NodeJS.ProcessEnv): string {
 /** Read a .env file (never mutates process.env). Real environment variables win. */
 export function readEnvFile(file: string): Record<string, string> {
   if (!existsSync(file)) return {};
-  return parseEnv(readFileSync(file, 'utf8')) as Record<string, string>;
+  return parseEnv(normalizeText(readFileSync(file, 'utf8'))) as Record<string, string>;
 }
 
 export function loadConfig(opts: LoadConfigOptions = {}): AppConfig {
@@ -200,6 +294,12 @@ export function loadConfig(opts: LoadConfigOptions = {}): AppConfig {
     environment: c.ENVIRONMENT,
     agentHome: home,
     databasePath: path.resolve(c.DATABASE_PATH ?? path.join(home, 'agent.db')),
+    backup: {
+      dir: path.resolve(c.BACKUP_DIR ?? path.join(home, 'backups')),
+      intervalHours: c.BACKUP_INTERVAL_HOURS,
+      retention: c.BACKUP_RETENTION,
+    },
+    notifyWebhookUrl: c.NOTIFY_WEBHOOK_URL,
     workspaceRoot: path.resolve(c.WORKSPACE_ROOT ?? path.join(home, 'workspaces')),
     logDir: path.resolve(c.LOG_DIR ?? path.join(home, 'logs')),
     logLevel: c.LOG_LEVEL,
@@ -210,6 +310,24 @@ export function loadConfig(opts: LoadConfigOptions = {}): AppConfig {
     mockScenarioFile: c.MOCK_SCENARIO_FILE ? path.resolve(c.MOCK_SCENARIO_FILE) : undefined,
     claudeModel: c.CLAUDE_MODEL,
     claudeCliPath: c.CLAUDE_CLI_PATH,
+    claudeCli: {
+      minVersion: c.CLAUDE_CLI_MIN_VERSION,
+      watchdogEnv: {
+        CLAUDE_CODE_RETRY_WATCHDOG: c.CLAUDE_CODE_RETRY_WATCHDOG ? '1' : '0',
+        CLAUDE_CODE_RETRY_WATCHDOG_USAGE_LIMIT_RECHECK_MS: String(
+          c.CLAUDE_CODE_RETRY_WATCHDOG_USAGE_LIMIT_RECHECK_MS,
+        ),
+        CLAUDE_CODE_RESUME_INTERRUPTED_TURN: c.CLAUDE_CODE_RESUME_INTERRUPTED_TURN ? '1' : '0',
+        CLAUDE_CODE_RESUME_PROMPT: c.CLAUDE_CODE_RESUME_PROMPT,
+      },
+      maxCapacityWaitMs: c.CLAUDE_CLI_MAX_CAPACITY_WAIT_MS,
+      stallTimeoutMs: c.CLAUDE_CLI_STALL_TIMEOUT_MS,
+      resumeGraceMs: c.CAPACITY_RESUME_GRACE_MS,
+      suspendThresholdMs: c.HOST_SUSPEND_THRESHOLD_MS,
+    },
+    capacity: { escalateAfterMs: c.CAPACITY_ESCALATE_AFTER_MS, escalation: c.CAPACITY_ESCALATION },
+    minFreeMemoryMb: c.MIN_FREE_MEMORY_MB,
+    resumeFreeMemoryMb: Math.max(c.RESUME_FREE_MEMORY_MB, c.MIN_FREE_MEMORY_MB),
     maxConcurrentWorkers: c.MAX_CONCURRENT_WORKERS,
     defaultMaxRetries: c.DEFAULT_MAX_RETRIES,
     maxContinuations: c.MAX_CONTINUATIONS,
@@ -221,6 +339,19 @@ export function loadConfig(opts: LoadConfigOptions = {}): AppConfig {
     planApproval: c.PLAN_APPROVAL,
     maxPlanTasks: c.MAX_PLAN_TASKS,
     maxPlanRepairs: c.MAX_PLAN_REPAIRS,
+    researchWeb: c.RESEARCH_WEB_ACCESS,
+    writePlanDocs: c.WRITE_PLAN_DOCS,
+    independentReview: c.INDEPENDENT_REVIEW,
+    dashboard: {
+      host: c.DASHBOARD_HOST,
+      port: c.DASHBOARD_PORT,
+      allowRemote: c.DASHBOARD_ALLOW_REMOTE,
+      allowedHosts: c.DASHBOARD_ALLOWED_HOSTS.split(',')
+        .map((s) => s.trim())
+        .filter(Boolean),
+      secureCookies: c.DASHBOARD_SECURE_COOKIES,
+    },
+    maxCorrectionRounds: c.MAX_CORRECTION_ROUNDS,
     backoff: {
       baseMs: c.BACKOFF_BASE_MS,
       maxMs: c.BACKOFF_MAX_MS,

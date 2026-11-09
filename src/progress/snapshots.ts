@@ -56,11 +56,10 @@ export function recordSnapshotIfChanged(
         progressSummary: summarize(progress),
         currentMilestone: current ? `${current.key}: ${current.title}` : null,
       });
-      for (const m of progress.milestones) {
-        store.db
-          .prepare('UPDATE milestones SET status = ? WHERE project_id = ? AND key = ?')
-          .run(m.state, projectId, m.key);
-      }
+      // v2/main integration: `milestones.status` has ONE persisted owner, src/planning/status-reconcile.ts (A4,
+      // owner decision C: IMPLEMENTED / REVIEWED / VERIFIED / ACCEPTED kept distinct). Stage 5's milestone states
+      // (NOT_STARTED / IN_PROGRESS / BLOCKED / COMPLETE_UNVERIFIED / VERIFIED) remain the computed progress view
+      // (`progress` command, snapshot data, currentMilestone) and are no longer written over the reconciled column.
       store.db
         .prepare(
           `DELETE FROM progress_snapshots WHERE project_id = ? AND id NOT IN

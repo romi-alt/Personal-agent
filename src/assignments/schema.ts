@@ -41,6 +41,17 @@ export const assignmentSchema = z
       .default([])
       .refine(uniqueIds, 'duplicate non-functional requirement id'),
     technicalConstraints: z.array(z.string().min(3)).default([]),
+    /** Who will use the system (roles / audiences). */
+    targetUsers: z.array(z.string().min(2)).default([]),
+    /** Owner technology preferences (softer than technicalConstraints; deviations need an ADR). */
+    preferredTechnology: z.array(z.string().min(2)).default([]),
+    /** Security requirements; planned and verified like other requirements (kind non_functional). */
+    securityRequirements: z
+      .array(requirement)
+      .default([])
+      .refine(uniqueIds, 'duplicate security requirement id'),
+    /** Points where the owner wants to review/approve, in their own words (recorded; enforced approvals are fixed in code). */
+    ownerApprovalRequirements: z.array(z.string().min(3)).default([]),
     workspace: z
       .discriminatedUnion('type', [
         z.object({ type: z.literal('managed') }),
@@ -93,6 +104,8 @@ export const assignmentSchema = z
       .object({
         buildCommand: z.string().min(1).optional(),
         testCommand: z.string().min(1).optional(),
+        /** Browser/end-to-end suite; part of TESTS_PASS when configured (v2). */
+        browserTestCommand: z.string().min(1).optional(),
       })
       .default({}),
     source: z
@@ -103,7 +116,25 @@ export const assignmentSchema = z
       })
       .default({ system: 'manual' }),
   })
-  .strict();
+  .strict()
+  .superRefine((a, ctx) => {
+    const ids = [...a.functionalRequirements, ...a.nonFunctionalRequirements, ...a.securityRequirements].map(
+      (r) => r.id,
+    );
+    const dup = ids.filter((id, i) => ids.indexOf(id) !== i);
+    if (dup.length)
+      ctx.addIssue({
+        code: 'custom',
+        message: `requirement ids must be unique across all lists: ${[...new Set(dup)].join(', ')}`,
+      });
+  });
+
+/** All requirement ids of an assignment (functional, non-functional, security). */
+export const allRequirements = (a: ProjectAssignment) => [
+  ...a.functionalRequirements.map((r) => ({ ...r, kind: 'functional' as const })),
+  ...a.nonFunctionalRequirements.map((r) => ({ ...r, kind: 'non_functional' as const })),
+  ...a.securityRequirements.map((r) => ({ ...r, kind: 'non_functional' as const })),
+];
 
 export type ProjectAssignment = z.infer<typeof assignmentSchema>;
 export type ProjectAssignmentInput = z.input<typeof assignmentSchema>;

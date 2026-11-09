@@ -2,6 +2,7 @@ import type { Project } from '../types/index.js';
 import type { Store } from '../queue/store.js';
 import type { WorkspaceRegistry } from '../workspaces/registry.js';
 import { ASSIGNMENT_SCHEMA_VERSION, parseAssignment, type ProjectAssignment } from './schema.js';
+import { ensureDerivedCommands } from './verification-config.js';
 
 export interface RegisterResult {
   project: Project;
@@ -55,7 +56,18 @@ export async function registerAssignment(
         })
       : await registry.createManagedProject(store, base);
 
-  store.db.transaction(() => {
+  store.db.transaction(() => persistAssignment(store, project.id, a))();
+  // A5: an existing repository usually already has build/test scripts; record them at intake (audited).
+  const p = store.getProject(project.id)!;
+  if (a.workspace.type === 'existing' && p.repoPath)
+    ensureDerivedCommands(store, project.id, p.repoPath, 'intake');
+  return { project: p, assignment: getAssignment(store, project.id)!, created: true };
+}
+
+/** Persist a validated assignment for an existing project and seed project memory (call inside a transaction). */
+export function persistAssignment(store: Store, projectId: string, a: ProjectAssignment): void {
+  const project = { id: projectId };
+  {
     store.saveAssignment(project.id, ASSIGNMENT_SCHEMA_VERSION, a as unknown as Record<string, unknown>);
     store.setMemory(
       project.id,
@@ -64,9 +76,15 @@ export async function registerAssignment(
         `# ${a.title}`,
         a.description,
         `\n## Business objectives\n${bullets(a.businessObjectives)}`,
+        a.targetUsers.length ? `\n## Target users\n${bullets(a.targetUsers)}` : '',
         `\n## Expected deliverables\n${bullets(a.expectedDeliverables)}`,
         `\n## Acceptance criteria\n${bullets(a.acceptanceCriteria.map((c) => `[${c.id}] ${c.text} (verified by: ${c.verifiedBy})`))}`,
-      ].join('\n'),
+        a.ownerApprovalRequirements.length
+          ? `\n## Owner review points\n${bullets(a.ownerApprovalRequirements)}`
+          : '',
+      ]
+        .filter(Boolean)
+        .join('\n'),
     );
     store.setMemory(
       project.id,
@@ -76,8 +94,17 @@ export async function registerAssignment(
         a.nonFunctionalRequirements.length
           ? `\n## Non-functional\n${bullets(a.nonFunctionalRequirements.map((r) => `[${r.id}] (${r.priority}) ${r.text}`))}`
           : '',
+        a.securityRequirements.length
+          ? `\n## Security\n${bullets(a.securityRequirements.map((r) => `[${r.id}] (${r.priority}) ${r.text}`))}`
+          : '',
       ].join('\n'),
     );
+    if (a.preferredTechnology.length)
+      store.setMemory(
+        project.id,
+        'technology_decisions',
+        `## Owner preferences\n${bullets(a.preferredTechnology)}`,
+      );
     if (a.technicalConstraints.length)
       store.setMemory(
         project.id,
@@ -94,6 +121,5 @@ export async function registerAssignment(
         criteria: a.acceptanceCriteria.length,
       },
     });
-  })();
-  return { project: store.getProject(project.id)!, assignment: a, created: true };
+  }
 }

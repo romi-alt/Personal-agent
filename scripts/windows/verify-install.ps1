@@ -2,13 +2,19 @@
 .SYNOPSIS
   Verifies a Windows installation of the ELEVARIQ Personal Agent and prints PASS/FAIL per check.
   Read-only: it starts nothing and changes nothing (the supervisor is only queried).
-  Compatible with Windows PowerShell 5.1 and PowerShell 7. Written without access to Windows: run it, and report any FAIL.
+  Compatible with Windows PowerShell 5.1 and PowerShell 7.
 #>
 param(
   [string]$TaskName = 'ElevariqPersonalAgent',
-  [string]$RepoPath = (Split-Path -Parent (Split-Path -Parent $PSScriptRoot))
+  [string]$RepoPath = '',
+  [string]$AgentHome = '',
+  [string]$EnvFile = ''
 )
 $ErrorActionPreference = 'Continue'
+# Windows PowerShell 5.1 leaves $PSScriptRoot empty inside param() defaults, so resolve it here.
+if (-not $RepoPath) { $RepoPath = Split-Path -Parent (Split-Path -Parent $PSScriptRoot) }
+if ($AgentHome) { $env:AGENT_HOME = $AgentHome }
+if ($EnvFile) { $env:AGENT_ENV_FILE = $EnvFile }
 $script:fail = 0
 function Check([string]$Name, [bool]$Ok, [string]$Detail) {
   if ($Ok) { Write-Output ("PASS  {0}  {1}" -f $Name, $Detail) } else { $script:fail++; Write-Output ("FAIL  {0}  {1}" -f $Name, $Detail) }
@@ -44,6 +50,8 @@ if ($task) {
   Check 'task last result is OK or still running' (($info.LastTaskResult -eq 0) -or ($info.LastTaskResult -eq 267009) -or ($info.LastTaskResult -eq 267011)) ("LastTaskResult=$($info.LastTaskResult) LastRun=$($info.LastRunTime)")
   Check 'task has no execution time limit' ($task.Settings.ExecutionTimeLimit -eq 'PT0S') "$($task.Settings.ExecutionTimeLimit)"
   Check 'task ignores duplicate starts' ($task.Settings.MultipleInstances -eq 'IgnoreNew') "$($task.Settings.MultipleInstances)"
+  Check 'task runs on battery and is not stopped when unplugged' ((-not $task.Settings.DisallowStartIfOnBatteries) -and (-not $task.Settings.StopIfGoingOnBatteries)) "DisallowStartIfOnBatteries=$($task.Settings.DisallowStartIfOnBatteries) StopIfGoingOnBatteries=$($task.Settings.StopIfGoingOnBatteries)"
+  Check 'keepalive trigger present' (@($task.Triggers | Where-Object { $_.Repetition.Interval }).Count -ge 1) 'restarts the agent if its process tree ends'
 }
 
 $power = (powercfg /query SCHEME_CURRENT SUB_SLEEP STANDBYIDLE 2>&1 | Out-String)

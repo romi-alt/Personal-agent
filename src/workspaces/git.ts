@@ -19,32 +19,70 @@ async function git(cwd: string, args: string[], timeout = 15_000): Promise<strin
   return stdout.trim();
 }
 
+/** Split off the first `n` space-separated fields; the remainder (a path, which may contain spaces) is returned last. */
+function fields(line: string, n: number): string[] {
+  const out: string[] = [];
+  let rest = line;
+  for (let i = 0; i < n; i++) {
+    const sp = rest.indexOf(' ');
+    if (sp < 0) return [...out, rest];
+    out.push(rest.slice(0, sp));
+    rest = rest.slice(sp + 1);
+  }
+  return [...out, rest];
+}
+
+/** Render one `git status --porcelain=v2` entry in the familiar short (`XY path`) form. */
+export function shortStatusLine(entry: string): string | null {
+  const kind = entry[0];
+  if (kind === '?') return `?? ${entry.slice(2)}`;
+  if (kind === '!') return `!! ${entry.slice(2)}`;
+  const xy = (s: string | undefined) => (s ?? '??').replace(/\./g, ' ');
+  if (kind === '1') {
+    const f = fields(entry, 8);
+    return `${xy(f[1])} ${f[8] ?? ''}`;
+  }
+  if (kind === '2') {
+    const f = fields(entry, 9);
+    const [to, from] = (f[9] ?? '').split('\t');
+    return `${xy(f[1])} ${from ?? '?'} -> ${to ?? ''}`;
+  }
+  if (kind === 'u') {
+    const f = fields(entry, 10);
+    return `${xy(f[1])} ${f[10] ?? ''}`;
+  }
+  return null;
+}
+
+/**
+ * One `git status --porcelain=v2 --branch` call yields HEAD, branch and changes. Process creation is expensive on
+ * Windows (~150 ms per git spawn with real-time antivirus scanning), and this runs several times per task.
+ */
 export async function gitState(cwd: string): Promise<GitState> {
-  if (!existsSync(cwd)) return { isRepo: false, head: null, branch: null, dirty: null, changes: [] };
+  const none: GitState = { isRepo: false, head: null, branch: null, dirty: null, changes: [] };
+  if (!existsSync(cwd)) return none;
+  let out: string;
   try {
-    await git(cwd, ['rev-parse', '--is-inside-work-tree']);
+    out = await git(cwd, ['status', '--porcelain=v2', '--branch']);
   } catch {
-    return { isRepo: false, head: null, branch: null, dirty: null, changes: [] };
+    return none;
   }
   let head: string | null = null;
-  try {
-    head = await git(cwd, ['rev-parse', 'HEAD']);
-  } catch {
-    /* repo with no commits */
-  }
   let branch: string | null = null;
-  try {
-    branch = await git(cwd, ['rev-parse', '--abbrev-ref', 'HEAD']);
-  } catch {
-    try {
-      branch = await git(cwd, ['symbolic-ref', '--short', 'HEAD']);
-    } catch {
-      /* detached/unborn */
+  const changes: string[] = [];
+  for (const line of out ? out.split('\n') : []) {
+    if (line.startsWith('# branch.oid ')) {
+      const v = line.slice('# branch.oid '.length).trim();
+      head = v === '(initial)' ? null : v;
+    } else if (line.startsWith('# branch.head ')) {
+      const v = line.slice('# branch.head '.length).trim();
+      branch = v === '(detached)' ? 'HEAD' : v;
+    } else if (!line.startsWith('#')) {
+      const s = shortStatusLine(line);
+      if (s) changes.push(s);
     }
   }
-  const porcelain = await git(cwd, ['status', '--porcelain']);
-  const lines = porcelain ? porcelain.split('\n') : [];
-  return { isRepo: true, head, branch, dirty: lines.length > 0, changes: lines.slice(0, 50) };
+  return { isRepo: true, head, branch, dirty: changes.length > 0, changes: changes.slice(0, 50) };
 }
 
 /** Create a repo with an initial empty commit using an explicit local identity (never touches global git config). */

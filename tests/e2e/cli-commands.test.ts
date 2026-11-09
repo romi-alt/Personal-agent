@@ -1,11 +1,11 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { spawnSync } from 'node:child_process';
 import { mkdtempSync, mkdirSync, writeFileSync } from 'node:fs';
-import { removeDir } from '../helpers/fs.js';
 import { tmpdir, hostname } from 'node:os';
 import path from 'node:path';
 import { openDatabase } from '../../src/database/connection.js';
 import { Store } from '../../src/queue/store.js';
+import { removeTempDir } from '../helpers/fs.js';
 
 /** Every advertised CLI command is executed for real against a throwaway AGENT_HOME. */
 const ROOT = path.resolve(__dirname, '../..');
@@ -37,12 +37,13 @@ beforeAll(() => {
     AGENT_ENV_FILE: path.join(home, 'none.env'),
     LOG_TO_CONSOLE: 'false',
     EXECUTION_PROVIDER: 'mock',
+    MIN_FREE_MEMORY_MB: '0', // spawned supervisors: host memory must not decide outcomes (gate tested in resource-gate)
     NODE_NO_WARNINGS: '1',
   };
 });
 afterAll(() => {
   for (const s of opened.splice(0)) s.db.close(); // Windows cannot delete a database file that is still open
-  removeDir(home);
+  removeTempDir(home);
 });
 
 describe('CLI commands', () => {
@@ -80,9 +81,19 @@ describe('CLI commands', () => {
       '3',
     );
     taskId = out.match(/tsk_[a-z0-9]+/)![0];
-    expect(ok('task:add', '--project', 'cli-demo', '--title', 'First', '--instructions', 'do it')).toContain(
-      'duplicate ignored',
-    );
+    expect(
+      ok(
+        'task:add',
+        '--project',
+        'cli-demo',
+        '--title',
+        'First',
+        '--instructions',
+        'do it',
+        '--criteria',
+        'works',
+      ),
+    ).toContain('duplicate ignored');
     expect(ok('task:add', '--project', 'cli-demo', '--file', 'examples/task-example.json')).toContain(
       'queued task',
     );
@@ -91,8 +102,20 @@ describe('CLI commands', () => {
     );
     // Regression (found on a real Windows runner): CRLF line endings must not break the markdown title parse.
     const crlf = path.join(home, 'crlf-task.md');
-    writeFileSync(crlf, '# CRLF titled task\r\n\r\nDo the thing carefully.\r\n');
+    // v2 (A6): coding tasks need acceptance criteria; the CRLF file carries an "Acceptance:" line too, which proves
+    // the criteria line also parses with CRLF endings (no trailing \r stored).
+    writeFileSync(
+      crlf,
+      '# CRLF titled task\r\n\r\nDo the thing carefully.\r\nAcceptance: the thing is done\r\n',
+    );
     expect(ok('task:add', '--project', 'cli-demo', '--file', crlf)).toContain('CRLF titled task');
+    {
+      const s = store();
+      expect(s.listTasks({}).find((t) => t.title === 'CRLF titled task')!.acceptanceCriteria).toBe(
+        'the thing is done',
+      );
+      s.db.close();
+    }
     expect(ok('tasks', '--project', 'cli-demo')).toMatch(/First\s+QUEUED\s+3/);
     expect(ok('tasks', '--status', 'queued')).toContain('First');
     expect(run('tasks', '--status', 'nonsense').status).toBe(1);
@@ -219,7 +242,17 @@ describe('CLI: Phase 1.5 commands (assignments, project lifecycle, verification,
     expect(shown.approvalPolicy.deliveryRequiresOwnerApproval).toBe(true);
   });
   it('project:status shows lifecycle and a strict delivery-readiness table', () => {
-    ok('task:add', '--project', 'school-management-erp', '--title', 'Only task', '--instructions', 'do');
+    ok(
+      'task:add',
+      '--project',
+      'school-management-erp',
+      '--title',
+      'Only task',
+      '--instructions',
+      'do',
+      '--criteria',
+      'done',
+    );
     const status = ok('project:status', 'school-management-erp');
     expect(status).toMatch(/lifecycle=IN_DEVELOPMENT/);
     expect(status).toMatch(/delivery ready: NO/);
@@ -238,7 +271,7 @@ describe('CLI: Phase 1.5 commands (assignments, project lifecycle, verification,
   it('project:verify records per-level evidence (unknowns stay unknown)', () => {
     const out = ok('project:verify', 'school-management-erp');
     expect(out).toMatch(/REQUIREMENTS_SATISFIED\s+NOT_EVALUATED/);
-    expect(out).toMatch(/SECURITY_CHECKS_PASS\s+NOT_EVALUATED/);
+    expect(out).toMatch(/SECURITY_CHECKS_PASS\s+PASSED\s+secret scan: 0 findings/); // real scan, scope stated
     expect(out).toMatch(/delivery ready: NO/);
   });
   it('provider:status reports each readiness level without claiming operational; provider:verify demands an explicit flag', () => {

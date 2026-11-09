@@ -11,13 +11,16 @@ import type { Db } from '../database/connection.js';
 import { newId } from '../core/ids.js';
 import type { Logger } from '../logging/logger.js';
 import { redactValue } from '../security/redact.js';
+import { reconcileProjectStatus } from '../planning/status-reconcile.js';
 import {
   type ActivityEvent,
   type Approval,
+  type CapacityWait,
   type Checkpoint,
   type Clock,
   type ErrorClass,
   type ExecutionRecord,
+  type WorkerIdentity,
   type Project,
   type ProjectStatus,
   type ProviderState,
@@ -91,6 +94,8 @@ function mapTask(r: Row): Task {
     verificationRequired: JSON.parse(r['verification_required'] as string) as string[],
     kind: (r['kind'] as 'CODING' | 'PLANNING') ?? 'CODING',
     readOnly: !!r['read_only'],
+    allowWeb: !!r['allow_web'],
+    role: (r['role'] as string | null) ?? null,
     createdAt: r['created_at'] as number,
     updatedAt: r['updated_at'] as number,
     completedAt: (r['completed_at'] as number | null) ?? null,
@@ -119,6 +124,20 @@ function mapExecution(r: Row): ExecutionRecord {
     summary: (r['summary'] as string | null) ?? null,
     startRef: (r['start_ref'] as string | null) ?? null,
     startStatusHash: (r['start_status_hash'] as string | null) ?? null,
+    capacityWait:
+      r['capacity_wait_since'] != null
+        ? {
+            since: r['capacity_wait_since'] as number,
+            reason: (r['capacity_wait_reason'] as string | null) ?? 'usage limit',
+            resetsAt: (r['capacity_wait_resets_at'] as number | null) ?? null,
+            recheckAt: (r['capacity_wait_recheck_at'] as number | null) ?? null,
+          }
+        : null,
+    workerPid: (r['worker_pid'] as number | null) ?? null,
+    workerIdentity: r['worker_identity']
+      ? (JSON.parse(r['worker_identity'] as string) as WorkerIdentity)
+      : null,
+    lastActivityAt: (r['last_activity_at'] as number | null) ?? null,
   };
 }
 
@@ -439,6 +458,10 @@ export class Store {
     dedupeKey?: string;
     verificationRequired?: string[];
     kind?: 'CODING' | 'PLANNING';
+    /** PLANNING tasks only: also allow read-only web tools (research). */
+    allowWeb?: boolean;
+    /** Specialist role brief for coding tasks (src/engineering/roles.ts). */
+    role?: string | null;
   }): { task: Task; created: boolean } {
     const dedupeKey =
       input.dedupeKey ??
@@ -465,8 +488,8 @@ export class Store {
         const id = newId('tsk');
         this.db
           .prepare(
-            `INSERT INTO tasks(id,project_id,title,instructions,acceptance_criteria,depends_on,priority,status,max_retries,scheduled_start,dedupe_key,verification_required,kind,read_only,created_at,updated_at)
-           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+            `INSERT INTO tasks(id,project_id,title,instructions,acceptance_criteria,depends_on,priority,status,max_retries,scheduled_start,dedupe_key,verification_required,kind,read_only,allow_web,role,created_at,updated_at)
+           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
           )
           .run(
             id,
@@ -483,6 +506,8 @@ export class Store {
             JSON.stringify(input.verificationRequired ?? []),
             input.kind ?? 'CODING',
             input.kind === 'PLANNING' ? 1 : 0,
+            input.kind === 'PLANNING' && input.allowWeb ? 1 : 0,
+            input.role ?? null,
             now,
             now,
           );
@@ -621,6 +646,7 @@ export class Store {
       payload: { from: current.status, to, reason: opts.reason },
     });
     if (to === 'COMPLETED' || to === 'CANCELLED') this.advanceProjectAfterTerminalTask(current.projectId);
+    this.reconcileRoadmapStatus(current.projectId, taskId);
     return this.requireTask(taskId);
   }
 
@@ -661,12 +687,20 @@ export class Store {
             )
             .all(...EXECUTABLE_LIFECYCLES, ...CLAIMABLE_STATUSES, now, now) as Row[]
         ).map(mapTask);
-        const statusOf = this.db.prepare('SELECT status FROM tasks WHERE id = ?');
+        const statusOf = this.db.prepare('SELECT status, verification_required FROM tasks WHERE id = ?');
+        const reviewPassed = this.db.prepare(
+          // Owner acceptance (v2: OWNER_ACCEPTED, not PASSED) also releases dependants: the owner decided so.
+          `SELECT 1 FROM verification_evidence WHERE task_id = ? AND level = 'REQUIREMENTS_SATISFIED' AND status IN ('PASSED','OWNER_ACCEPTED') LIMIT 1`,
+        );
         const overBudget = new Map<string, boolean>();
         const chosen = candidates.find((t) => {
-          const depsDone = t.dependsOn.every(
-            (d) => (statusOf.get(d) as { status: string } | undefined)?.status === 'COMPLETED',
-          );
+          // A dependency is done only when COMPLETED and, if it requires independent review, that review PASSED:
+          // the coding worker cannot approve its own work for downstream tasks.
+          const depsDone = t.dependsOn.every((d) => {
+            const r = statusOf.get(d) as { status: string; verification_required: string } | undefined;
+            if (r?.status !== 'COMPLETED') return false;
+            return !r.verification_required.includes('REQUIREMENTS_SATISFIED') || !!reviewPassed.get(d);
+          });
           if (!depsDone) return false;
           if (!this.milestoneGateOpen(t.id, t.projectId)) return false;
           if (!overBudget.has(t.projectId)) overBudget.set(t.projectId, this.projectOverBudget(t.projectId));
@@ -771,6 +805,46 @@ export class Store {
       .prepare('SELECT * FROM executions WHERE task_id = ? ORDER BY started_at DESC, rowid DESC LIMIT 1')
       .get(taskId) as Row | undefined;
     return r ? mapExecution(r) : null;
+  }
+
+  /** Record (or clear, with null) an official capacity wait inside the live provider process. */
+  setExecutionCapacityWait(executionId: string, wait: CapacityWait | null): void {
+    this.db
+      .prepare(
+        `UPDATE executions SET capacity_wait_since = ?, capacity_wait_reason = ?, capacity_wait_resets_at = ?,
+           capacity_wait_recheck_at = ?, last_activity_at = ? WHERE id = ?`,
+      )
+      .run(
+        wait?.since ?? null,
+        wait?.reason ?? null,
+        wait?.resetsAt ?? null,
+        wait?.recheckAt ?? null,
+        this.clock.now(),
+        executionId,
+      );
+  }
+
+  /** Record the OS pid of the provider child process (null once it has exited). */
+  setExecutionWorkerPid(executionId: string, pid: number | null): void {
+    if (pid === null)
+      this.db
+        .prepare('UPDATE executions SET worker_pid = NULL, worker_identity = NULL WHERE id = ?')
+        .run(executionId);
+    else this.db.prepare('UPDATE executions SET worker_pid = ? WHERE id = ?').run(pid, executionId);
+  }
+
+  /** Records the OS identity of the worker, only if that pid is still the execution's current worker. */
+  setExecutionWorkerIdentity(executionId: string, identity: WorkerIdentity): void {
+    this.db
+      .prepare('UPDATE executions SET worker_identity = ? WHERE id = ? AND worker_pid = ?')
+      .run(JSON.stringify(identity), executionId, identity.pid);
+  }
+
+  /** Cheap liveness marker for provider output; used for stall detection and the command center. */
+  touchExecutionActivity(executionId: string): void {
+    this.db
+      .prepare('UPDATE executions SET last_activity_at = ? WHERE id = ?')
+      .run(this.clock.now(), executionId);
   }
 
   /** Persist the provider session id immediately so a crash still leaves a resumable reference. */
@@ -1232,7 +1306,33 @@ export class Store {
    * When every task is terminal (COMPLETED/CANCELLED) the project moves to VERIFYING - never to a
    * delivery state. A single provider success cannot declare a project finished.
    */
-  private advanceProjectAfterTerminalTask(projectId: string): void {
+  /**
+   * A4: re-derive requirement and milestone statuses from verified task state (src/planning/status-reconcile.ts).
+   * With `taskId`, only when that task belongs to a plan. Never throws: a reconciliation problem must not undo the
+   * task/QA change that triggered it (it is re-derived on the next change or at supervisor start).
+   */
+  reconcileRoadmapStatus(projectId: string, taskId?: string): void {
+    try {
+      if (taskId && !this.db.prepare('SELECT 1 FROM plan_tasks WHERE task_id = ?').get(taskId)) return;
+      const { changes } = reconcileProjectStatus(this.db, projectId);
+      if (changes.length)
+        this.recordEvent({
+          type: 'roadmap.status_reconciled',
+          projectId,
+          taskId: taskId ?? null,
+          payload: { changes: changes.map((c) => `${c.kind}:${c.id}:${c.from}->${c.to}`) },
+        });
+    } catch (err) {
+      this.recordEvent({
+        type: 'roadmap.reconcile_error',
+        projectId,
+        severity: 'warn',
+        payload: { error: err instanceof Error ? err.message : String(err) },
+      });
+    }
+  }
+
+  advanceProjectAfterTerminalTask(projectId: string): void {
     const p = this.getProject(projectId);
     if (!p || p.lifecycle !== 'IN_DEVELOPMENT') return;
     const counts = this.db
@@ -1240,7 +1340,17 @@ export class Store {
         `SELECT SUM(CASE WHEN status NOT IN ('COMPLETED','CANCELLED') THEN 1 ELSE 0 END) AS open, SUM(CASE WHEN status = 'COMPLETED' THEN 1 ELSE 0 END) AS done FROM tasks WHERE project_id = ? AND kind = 'CODING'`,
       )
       .get(projectId) as { open: number | null; done: number | null };
-    if ((counts.open ?? 0) === 0 && (counts.done ?? 0) > 0) {
+    // Completed tasks that require an independent review count as open until that review passed.
+    const unreviewed = (
+      this.db
+        .prepare(
+          `SELECT COUNT(*) AS n FROM tasks t WHERE t.project_id = ? AND t.kind = 'CODING' AND t.status = 'COMPLETED'
+             AND t.verification_required LIKE '%REQUIREMENTS_SATISFIED%'
+             AND NOT EXISTS (SELECT 1 FROM verification_evidence e WHERE e.task_id = t.id AND e.level = 'REQUIREMENTS_SATISFIED' AND e.status IN ('PASSED','OWNER_ACCEPTED'))`,
+        )
+        .get(projectId) as { n: number }
+    ).n;
+    if ((counts.open ?? 0) === 0 && unreviewed === 0 && (counts.done ?? 0) > 0) {
       this.transitionProject(
         projectId,
         'VERIFYING',

@@ -82,7 +82,7 @@ All settings are environment variables validated at startup (`src/config/index.t
 | `docs/PHASE_2_ROADMAP.md` | Next stage (not implemented) |
 | `docs/TEST_RESULTS.md` | Real commands and results |
 | `docs/PLANNING.md` | Phase 2 planning pipeline (stages 1-4) |
-| `docs/PROGRESS.md` | Evidence-based progress, milestone gating, owner inbox (stage 5) |
+| `docs/PROGRESS_TRACKING.md` | Evidence-based progress, milestone gating, owner inbox (stage 5) |
 | `docs/AUDIT_PHASE_1_5.md` | Independent audit: defects, fixes, residual weaknesses |
 | `docs/PROJECT_ASSIGNMENTS.md` | Assignment schema, durable context, project lifecycle |
 | `docs/COMPLETION_VERIFICATION.md` | Verification ladder, interfaces, evidence |

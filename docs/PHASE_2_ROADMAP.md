@@ -1,7 +1,7 @@
 # Phase 2 - technical implementation plan
 
 > **Progress:** stages **1-5 are implemented** (workflow engine, requirement analysis, architecture, decomposition + plan validation + owner approval + materialisation; evidence-based progress, milestone gating, owner inbox) with the mock provider -
-> see `docs/PLANNING.md` and `docs/PROGRESS.md`. Stages 6-12 are **not implemented**. Stage 0 (live verification, isolation decision) is **still open**: nothing in Phase 2 has run against a real model yet.
+> see `docs/PLANNING.md` and `docs/PROGRESS_TRACKING.md`. Stages 6-12 are **not implemented**. Stage 0 (live verification, isolation decision) is **still open**: nothing in Phase 2 has run against a real model yet.
 
 Goal: turn the Phase 1/1.5 runtime into a **project execution engine**: given a registered assignment it analyses, plans, decomposes, dispatches coding tasks,
 inspects and verifies the result, creates correction tasks, survives interruptions, keeps accurate progress and surfaces approvals - until verified completion or a blocker.

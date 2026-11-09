@@ -6,6 +6,7 @@ import type { Logger } from '../logging/logger.js';
 import type { RunOutcome } from '../providers/types.js';
 import { pidAlive, type Store } from '../queue/store.js';
 import type { TaskRunner } from '../workers/runner.js';
+import { stopOrphanWorker, type OrphanExpectation, type OrphanStopResult } from '../workers/process-tree.js';
 import type { ExecutionRecord, Task } from '../types/index.js';
 import { decide } from './decide.js';
 import type { WorkspaceRegistry } from '../workspaces/registry.js';
@@ -20,7 +21,8 @@ export interface ReconcileAction {
     | 'reapplied_outcome'
     | 'requeued_interrupted'
     | 'blocked_workspace_missing'
-    | 'skipped_live_lease';
+    | 'skipped_live_lease'
+    | 'deferred_worker_alive';
   detail: string;
 }
 
@@ -38,6 +40,10 @@ export interface ReconcileOptions {
   providerName: string;
   /** Executions currently running inside THIS process; the lease sweep must never reclaim these. */
   isLocallyActive?: (executionId: string) => boolean;
+  /** Provider worker executable pattern (fallback identity check; see ExecutionProvider.workerImage). */
+  workerImage?: RegExp;
+  /** Injection point for tests. */
+  stopWorker?: (e: OrphanExpectation) => Promise<OrphanStopResult>;
 }
 
 /** Last terminal `result` record in an execution transcript, if the process died after the provider returned. */
@@ -79,6 +85,58 @@ export async function reconcileOrphans(o: ReconcileOptions): Promise<ReconcileAc
         pid: exec!.pid,
         note: 'previous worker pid still exists; lease reclaimed after expiry/startup lock',
       });
+    }
+
+    // A provider child process (native CLI worker) outlives a killed supervisor on Windows. Stop it before anything is
+    // re-dispatched: a replacement execution must never run alongside the old session in the same workspace.
+    if (exec?.workerPid && exec.host === hostname()) {
+      const pid = exec.workerPid;
+      const r = await (o.stopWorker ?? stopOrphanWorker)({
+        pid,
+        identity: exec.workerIdentity,
+        imagePattern: o.workerImage,
+        notBeforeMs: exec.startedAt,
+        notAfterMs: exec.heartbeatAt,
+      });
+      const payload = {
+        pid,
+        result: r,
+        identityRecorded: !!exec.workerIdentity,
+        image: exec.workerIdentity?.image ?? null,
+      };
+      if (r === 'still_running' || r === 'unverifiable') {
+        // Fail safe: never start a replacement while a worker that may be ours is still alive. The task keeps its
+        // RUNNING status; the next lease sweep retries this check.
+        log.error('recovery.orphan_worker_unresolved', { taskId: task.id, ...payload });
+        store.recordEvent({
+          type: 'recovery.orphan_worker_unresolved',
+          projectId: project.id,
+          taskId: task.id,
+          executionId: exec.id,
+          severity: 'error',
+          payload,
+        });
+        actions.push({
+          taskId: task.id,
+          title: task.title,
+          previousStatus: task.status,
+          action: 'deferred_worker_alive',
+          detail: `worker pid ${pid}: ${r}`,
+        });
+        continue;
+      }
+      store.setExecutionWorkerPid(exec.id, null);
+      if (r === 'terminated' || r === 'pid_reused') {
+        log.warn(`recovery.orphan_worker_${r}`, { taskId: task.id, ...payload });
+        store.recordEvent({
+          type: r === 'terminated' ? 'recovery.orphan_worker_terminated' : 'recovery.orphan_pid_reused',
+          projectId: project.id,
+          taskId: task.id,
+          executionId: exec.id,
+          severity: 'warn',
+          payload,
+        });
+      }
     }
 
     // Case 1: the provider outcome was already persisted (crash between the two durable steps).

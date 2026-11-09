@@ -116,4 +116,4 @@ planning steps are read-only `PLANNING` tasks, the engine advances on every supe
 # Phase 2 stage 5 addendum
 
 `src/progress/` computes evidence-based progress (`model.ts`), appends change-only snapshots (`snapshots.ts`, driven by the supervisor's `ProgressTracker`) and builds the owner inbox from durable state (`inbox.ts`).
-Strict milestone gating is enforced inside `Store.claimNext` (`milestoneGateOpen`). Migration 4 adds `progress_snapshots`. See `docs/PROGRESS.md`.
+Strict milestone gating is enforced inside `Store.claimNext` (`milestoneGateOpen`). Migration 11 adds `progress_snapshots` (shipped on main as migration 4; renumbered at the v2/main integration because version 4 already exists on the v1/v2 line). See `docs/PROGRESS_TRACKING.md`.

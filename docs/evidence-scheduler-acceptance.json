@@ -1,0 +1,258 @@
+{
+    "at":  "2026-11-07T14:27:59.9643213+05:00",
+    "machine":  "<machine>",
+    "user":  "<machine>\\<owner>",
+    "node":  "C:\\Program Files\\nodejs\\node.exe",
+    "results":  [
+                    {
+                        "check":  "task registered",
+                        "ok":  true,
+                        "detail":  "ElevariqPersonalAgent-Acceptance"
+                    },
+                    {
+                        "check":  "action runs the wrapper with an absolute node path",
+                        "ok":  true,
+                        "detail":  "-NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy RemoteSigned -File \"E:\\Agent\\Personal-agent\\scripts\\windows\\run-supervisor.ps1\" -RepoPath \"E:\\Agent\\Personal-agent\" -NodePath \"C:\\Program Files\\nodejs\\node.exe\" -AgentHome \"C:\\Users\\<owner>\\AppData\\Local\\ElevariqAgent-acceptance\" -EnvFile \"C:\\Users\\<owner>\\AppData\\Local\\ElevariqAgent-acceptance\\acceptance.env\""
+                    },
+                    {
+                        "check":  "absolute working directory",
+                        "ok":  true,
+                        "detail":  "E:\\Agent\\Personal-agent"
+                    },
+                    {
+                        "check":  "logon trigger for this user",
+                        "ok":  true,
+                        "detail":  "MSFT_TaskLogonTrigger <machine>\\<owner>"
+                    },
+                    {
+                        "check":  "keepalive trigger (repeats indefinitely)",
+                        "ok":  true,
+                        "detail":  "interval=PT1M duration=\u0027\u0027"
+                    },
+                    {
+                        "check":  "runs as this user, interactive token, not elevated",
+                        "ok":  true,
+                        "detail":  "<owner> Interactive Limited"
+                    },
+                    {
+                        "check":  "single instance (IgnoreNew), no time limit, restart on failure",
+                        "ok":  true,
+                        "detail":  "IgnoreNew PT0S restart=999xPT1M"
+                    },
+                    {
+                        "check":  "no secret in task arguments",
+                        "ok":  true,
+                        "detail":  "paths only"
+                    },
+                    {
+                        "check":  "runs on battery power and is not stopped when unplugged",
+                        "ok":  true,
+                        "detail":  "DisallowStartIfOnBatteries=False StopIfGoingOnBatteries=False"
+                    },
+                    {
+                        "check":  "power source during this run",
+                        "ok":  null,
+                        "detail":  "Offline (Offline = on battery)"
+                    },
+                    {
+                        "check":  "probe ran inside Task Scheduler",
+                        "ok":  true,
+                        "detail":  "C:\\Users\\<owner>\\AppData\\Local\\ElevariqAgent-acceptance\\probe.json"
+                    },
+                    {
+                        "check":  "task context user = owner",
+                        "ok":  true,
+                        "detail":  "<machine>\\<owner> session=4"
+                    },
+                    {
+                        "check":  "task context working directory = repo",
+                        "ok":  true,
+                        "detail":  "E:\\Agent\\Personal-agent"
+                    },
+                    {
+                        "check":  "task context node",
+                        "ok":  true,
+                        "detail":  "C:\\Program Files\\nodejs\\node.exe v26.13.0"
+                    },
+                    {
+                        "check":  "claude CLI found in task context",
+                        "ok":  true,
+                        "detail":  "C:\\Users\\<owner>\\.local\\bin\\claude.exe 2.1.319 (Claude Code)"
+                    },
+                    {
+                        "check":  "subscription login readable in task context",
+                        "ok":  true,
+                        "detail":  "loggedIn=True method=claude.ai plan=max"
+                    },
+                    {
+                        "check":  "claude-cli provider ready in task context",
+                        "ok":  true,
+                        "detail":  "Provider: claude-cli (native Claude Code, subscription login)   ready: YES"
+                    },
+                    {
+                        "check":  "supervisor started by the task",
+                        "ok":  true,
+                        "detail":  "pid=18188"
+                    },
+                    {
+                        "check":  "supervisor is node.exe from the embedded path, child of the wrapper",
+                        "ok":  true,
+                        "detail":  "supervisors=1 wrappers=1 exe=C:\\Program Files\\nodejs\\node.exe"
+                    },
+                    {
+                        "check":  "wrapper runs as owner",
+                        "ok":  true,
+                        "detail":  "<machine>\\<owner>"
+                    },
+                    {
+                        "check":  "supervisor uses the configured agent home",
+                        "ok":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "check":  "persistent database created",
+                        "ok":  true,
+                        "detail":  "C:\\Users\\<owner>\\AppData\\Local\\ElevariqAgent-acceptance\\agent.db"
+                    },
+                    {
+                        "check":  "wrapper log written",
+                        "ok":  true,
+                        "detail":  "C:\\Users\\<owner>\\AppData\\Local\\ElevariqAgent-acceptance\\logs\\wrapper.log"
+                    },
+                    {
+                        "check":  "application logs written",
+                        "ok":  true,
+                        "detail":  "agent-2026-11-07.log"
+                    },
+                    {
+                        "check":  "mock task executed to COMPLETED under the task",
+                        "ok":  true,
+                        "detail":  "tsk_mw67297v1146c4a0b4 COMPLETED"
+                    },
+                    {
+                        "check":  "second task start ignored (one wrapper, one supervisor)",
+                        "ok":  true,
+                        "detail":  "wrappers=1 supervisors=1"
+                    },
+                    {
+                        "check":  "manually started second supervisor refused (exit 3)",
+                        "ok":  true,
+                        "detail":  "exit=3"
+                    },
+                    {
+                        "check":  "wrapper restarted the killed supervisor",
+                        "ok":  true,
+                        "detail":  "old=18188 new=12256"
+                    },
+                    {
+                        "check":  "interrupted task recovered and completed",
+                        "ok":  true,
+                        "detail":  "COMPLETED executions=interrupted,completed"
+                    },
+                    {
+                        "check":  "restart recorded in wrapper log",
+                        "ok":  true,
+                        "detail":  "exit code + restart delay logged"
+                    },
+                    {
+                        "check":  "supervisor survives loss of its wrapper",
+                        "ok":  true,
+                        "detail":  "pid=12256"
+                    },
+                    {
+                        "check":  "Task Scheduler restarted the killed wrapper by itself",
+                        "ok":  null,
+                        "detail":  "True (RestartCount applies only to some failure kinds)"
+                    },
+                    {
+                        "check":  "new wrapper monitors the surviving supervisor (no second supervisor)",
+                        "ok":  true,
+                        "detail":  "wrappers=1"
+                    },
+                    {
+                        "check":  "monitoring wrapper takes over after that supervisor dies",
+                        "ok":  true,
+                        "detail":  "old=12256 new=20028"
+                    },
+                    {
+                        "check":  "graceful stop ends supervisor, wrapper and task",
+                        "ok":  true,
+                        "detail":  "stop=0 taskState=Ready supervisor=STOPPED"
+                    },
+                    {
+                        "check":  "wrapper logged the graceful stop",
+                        "ok":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "check":  "keepalive trigger restarts the agent after it ended",
+                        "ok":  true,
+                        "detail":  "pid=13920"
+                    },
+                    {
+                        "check":  "wrapper and supervisor both killed (simulated total failure)",
+                        "ok":  true,
+                        "detail":  "wrappers=0 supervisorAlive=False"
+                    },
+                    {
+                        "check":  "keepalive recovers from total failure of the task process tree",
+                        "ok":  true,
+                        "detail":  "old=13920 new=19572"
+                    },
+                    {
+                        "check":  "stop --hold: keepalive does not restart the agent",
+                        "ok":  true,
+                        "detail":  "stop=0 live=0"
+                    },
+                    {
+                        "check":  "claude-cli supervisor started by the task",
+                        "ok":  true,
+                        "detail":  "pid=7836"
+                    },
+                    {
+                        "check":  "real CLI task completed under the task",
+                        "ok":  true,
+                        "detail":  "tsk_mw679kdbb28553e135 COMPLETED"
+                    },
+                    {
+                        "check":  "real CLI worker wrote its artifact",
+                        "ok":  true,
+                        "detail":  "C:\\Users\\<owner>\\AppData\\Local\\ElevariqAgent-acceptance\\workspaces\\scheduler-acceptance\\sched-cli.txt"
+                    },
+                    {
+                        "check":  "watchdog variables visible to the worker\u0027s Bash tool",
+                        "ok":  null,
+                        "detail":  "1 | 300000 (Claude Code decides what tool shells inherit)"
+                    },
+                    {
+                        "check":  "all 4 watchdog variables in the environment handed to the claude worker",
+                        "ok":  true,
+                        "detail":  "RETRY_WATCHDOG=1 RECHECK_MS=300000 RESUME_INTERRUPTED_TURN=1 RESUME_PROMPT set=True"
+                    },
+                    {
+                        "check":  "watchdog variables inherited by claude\u0027s own child processes (policy hook)",
+                        "ok":  null,
+                        "detail":  "RETRY_WATCHDOG=1 RECHECK_MS=300000 RESUME_INTERRUPTED_TURN= RESUME_PROMPT set=False (Claude Code does not pass RESUME_* on to children)"
+                    },
+                    {
+                        "check":  "worker used the subscription login (init credential source)",
+                        "ok":  true,
+                        "detail":  "subscription"
+                    },
+                    {
+                        "check":  "claude-cli supervisor stopped gracefully",
+                        "ok":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "check":  "acceptance task unregistered",
+                        "ok":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "check":  "not covered",
+                        "ok":  null,
+                        "detail":  "Windows restart / sign-in trigger: manual check, see docs/WINDOWS_DEPLOYMENT.md"
+                    }
+                ]
+}

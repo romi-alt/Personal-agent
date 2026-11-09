@@ -1,14 +1,20 @@
 <#
 .SYNOPSIS
   Gracefully stops the supervisor (so in-flight work is checkpointed) and unregisters the scheduled task.
-  Compatible with Windows PowerShell 5.1 and PowerShell 7. Not executed in the Phase 1.5 build environment.
+  Compatible with Windows PowerShell 5.1 and PowerShell 7.
 #>
 [CmdletBinding(SupportsShouldProcess = $true)]
 param(
   [string]$TaskName = 'ElevariqPersonalAgent',
-  [string]$RepoPath = (Split-Path -Parent (Split-Path -Parent $PSScriptRoot))
+  [string]$RepoPath = '',
+  [string]$AgentHome = '',
+  [string]$EnvFile = ''
 )
 $ErrorActionPreference = 'Stop'
+# Windows PowerShell 5.1 leaves $PSScriptRoot empty inside param() defaults, so resolve it here.
+if (-not $RepoPath) { $RepoPath = Split-Path -Parent (Split-Path -Parent $PSScriptRoot) }
+if ($AgentHome) { $env:AGENT_HOME = $AgentHome }
+if ($EnvFile) { $env:AGENT_ENV_FILE = $EnvFile }
 
 $task = Get-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue
 if (-not $task) { Write-Output "Task '$TaskName' not found."; exit 0 }

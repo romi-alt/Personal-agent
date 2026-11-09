@@ -315,6 +315,217 @@ CREATE TABLE plan_tasks (
   },
   {
     version: 4,
+    name: 'phase_1_5_cli_worker_supervision',
+    sql: `
+-- Official retry-watchdog capacity wait observed inside a live provider process (NULL = not waiting)
+ALTER TABLE executions ADD COLUMN capacity_wait_since INTEGER;
+ALTER TABLE executions ADD COLUMN capacity_wait_reason TEXT;
+ALTER TABLE executions ADD COLUMN capacity_wait_resets_at INTEGER;
+ALTER TABLE executions ADD COLUMN capacity_wait_recheck_at INTEGER;
+-- OS process id of the provider child (native CLI worker) so recovery can stop an orphan before replacing it
+ALTER TABLE executions ADD COLUMN worker_pid INTEGER;
+-- Last time the provider produced any output (model text, tool event, retry/wait notice)
+ALTER TABLE executions ADD COLUMN last_activity_at INTEGER;
+`,
+  },
+  {
+    version: 5,
+    name: 'worker_process_identity',
+    sql: `
+-- JSON {pid,image,startedAtMs}: OS identity of the provider child recorded at spawn; recovery stops an orphan only
+-- if the live process still has this identity (pid reuse safe)
+ALTER TABLE executions ADD COLUMN worker_identity TEXT;
+`,
+  },
+  {
+    version: 6,
+    name: 'phase_2_project_intelligence',
+    sql: `
+-- Research tasks may use read-only web tools (still subject to the project's web_access approval policy)
+ALTER TABLE tasks ADD COLUMN allow_web INTEGER NOT NULL DEFAULT 0;
+
+-- Original owner input: free-text assignment and attached specifications, kept verbatim
+CREATE TABLE project_documents (
+  id TEXT PRIMARY KEY,
+  project_id TEXT NOT NULL,
+  kind TEXT NOT NULL,            -- assignment_text | attachment
+  name TEXT NOT NULL,
+  content TEXT NOT NULL,
+  sha256 TEXT NOT NULL,
+  bytes INTEGER NOT NULL,
+  created_at INTEGER NOT NULL,
+  UNIQUE(project_id, sha256)
+);
+
+CREATE TABLE research_findings (
+  run_id TEXT NOT NULL,
+  finding_id TEXT NOT NULL,
+  project_id TEXT NOT NULL,
+  area TEXT NOT NULL,
+  statement TEXT NOT NULL,
+  kind TEXT NOT NULL,            -- verified | assumption (after the citation check)
+  claimed_kind TEXT NOT NULL,    -- what the model claimed
+  confidence TEXT NOT NULL,
+  sources TEXT NOT NULL,         -- JSON [{title,url}]
+  citation_check TEXT NOT NULL,  -- observed | not_observed | no_web_access | none
+  researched_at INTEGER NOT NULL,
+  PRIMARY KEY(run_id, finding_id)
+);
+CREATE INDEX idx_research_project ON research_findings(project_id);
+
+CREATE TABLE adrs (
+  project_id TEXT NOT NULL,
+  adr_id TEXT NOT NULL,
+  number INTEGER NOT NULL,
+  title TEXT NOT NULL,
+  status TEXT NOT NULL,          -- proposed | accepted | rejected | superseded
+  context TEXT NOT NULL,
+  decision TEXT NOT NULL,
+  alternatives TEXT NOT NULL,    -- JSON string[]
+  rationale TEXT NOT NULL,
+  consequences TEXT NOT NULL,
+  significant INTEGER NOT NULL,
+  decided_at INTEGER NOT NULL,
+  run_id TEXT NOT NULL,
+  file_path TEXT,
+  PRIMARY KEY(project_id, adr_id)
+);
+
+CREATE TABLE architecture_specs (
+  run_id TEXT PRIMARY KEY,
+  project_id TEXT NOT NULL,
+  sections TEXT NOT NULL,        -- JSON {system,database,...}
+  diagrams TEXT NOT NULL,        -- JSON [{title,mermaid}]
+  created_at INTEGER NOT NULL
+);
+
+CREATE TABLE plan_reviews (
+  id TEXT PRIMARY KEY,
+  run_id TEXT NOT NULL,
+  project_id TEXT NOT NULL,
+  round INTEGER NOT NULL,
+  source TEXT NOT NULL,          -- deterministic | model
+  verdict TEXT NOT NULL,         -- approve | revise
+  issues TEXT NOT NULL,          -- JSON [{id,category,severity,description,recommendation}]
+  created_at INTEGER NOT NULL
+);
+CREATE INDEX idx_plan_reviews_run ON plan_reviews(run_id);
+
+CREATE TABLE epics (
+  project_id TEXT NOT NULL,
+  key TEXT NOT NULL,
+  title TEXT NOT NULL,
+  goal TEXT NOT NULL,
+  position INTEGER NOT NULL,
+  PRIMARY KEY(project_id, key)
+);
+ALTER TABLE plan_tasks ADD COLUMN epic_key TEXT;
+ALTER TABLE plan_tasks ADD COLUMN subtasks TEXT NOT NULL DEFAULT '[]';
+ALTER TABLE plan_tasks ADD COLUMN testing TEXT NOT NULL DEFAULT '';
+`,
+  },
+  {
+    version: 7,
+    name: 'phase_3_engineering',
+    sql: `
+-- Bounded specialist role a coding task runs under (adds a brief; never adds permissions)
+ALTER TABLE tasks ADD COLUMN role TEXT;
+
+-- Independent QA per coding task: review rounds, correction tasks, escalation
+CREATE TABLE qa_reviews (
+  task_id TEXT NOT NULL,           -- the reviewed (original) coding task
+  round INTEGER NOT NULL,
+  review_task_id TEXT,
+  correction_task_id TEXT,
+  status TEXT NOT NULL,            -- REVIEWING | PASSED | FAILED | CORRECTING | ESCALATED | OWNER_ACCEPTED | OWNER_REJECTED
+  repairs INTEGER NOT NULL DEFAULT 0,
+  result TEXT,                     -- JSON: criteria verdicts, defects, citation check
+  approval_id TEXT,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL,
+  PRIMARY KEY(task_id, round)
+);
+CREATE INDEX idx_qa_status ON qa_reviews(status);
+`,
+  },
+  {
+    version: 8,
+    name: 'phase_4_integration_sync',
+    sql: `
+-- Read-only ERP/CRM sync audit, resumable cursors, idempotent external records (no live adapter yet)
+CREATE TABLE sync_runs (
+  id TEXT PRIMARY KEY,
+  system TEXT NOT NULL,
+  kind TEXT NOT NULL,
+  scope TEXT NOT NULL,
+  status TEXT NOT NULL,            -- running | completed | partial | failed
+  started_at INTEGER NOT NULL,
+  finished_at INTEGER,
+  pages INTEGER NOT NULL DEFAULT 0,
+  created INTEGER NOT NULL DEFAULT 0,
+  updated INTEGER NOT NULL DEFAULT 0,
+  unchanged INTEGER NOT NULL DEFAULT 0,
+  error TEXT
+);
+CREATE TABLE sync_cursors (
+  key TEXT PRIMARY KEY,
+  cursor TEXT,
+  updated_at INTEGER NOT NULL
+);
+CREATE TABLE external_records (
+  system TEXT NOT NULL,
+  kind TEXT NOT NULL,
+  external_id TEXT NOT NULL,
+  content_hash TEXT NOT NULL,
+  data TEXT NOT NULL,
+  first_seen_at INTEGER NOT NULL,
+  last_seen_at INTEGER NOT NULL,
+  last_changed_at INTEGER NOT NULL,
+  last_run_id TEXT NOT NULL,
+  PRIMARY KEY(system, kind, external_id)
+);
+`,
+  },
+  // v9 is reserved for a concurrent change set; versions are applied in order of what is missing, so a later v9
+  // still applies on a database that already has v10 (the two touch different tables).
+  {
+    version: 10,
+    name: 'qa_requirement_ownership_and_review_links',
+    sql: `
+-- A1: the single plan task that OWNS a requirement (the independent review judges the requirement only there;
+-- every other linked task merely contributes). NULL = not yet resolved: code falls back to the last linked task in
+-- plan (topological) order.
+ALTER TABLE requirements ADD COLUMN owner_task_id TEXT;
+
+-- A3: every review task (including repair re-dispatches that supersede an earlier review of the same round) is
+-- linked to its QA round. qa_reviews.review_task_id keeps pointing at the latest one.
+CREATE TABLE qa_review_tasks (
+  review_task_id TEXT PRIMARY KEY,
+  task_id TEXT NOT NULL,           -- the reviewed (original) coding task
+  round INTEGER NOT NULL,
+  repair INTEGER NOT NULL,
+  created_at INTEGER NOT NULL
+);
+CREATE INDEX idx_qa_review_tasks_task ON qa_review_tasks(task_id, round);
+-- Backfill from the review dedupe key "qa:<taskId>:<round>:<repair>" (existing review tasks become linked).
+INSERT OR IGNORE INTO qa_review_tasks(review_task_id, task_id, round, repair, created_at)
+SELECT id,
+       substr(k, 1, instr(k, ':') - 1),
+       CAST(substr(r, 1, instr(r, ':') - 1) AS INTEGER),
+       CAST(substr(r, instr(r, ':') + 1) AS INTEGER),
+       created_at
+FROM (
+  SELECT id, created_at, k, substr(k, instr(k, ':') + 1) AS r
+  FROM (SELECT id, created_at, substr(dedupe_key, 4) AS k FROM tasks WHERE dedupe_key LIKE 'qa:%:%:%')
+)
+WHERE instr(k, ':') > 0 AND instr(r, ':') > 0;
+`,
+  },
+  {
+    // Phase 2 stage 5 (origin/main 09c7397) shipped this as version 4, but version 4 is already
+    // phase_1_5_cli_worker_supervision on the v1/v2 line (production DBs are at v8/v10 of that line). Renumbered to 11
+    // during the v2/main integration so every existing database receives it. Additive only.
+    version: 11,
     name: 'phase_2_stage_5_progress_snapshots',
     sql: `
 -- Evidence-based progress history (appended only when the numbers change)
