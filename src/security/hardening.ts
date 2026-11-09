@@ -54,7 +54,7 @@ export function stripEscapes(command: string): string {
   return command.replace(/\^(?=\S)/g, '').replace(/`(?=[A-Za-z])/g, '');
 }
 
-const HARD_DENY_RULES: { cls: string; reason: string; re: RegExp }[] = [
+const HARD_DENY_RULES: { cls: string; reason: string; re: RegExp; commandOnly?: boolean }[] = [
   {
     cls: 'E',
     reason: 'encoded or obfuscated command execution is not permitted',
@@ -77,6 +77,14 @@ const HARD_DENY_RULES: { cls: string; reason: string; re: RegExp }[] = [
     reason: 'reading credentials, credential stores or dumping the environment is not permitted',
     // PR #5 review fix (finding 4): every common per-user credential store, not only Claude's.
     re: /(\.credentials(\.json)?\b|(~|\$HOME|\$\{HOME\}|%USERPROFILE%|\$env:USERPROFILE|\$USERPROFILE|[a-z]:[\\/]+users[\\/]+[^\\/'"]+?|\/[a-z]\/users\/[^/'"]+?|\/home\/[^/\s'"]+|\/root)[\\/]+(\.claude|\.ssh|\.npmrc|\.yarnrc(\.yml)?|\.pypirc|\.netrc|_netrc|\.git-credentials|\.aws|\.azure|\.kube|\.gnupg|\.docker[\\/]+config\.json|\.config[\\/]+gh|AppData[\\/]+Roaming[\\/]+GitHub CLI|AppData[\\/]+Roaming[\\/]+npm[\\/]+etc)\b|\bid_(rsa|ed25519|ecdsa|dsa)\b|\bCLAUDE_CODE_OAUTH_TOKEN\b|\bCLAUDE_CONFIG_DIR\b|\bANTHROPIC_(API_KEY|AUTH_TOKEN)\b|\.git-credentials\b|\bgit\s+credential\b|\bcmdkey(\.exe)?\b|\bvaultcmd(\.exe)?\b|\bGet-StoredCredential\b|(^|[;&|(]|&&|\|\|)\s*(printenv|env|set|export\s+-p|declare\s+-x|(Get-ChildItem|gci|dir|ls)\s+env:\\?)\s*($|[;&|>)]))/i,
+  },
+  {
+    // Phase B (Rule K matrix): environment dumps through an interpreter or a nested shell, credential CLIs and OS
+    // credential stores. COMMAND text only: source files legitimately pass `process.env` to child processes.
+    cls: 'K',
+    reason: 'reading credentials, credential stores or dumping the environment is not permitted',
+    commandOnly: true,
+    re: /(\b(node|nodejs|deno|bun)(\.exe)?\b[^;&|\n]*\bprocess\.env\b(?![.[\w])|\bos\.environ\b(?!\s*(\.get\b|\[))|\/proc\/(self|\d+|\$\$)\/environ\b|\bGetEnvironmentVariables\s*\(|\b(ba|z|da|k)?sh(\.exe)?\s+-c\s+["']\s*(printenv|env|set|export\s+-p|declare\s+-x)\s*($|["';&|>)])|\bcmd(\.exe)?\s+\/[ck]\s+["']?\s*set\s*($|["'&|>])|\b(Get-ChildItem|gci|dir|ls)\s+env:\\?\s*($|["';&|>)])|\bgh(\.exe)?\s+auth\s+(token\b|status\b[^;&|\n]*(\s-t\b|--show-token))|\b(npm|pnpm|yarn)\s+config\s+(get|list|ls)\b[^;&|\n]*(_auth|token|\s(-l|--long|--json)\b)|\bsecurity\s+(find-(generic|internet)-password|dump-keychain)\b|\bkeymgr\.dll\b|\bcredwiz(\.exe)?\b|[\\/]Microsoft[\\/]+(Credentials|Protect|Vault)\b)/i,
   },
 ];
 
@@ -114,19 +122,33 @@ export const V21_APPROVAL_RULES: { type: string; description: string; re: RegExp
   {
     type: 'destructive_delete',
     description: 'Deleting substantial data',
-    re: /(\brm\b[^;&|\n]*\s(-[a-zA-Z]*[rR][a-zA-Z]*|--recursive)\b|\b(rd|rmdir|del|erase)\b[^;&|\n]*\s\/s\b|\b(Remove-Item|ri|rm|rmdir|rd|del|erase)\b[^;&|\n]*\s-r(e(c(u(r(se?)?)?)?)?)?\b|\b(rmSync|rmdirSync|fs\.rm|fs\.promises\.rm|fsp\.rm|rmdir)\s*\([^)]*recursive|\bshutil\.rmtree\b|\bos\.removedirs\b|\bIO\.Directory\]::Delete\([^)]*\$true|\brimraf\b|\bdel-cli\b|\bgit\s+clean\b[^;&|\n]*\s-[a-zA-Z]*f)/i,
+    re: /(\bgh(\.exe)?\s+(repo|release)\s+delete\b|\brm\b[^;&|\n]*\s(-[a-zA-Z]*[rR][a-zA-Z]*|--recursive)\b|\b(rd|rmdir|del|erase)\b[^;&|\n]*\s\/s\b|\b(Remove-Item|ri|rm|rmdir|rd|del|erase)\b[^;&|\n]*\s-r(e(c(u(r(se?)?)?)?)?)?\b|\b(rmSync|rmdirSync|fs\.rm|fs\.promises\.rm|fsp\.rm|rmdir)\s*\([^)]*recursive|\bshutil\.rmtree\b|\bos\.removedirs\b|\bIO\.Directory\]::Delete\([^)]*\$true|\brimraf\b|\bdel-cli\b|\bgit\s+clean\b[^;&|\n]*\s-[a-zA-Z]*f)/i,
   },
   {
     type: 'protected_branch_push',
     description: 'Pushing to a remote / protected branch',
-    re: /(\bgit\b(\s+(-C|-c|--git-dir|--work-tree|--namespace)\s+\S+|\s+--[\w-]+(=\S+)?)+\s+push\b|\bgit\b[^;&|\n]*\s-c\s+["']?alias\.|\bgit\s+config\b[^;&|\n]*\balias\.|\bgit\s+send-pack\b|\bgit\s+remote\s+(add|set-url)\b)/i,
+    re: /(\bgh(\.exe)?\s+(pr\s+merge|repo\s+sync)\b|\bgit\b(\s+(-C|-c|--git-dir|--work-tree|--namespace)\s+\S+|\s+--[\w-]+(=\S+)?)+\s+push\b|\bgit\b[^;&|\n]*\s-c\s+["']?alias\.|\bgit\s+config\b[^;&|\n]*\balias\.|\bgit\s+send-pack\b|\bgit\s+remote\s+(add|set-url)\b)/i,
   },
   {
     type: 'system_modification',
     description: 'Modifying the host system outside the workspace',
-    re: /(\bgit\b[^;&|\n]*\s-c\s+["']?(core\.(hooksPath|sshCommand|fsmonitor|gitProxy|editor|pager|askPass)|credential\.|protocol\.[\w.-]*allow|uploadpack\.|receivepack\.)|\bgit\s+config\b[^;&|\n]*\b(core\.(hooksPath|sshCommand|fsmonitor|gitProxy|askPass)|credential\.|include\.path)|\bschtasks(\.exe)?\b|\bRegister-ScheduledTask\b|\breg(\.exe)?\s+(add|delete|import)\b|\bSet-ItemProperty\b[^;&|\n]*HK(CU|LM):|\bNew-ItemProperty\b[^;&|\n]*HK(CU|LM):|\bsetx\b|\bnetsh\b|\bStart-Process\b[^;&|\n]*-Verb\s+RunAs)/i,
+    re: /(\bgh(\.exe)?\s+repo\s+(archive|rename|edit)\b|\bgit\b[^;&|\n]*\s-c\s+["']?(core\.(hooksPath|sshCommand|fsmonitor|gitProxy|editor|pager|askPass)|credential\.|protocol\.[\w.-]*allow|uploadpack\.|receivepack\.)|\bgit\s+config\b[^;&|\n]*\b(core\.(hooksPath|sshCommand|fsmonitor|gitProxy|askPass)|credential\.|include\.path)|\bschtasks(\.exe)?\b|\bRegister-ScheduledTask\b|\breg(\.exe)?\s+(add|delete|import)\b|\bSet-ItemProperty\b[^;&|\n]*HK(CU|LM):|\bNew-ItemProperty\b[^;&|\n]*HK(CU|LM):|\bsetx\b|\bnetsh\b|\bStart-Process\b[^;&|\n]*-Verb\s+RunAs)/i,
   },
 ];
+
+// Phase E: consequential remote operations that matched no category (unrecognized => allowed) in the V2.1 matrix.
+V21_APPROVAL_RULES.push(
+  {
+    type: 'publish_release',
+    description: 'Publishing a release or package',
+    re: /(\b(npm|pnpm|yarn)\s+(unpublish|deprecate)\b|\bnpm\s+dist-tag\s+(add|rm)\b|\bgh(\.exe)?\s+release\s+(edit|upload)\b)/i,
+  },
+  {
+    type: 'production_credentials',
+    description: 'Changing production credentials/secrets',
+    re: /\bgh(\.exe)?\s+(secret|variable)\s+(set|delete|remove)\b/i,
+  },
+);
 
 /**
  * PR #5 review fix (finding 1): returns EVERY matching V2.1 category. The first version returned only the first
@@ -310,7 +332,9 @@ export function contentHardDeny(
   workspace: string,
   protectedPaths: readonly string[],
 ): HardDeny | null {
-  const k = HARD_DENY_RULES.find((r) => (r.cls === 'K' || r.cls === 'W') && r.re.test(content));
+  const k = HARD_DENY_RULES.find(
+    (r) => (r.cls === 'K' || r.cls === 'W') && !r.commandOnly && r.re.test(content),
+  );
   if (
     k &&
     !/^\s*[;&|(]?\s*(printenv|env|set|export|declare|Get-ChildItem|gci|dir|ls)\b/i.test(
