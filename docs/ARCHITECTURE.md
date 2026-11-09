@@ -110,3 +110,10 @@ a `canUseTool` callback enforcing the workspace/approval policy, `maxTurns`, `ma
 
 `src/planning/*` (schemas, JSON extraction, prompts, deterministic validators) and `src/workflows/*` (`WorkflowEngine`, `WorkflowRepository`) implement the planning pipeline on top of the existing queue:
 planning steps are read-only `PLANNING` tasks, the engine advances on every supervisor tick, and plan materialisation creates ordinary coding tasks. See `docs/PLANNING.md`.
+
+---
+
+# Phase 2 stage 5 addendum
+
+`src/progress/` computes evidence-based progress (`model.ts`), appends change-only snapshots (`snapshots.ts`, driven by the supervisor's `ProgressTracker`) and builds the owner inbox from durable state (`inbox.ts`).
+Strict milestone gating is enforced inside `Store.claimNext` (`milestoneGateOpen`). Migration 11 adds `progress_snapshots` (shipped on main as migration 4; renumbered at the v2/main integration because version 4 already exists on the v1/v2 line). See `docs/PROGRESS_TRACKING.md`.

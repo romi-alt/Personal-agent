@@ -25,6 +25,7 @@ npm run agent -- project:status school-management-erp
 | `budget` | `{maxUsdTotal?, maxUsdPerExecution?, maxExecutions?}` | enforced at claim time (total estimated spend, execution count) and per execution (min with the global cap). Estimates, not billing |
 | `approvalPolicy` | `{preApproved: [...], alsoRequire: [...], deliveryRequiresOwnerApproval: true}` | `preApproved` may only contain `destructive_delete`, `system_modification`, `external_tool`. Production-facing categories (deploy, publish, push, live migration, credentials, customer messages, money, access control) **cannot** be pre-approved. `alsoRequire`: `web_access`, `external_tool`. Delivery approval is fixed to `true` |
 | `requiredIntegrations` | `{system: erp|crm|github|other, access: none|read, purpose}[]` | **write access cannot be requested** in Phase 1.5 |
+| `execution` | `{milestoneGating: strict|off}` | default `strict`: planned tasks of a milestone wait until all earlier milestones are finished (see `docs/PROGRESS_TRACKING.md`) |
 | `verification` | `{buildCommand?, testCommand?}` | owner-configured commands run by the verifiers (see below) |
 | `source` | `{system: manual|erp|crm, externalId?}` | `(system, externalId)` makes registration idempotent - re-registering returns the existing project |
 

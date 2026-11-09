@@ -165,6 +165,18 @@ describe('E2E: assignment -> planned tasks -> executed -> VERIFYING, across a SI
     expect(planShow).toMatch(/Latest plan: valid; uncovered requirements: none/);
     expect(ok('workflow:list')).toMatch(/plan_project\s+COMPLETED/);
 
+    // ---- evidence-based progress and the owner inbox (stage 5)
+    const prog = ok('progress', 'school-management-erp');
+    // T2 required TESTS_PASS, which has no command configured, so it is only claimed: 3/5 of the weight is verified.
+    expect(prog).toMatch(/VERIFIED 60%\s+\(claimed by the model: 100%\)/);
+    expect(prog).toMatch(/M1\s+VERIFIED/);
+    expect(prog).toMatch(/M2\s+COMPLETE_UNVERIFIED/);
+    expect(prog).toMatch(/TESTS_PASS=NOT_CONFIGURED/);
+    const inbox = ok('inbox');
+    expect(inbox).toMatch(/All tasks finished - verification needed/);
+    expect(inbox).toMatch(/project:verify school-management-erp/);
+    expect(ok('status')).toMatch(/Owner inbox\s+: 1 item\(s\)/);
+
     expect(ok('stop')).toBeTypeOf('string');
     expect(await exited(b)).toBe(0);
   }, 150_000);

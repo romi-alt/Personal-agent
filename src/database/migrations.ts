@@ -521,6 +521,26 @@ FROM (
 WHERE instr(k, ':') > 0 AND instr(r, ':') > 0;
 `,
   },
+  {
+    // Phase 2 stage 5 (origin/main 09c7397) shipped this as version 4, but version 4 is already
+    // phase_1_5_cli_worker_supervision on the v1/v2 line (production DBs are at v8/v10 of that line). Renumbered to 11
+    // during the v2/main integration so every existing database receives it. Additive only.
+    version: 11,
+    name: 'phase_2_stage_5_progress_snapshots',
+    sql: `
+-- Evidence-based progress history (appended only when the numbers change)
+CREATE TABLE progress_snapshots (
+  id TEXT PRIMARY KEY,
+  project_id TEXT NOT NULL REFERENCES projects(id),
+  at INTEGER NOT NULL,
+  verified_percent REAL NOT NULL,
+  claimed_percent REAL NOT NULL,
+  fingerprint TEXT NOT NULL,
+  data TEXT NOT NULL
+);
+CREATE INDEX idx_progress_project ON progress_snapshots(project_id, at);
+`,
+  },
 ];
 
 export function runMigrations(db: Database.Database, migrations: Migration[] = MIGRATIONS): number[] {

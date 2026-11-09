@@ -14,6 +14,7 @@ import type { WorkflowEngine } from '../workflows/engine.js';
 import type { QaEngine } from '../engineering/qa.js';
 import { createBackup, listBackups, pruneBackups } from '../ops/backup.js';
 import { Notifier } from '../ops/notify.js';
+import { ProgressTracker } from '../progress/snapshots.js';
 
 export interface SupervisorDeps {
   config: AppConfig;
@@ -49,6 +50,7 @@ export class Supervisor {
   private readonly shutdownCtl = new AbortController();
   private readonly workers = new Map<string, Promise<void>>();
   private readonly runner: TaskRunner;
+  private readonly progress?: ProgressTracker;
   private lastGate = '';
   private memoryDeferred = false;
   private lastRetentionRun = 0;
@@ -56,6 +58,7 @@ export class Supervisor {
 
   constructor(private readonly d: SupervisorDeps) {
     this.instanceId = d.instanceId ?? `sup_${randomBytes(4).toString('hex')}`;
+    this.progress = d.workflows ? new ProgressTracker(d.store, d.workflows.repo) : undefined;
     this.runner = new TaskRunner({
       config: d.config,
       store: d.store,
@@ -253,6 +256,7 @@ export class Supervisor {
       this.d.log.error('qa.tick_error', { error: err });
     }
     await this.maintenance();
+    this.progress?.sweep(); // evidence-based progress snapshots (append-only, only on change)
     const gate = await this.gate();
     if (gate.reason !== this.lastGate) {
       this.lastGate = gate.reason;

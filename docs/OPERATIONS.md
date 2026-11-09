@@ -301,3 +301,12 @@ that date; an expired login stops all CLI workers (`provider:status` reports it)
   - Coding workers cannot run state-changing agent commands. The policy hook hard-denies them, and the CLI refuses owner-only commands when `ELEVARIQ_WORKER=1`.
   - This is a guardrail, not a sandbox (see SECURITY.md).
 - **Database migration v10** (additive) applies when v2 first opens a database. Rollback means restoring a backup taken before the upgrade, with v1's `restore`. See `docs/V2_RELEASE_REPORT.md`, where the rollback is rehearsed.
+
+# Phase 2 stage 5 addendum
+
+```bash
+npm run agent -- inbox [--project P] [--json]      # what is waiting for you, with the resolving commands
+npm run agent -- progress <project> [--history]    # evidence-based progress; "claimed" is never the headline
+```
+
+`status` shows the inbox count. Check `inbox` after any `BLOCKED`/`WAITING_FOR_*` state; each item says exactly what to run. See `docs/PROGRESS_TRACKING.md`.

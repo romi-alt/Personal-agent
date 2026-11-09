@@ -30,6 +30,7 @@ Phase 1.5 = Phase 1 foundation + an independent audit (14 defects fixed, two of 
 | Verification of requirements satisfied / security checks | **NOT IMPLEMENTED** (always `NOT_EVALUATED`; Phase 2) |
 | Provider readiness report (SDK / credentials / API access / budget / live execution / live recovery) | **IMPLEMENTED AND TESTED**; live levels are **NOT VERIFIED** |
 | Phase 2 planning pipeline: analyse -> architect -> decompose -> owner approval -> tasks (read-only planning tasks, validated structured output, bounded repair loop) | **IMPLEMENTED AND TESTED** with the mock provider + real-process SIGKILL e2e; **not run with a real model** |
+| Evidence-based progress (verified vs claimed), milestone gating, snapshots, owner inbox (Phase 2 stage 5) | **IMPLEMENTED AND TESTED** (mock + real processes) |
 | Live-provider verification (`provider:verify --access`, `smoke:live`, `smoke:live-recovery`) | **BLOCKED** - needs `ANTHROPIC_API_KEY` + spending authorisation in the running environment |
 | Windows scripts | static review + string guards only; **never parsed or run by PowerShell**; checklist in `docs/WINDOWS_DEPLOYMENT.md` |
 | GitHub `main` created; default-branch switch and branch protection | `main` **DONE**; default branch + protection **BLOCKED** by the session proxy - owner steps in `docs/GITHUB_SETUP.md` |
@@ -81,8 +82,25 @@ All settings are environment variables validated at startup (`src/config/index.t
 | `docs/PHASE_2_ROADMAP.md` | Next stage (not implemented) |
 | `docs/TEST_RESULTS.md` | Real commands and results |
 | `docs/PLANNING.md` | Phase 2 planning pipeline (stages 1-4) |
+| `docs/PROGRESS_TRACKING.md` | Evidence-based progress, milestone gating, owner inbox (stage 5) |
 | `docs/AUDIT_PHASE_1_5.md` | Independent audit: defects, fixes, residual weaknesses |
 | `docs/PROJECT_ASSIGNMENTS.md` | Assignment schema, durable context, project lifecycle |
 | `docs/COMPLETION_VERIFICATION.md` | Verification ladder, interfaces, evidence |
 | `docs/WINDOWS_DEPLOYMENT.md` | Windows 11 install + verification checklist (not live-tested) |
 | `docs/GITHUB_SETUP.md` | Branch setup and the admin-only settings |
+
+## CI is local (GitHub Actions is off)
+
+This repository is private and GitHub Actions is disabled for it (no paid Actions minutes). The CI is
+`scripts/ci-local.mjs`: it runs the same steps as `.github/workflows/ci.yml` on your own machine, in a clean temporary
+checkout of the commit.
+
+- **Before pushing a branch that deploys (`main`), the full run must pass.** The pre-push hook in `.githooks/`
+  (switched on once per clone with `npm run hooks`, or automatically the first time you run `npm run ci:local`; `npm install` cannot do it because `.npmrc` has `ignore-scripts=true`) runs it automatically; other branches get a quick check.
+  Running `npm run ci:local` by hand first is fine: a passed commit is remembered, so the push doesn't rerun it.
+- Needs Node 22. On Windows the `check-windows` job runs too.
+- Emergency only: `CI_LOCAL_SKIP=1 git push` (or `git push --no-verify`) skips it. Say so to the team.
+- With the GitHub CLI (`gh`) logged in, results appear on the commit as `local/<job>` statuses.
+- When `.github/workflows/ci.yml` changes, change `CONFIG` at the top of `scripts/ci-local.mjs` the same way.
+- Claude Code sessions: run `npm run ci:local` before pushing a deploy branch. If the environment can't run it (no
+  Docker or database), push a different branch and open a PR so a person runs it.

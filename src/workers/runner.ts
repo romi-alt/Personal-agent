@@ -607,10 +607,7 @@ export class TaskRunner {
         if (decision.next === 'COMPLETED' && outcome.kind === 'completed') {
           store.saveTaskOutput(taskId, executionId, outcome.summary);
         }
-        if (decision.next === 'COMPLETED')
-          store.updateProject(projectId, {
-            progressSummary: `Last completed: ${store.requireTask(taskId).title}`,
-          });
+        // progress_summary is owned by the evidence-based progress tracker (src/progress), not by provider claims.
         return true;
       })
       .immediate();

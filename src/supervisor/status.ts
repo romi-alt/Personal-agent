@@ -1,6 +1,8 @@
 import type { ExecutionProvider } from '../providers/types.js';
 import type { Store } from '../queue/store.js';
 import type { CapacityWait, Task } from '../types/index.js';
+import { buildInbox } from '../progress/inbox.js';
+import { WorkflowRepository } from '../workflows/repository.js';
 
 export type WorkerState =
   | 'RUNNING'
@@ -48,6 +50,8 @@ export function deriveWorkerState(input: {
 }
 
 export interface StatusReport {
+  /** Items waiting for a human decision (see `inbox`). */
+  inbox: { total: number; high: number };
   supervisor: {
     live: boolean;
     status: string;
@@ -127,7 +131,9 @@ export async function buildStatus(
     byStatus,
     total: tasks.length,
   });
+  const inboxItems = buildInbox(store, new WorkflowRepository(store));
   return {
+    inbox: { total: inboxItems.length, high: inboxItems.filter((i) => i.severity === 'high').length },
     workerState: ws.state,
     workerStateReason: ws.reason,
     currentExecution: exec

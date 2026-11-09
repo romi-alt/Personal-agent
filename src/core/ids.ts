@@ -18,7 +18,8 @@ export function newId(
     | 'doc'
     | 'rev'
     | 'ses'
-    | 'syn',
+    | 'syn'
+    | 'pgs',
 ): string {
   return `${prefix}_${Date.now().toString(36)}${randomBytes(5).toString('hex')}`;
 }
