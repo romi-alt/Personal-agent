@@ -1,5 +1,6 @@
 import { execFile } from 'node:child_process';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, lstatSync, readFileSync, realpathSync } from 'node:fs';
+import { redactString } from '../security/redact.js';
 import path from 'node:path';
 import { promisify } from 'node:util';
 import { z } from 'zod';
@@ -719,19 +720,45 @@ export class QaEngine {
       .slice(0, 25);
     const newFiles = untracked
       .map((f) => {
-        const abs = path.join(repoPath, f);
-        try {
-          const text = readFileSync(abs, 'utf8');
-          return `--- new file: ${f}\n${text.length > 4000 ? text.slice(0, 4000) + '\n...[truncated]' : text}`;
-        } catch {
-          return `--- new file: ${f} (unreadable)`;
-        }
+        const r = readUntrackedSafely(repoPath, f);
+        if (!r.ok) return `--- new file: ${f} (${r.why}; not read)`;
+        const text = r.text;
+        return `--- new file: ${f}\n${text.length > 4000 ? text.slice(0, 4000) + '\n...[truncated]' : text}`;
       })
       .join('\n');
-    const out = `git status --porcelain:\n${status || '(clean)'}\n\ngit diff ${base ? base.slice(0, 12) : 'HEAD'}..working tree:\n${diff || '(no tracked changes)'}${newFiles ? `\n\nNew (untracked) files:\n${newFiles}` : ''}`;
+    // V2.1 Phase C: the review prompt is persisted (review task instructions); redact it like every other record.
+    const out = redactString(
+      `git status --porcelain:\n${status || '(clean)'}\n\ngit diff ${base ? base.slice(0, 12) : 'HEAD'}..working tree:\n${diff || '(no tracked changes)'}${newFiles ? `\n\nNew (untracked) files:\n${newFiles}` : ''}`,
+    );
     return out.length > 40_000
       ? out.slice(0, 40_000) + '\n...[diff truncated; read the files directly]'
       : out;
+  }
+}
+
+/**
+ * V2.1 Phase D (confused deputy): the TRUSTED QA service runs as the owner and reads files the worker created. A worker
+ * can plant a junction/symlink or a hard link inside the workspace that points at an owner-only file, which `git
+ * status` lists as an ordinary untracked file. Read a file only when it is a regular file, its real path is inside the
+ * real workspace path, and it has a single link.
+ */
+export function readUntrackedSafely(
+  repoPath: string,
+  rel: string,
+): { ok: true; text: string } | { ok: false; why: string } {
+  const abs = path.resolve(repoPath, rel);
+  try {
+    if (!isPathInside(abs, repoPath)) return { ok: false, why: 'outside the workspace' };
+    const st = lstatSync(abs);
+    if (st.isSymbolicLink()) return { ok: false, why: 'symbolic link' };
+    if (!st.isFile()) return { ok: false, why: 'not a regular file' };
+    if (st.nlink > 1) return { ok: false, why: 'hard link' };
+    const real = realpathSync.native(abs);
+    if (!isPathInside(real, realpathSync.native(repoPath)))
+      return { ok: false, why: 'resolves outside the workspace (junction or link)' };
+    return { ok: true, text: readFileSync(real, 'utf8') };
+  } catch {
+    return { ok: false, why: 'unreadable' };
   }
 }
 

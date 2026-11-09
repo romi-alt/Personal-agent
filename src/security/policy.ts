@@ -1,4 +1,5 @@
-﻿import path from 'node:path';
+﻿import os from 'node:os';
+import path from 'node:path';
 import { isPathInside } from '../workspaces/paths.js';
 import { analyzeShellCommand } from './shell-normalize.js';
 import {
@@ -249,7 +250,9 @@ export function evaluateToolUse(
     for (const key of pathKeys) {
       const raw = input[key];
       if (typeof raw !== 'string' || raw === '') continue;
-      const abs = path.isAbsolute(raw) ? raw : path.resolve(workspace, raw);
+      // Phase D: a leading `~` names the user's home (fail safe: if the tool expands it, the check must too).
+      const exp = /^~(?=[\\/]|$)/.test(raw) ? path.join(os.homedir(), raw.slice(1)) : raw;
+      const abs = path.isAbsolute(exp) ? exp : path.resolve(workspace, exp);
       const readOnly = toolName === 'Read' || toolName === 'Glob' || toolName === 'Grep';
       const roots = readOnly ? [workspace, ...extraReadable] : [workspace];
       if (!roots.some((r) => isPathInside(abs, r))) {

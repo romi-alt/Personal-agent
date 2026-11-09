@@ -13,6 +13,7 @@
 import { createHash } from 'node:crypto';
 import { appendFileSync, existsSync, readFileSync } from 'node:fs';
 import { evaluateToolUse } from '../../security/policy.js';
+import { redactValue } from '../../security/redact.js';
 
 /** Non-secret variables the provider injects into every worker; recorded once per execution as evidence. */
 export const WATCHDOG_VARS = [
@@ -79,7 +80,8 @@ export function decide(
     allow: d.allow,
     reason: d.reason,
     approvalType: d.approvalType,
-    input,
+    // V2.1 Phase C: the decisions file is persisted evidence; the policy above saw the unredacted input.
+    input: redactValue(input) as Record<string, unknown>,
   };
   return { record, stdout: d.allow ? null : denyJson(`${d.reason}. ${DENY_SUFFIX}`) };
 }

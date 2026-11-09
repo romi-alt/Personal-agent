@@ -4,7 +4,7 @@ import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { redactString } from '../../security/redact.js';
+import { redactString, redactValue } from '../../security/redact.js';
 import { promisify } from 'node:util';
 import type {
   AuthReadiness,
@@ -151,9 +151,27 @@ export function scratchCleanEnv(
  * the OS-level worker identity (V2.2) is what actually denies access.
  */
 export function ownerCredentialDirs(home = os.homedir()): string[] {
-  return ['.claude', '.ssh', '.aws', '.azure', '.kube', '.gnupg', '.docker', path.join('.config', 'gh')].map(
-    (d) => path.join(home, d),
-  );
+  return [
+    '.claude',
+    '.ssh',
+    '.aws',
+    '.azure',
+    '.kube',
+    '.gnupg',
+    '.docker',
+    path.join('.config', 'gh'),
+    // Phase B/D: per-user credential FILES and Windows per-user credential stores as well.
+    '.npmrc',
+    '.yarnrc.yml',
+    '.pypirc',
+    '.netrc',
+    '_netrc',
+    '.git-credentials',
+    path.join('AppData', 'Roaming', 'GitHub CLI'),
+    path.join('AppData', 'Roaming', 'Microsoft', 'Credentials'),
+    path.join('AppData', 'Local', 'Microsoft', 'Credentials'),
+    path.join('AppData', 'Roaming', 'Microsoft', 'Protect'),
+  ].map((d) => path.join(home, d));
 }
 
 /** Root of this agent's own repository/installation (two levels above src|dist/providers/claude-cli). */
@@ -548,14 +566,18 @@ export class ClaudeCliProvider implements ExecutionProvider {
                 tool: block.name,
                 id: block.id,
                 // PR #5 review fix (finding 5): redact BEFORE truncating, so a secret cut at the limit cannot leave a fragment.
-                input: redactString(JSON.stringify(block.input ?? {})).slice(0, 2000),
+                // Phase C: key-name redaction too (redactValue), not only token formats in the serialized text.
+                input: JSON.stringify(redactValue(block.input ?? {})).slice(0, 2000),
               },
             });
             if ((block.name === 'WebFetch' || block.name === 'WebSearch') && block.id) {
               webCalls.set(block.id, block.name);
               const url = block.input?.['url'];
               if (typeof url === 'string')
-                req.onEvent({ type: 'web_evidence', data: { tool: block.name, urls: [url.slice(0, 500)] } });
+                req.onEvent({
+                  type: 'web_evidence',
+                  data: { tool: block.name, urls: [redactString(url).slice(0, 500)] },
+                });
             }
           }
         }
@@ -805,7 +827,9 @@ function readDenials(file: string, result?: Record<string, unknown>): Permission
     tool_input: Record<string, unknown>;
   }[];
   for (const d of fromResult) {
-    if (!out.some((o) => o.tool === d.tool_name && JSON.stringify(o.input) === JSON.stringify(d.tool_input)))
+    // The hook records redacted input (Phase C); compare like with like so one denial is not reported twice.
+    const same = JSON.stringify(redactValue(d.tool_input));
+    if (!out.some((o) => o.tool === d.tool_name && JSON.stringify(o.input) === same))
       out.push({ tool: d.tool_name, reason: 'denied by permission system', input: d.tool_input });
   }
   return out;
