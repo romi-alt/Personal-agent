@@ -1,6 +1,7 @@
 import type { Store } from '../queue/store.js';
 import type { Task } from '../types/index.js';
 import {
+  qaEvidenceKind,
   TASK_VERIFIABLE_LEVELS,
   type EvidenceStatus,
   type VerificationLevel,
@@ -102,13 +103,21 @@ export function computeProgress(store: Store, repo: WorkflowRepository, projectI
 
   const tasks: TaskProgress[] = coding.map((t) => {
     const link = links.get(t.id);
-    const required = t.verificationRequired.filter((l): l is VerificationLevel =>
-      (TASK_VERIFIABLE_LEVELS as readonly string[]).includes(l),
+    // Integration with v2 (owner decision C): the independent QA review (task-level REQUIREMENTS_SATISFIED) is a
+    // required check whenever the task requires it. Only an independent pass counts as PASSED here; owner acceptance
+    // (OWNER_ACCEPTED, or legacy PASSED + ownerOverride) is "not proven", never VERIFIED.
+    const required = t.verificationRequired.filter(
+      (l): l is VerificationLevel =>
+        (TASK_VERIFIABLE_LEVELS as readonly string[]).includes(l) || l === 'REQUIREMENTS_SATISFIED',
     );
     // latest evidence row per required level (append-only log: the most recent verdict wins)
     const levels: Partial<Record<VerificationLevel, EvidenceStatus>> = {};
     for (const e of store.listEvidence({ taskId: t.id })) {
-      if (required.includes(e.level)) levels[e.level] = e.status;
+      if (!required.includes(e.level)) continue;
+      levels[e.level] =
+        e.level === 'REQUIREMENTS_SATISFIED' && qaEvidenceKind(e) === 'owner_accepted'
+          ? 'OWNER_ACCEPTED'
+          : e.status;
     }
     let verification: TaskVerificationState = 'NOT_DONE';
     let note: string | null = null;

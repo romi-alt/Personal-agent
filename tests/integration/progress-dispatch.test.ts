@@ -194,7 +194,9 @@ describe('progress snapshots', () => {
     env.clock.advance(1000);
     env.store.addEvidence({
       projectId: project.id,
-      taskId: env.store.listTasks({ projectId: project.id })[3]!.id,
+      // A CODING task (progress ignores planning tasks). The original `listTasks(...)[3]` assumed the stage-5 planning
+      // pipeline's task count; the v2 line creates more planning tasks, so index 3 became a planning task.
+      taskId: env.store.listTasks({ projectId: project.id }).find((t) => t.kind === 'CODING')!.id,
       level: 'CHANGES_EXIST',
       status: 'FAILED',
       summary: 'x',
