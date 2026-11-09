@@ -176,9 +176,13 @@ describe('progress snapshots', () => {
     const p = env.store.getProject(project.id)!;
     expect(p.progressSummary).toMatch(/60% verified \(100% claimed\); 2\/3 tasks verified/);
     expect(p.currentMilestone).toBe('M2: Core features');
+    // v2/main integration: the computed progress view keeps stage 5's milestone states ...
+    expect(progress(project.id).milestones.map((m) => m.state)).toEqual(['VERIFIED', 'COMPLETE_UNVERIFIED']);
+    // ... while the persisted column has one owner, the A4 reconciliation (owner decision C). Independent review is
+    // off in this suite, so every task is delivered but no requirement was independently reviewed: COMPLETED.
     expect(env.workflows.repo.listMilestones(project.id).map((m) => m.status)).toEqual([
-      'VERIFIED',
-      'COMPLETE_UNVERIFIED',
+      'COMPLETED',
+      'COMPLETED',
     ]);
   });
 
