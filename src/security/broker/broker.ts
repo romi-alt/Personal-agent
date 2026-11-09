@@ -57,8 +57,21 @@ export interface BrokerDeps {
 export class ApprovalBroker {
   constructor(private readonly d: BrokerDeps) {}
 
-  /** Seen requestIds, to reject duplicate submissions (replay at the request layer). */
+  /**
+   * Seen requestIds, to reject duplicate submissions (replay at the request layer). Bounded (FIFO eviction) so a
+   * long-running broker cannot grow memory without limit (preflight D10). The single-use approval grant is the
+   * durable anti-replay guard for consequential actions; this set covers the recent request window.
+   */
   private seenRequests = new Set<string>();
+  private static readonly MAX_SEEN_REQUESTS = 10_000;
+
+  private rememberRequest(requestId: string): void {
+    this.seenRequests.add(requestId);
+    if (this.seenRequests.size > ApprovalBroker.MAX_SEEN_REQUESTS) {
+      const oldest = this.seenRequests.values().next().value;
+      if (oldest !== undefined) this.seenRequests.delete(oldest);
+    }
+  }
 
   private boundAction(req: BrokerRequest, cap: Capability): BoundAction {
     return {
@@ -98,7 +111,7 @@ export class ApprovalBroker {
 
     const invalid = this.validate(req, cap);
     if (invalid) return this.deny(req, invalid);
-    this.seenRequests.add(req.requestId);
+    this.rememberRequest(req.requestId);
 
     // Ordinary (non-consequential) call: capability governs it elsewhere (paths/execs/network). The broker records it.
     if (!req.category) {
