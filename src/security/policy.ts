@@ -309,7 +309,7 @@ export function evaluateToolUse(
       if (!d.allow) return { ...d, reason: `package script "${s.name}": ${d.reason}` };
     }
     // V2.1 fix (approval short-circuit): EVERY matching category must be approved. V2 returned "allow" on the first
-    // approved match, so `rm -rf build && git push` passed once only destructive_delete had been approved.
+    // approved match, so `git push origin main && rm -rf ~` passed once only protected_branch_push had been approved.
     const matched: { type: string; description: string }[] = [];
     const v21 = approvalV21(toolName === 'Bash' ? commandTextForRules(expanded) : expanded);
     if (v21) matched.push(v21);

@@ -165,10 +165,15 @@ describe('V2.1 Write/Edit content', () => {
 });
 
 describe('V2.1 approval short-circuit fix', () => {
-  it('every matching category must be approved (V2 allowed this after approving only destructive_delete)', () => {
-    const d = bash('rm -rf build && git push origin main', ['destructive_delete']);
+  it('every matching category must be approved (V2 allowed these after approving only the first category)', () => {
+    // V2 (e60278f) returned ALLOW for both (evidence/approval-shortcircuit-check.txt).
+    const d = bash('git push origin main && rm -rf ~', ['protected_branch_push']);
     expect(d.allow).toBe(false);
-    expect(d.approvalType).toBe('protected_branch_push');
+    expect(d.approvalType).toBe('destructive_delete');
+    expect(bash('npm publish && rm -rf ~', ['publish_release']).approvalType).toBe('destructive_delete');
+    expect(bash('rm -rf build && git push origin main', ['destructive_delete']).approvalType).toBe(
+      'protected_branch_push',
+    );
     expect(
       bash('rm -rf build && git push origin main', ['destructive_delete', 'protected_branch_push']).allow,
     ).toBe(true);
