@@ -26,6 +26,7 @@ const ROOT = path.resolve(__dirname, '../..');
 let home: string;
 let env: NodeJS.ProcessEnv;
 const procs: ChildProcess[] = [];
+const opened: Store[] = [];
 
 const cli = (args: string[]) =>
   spawnSync(process.execPath, ['--import', 'tsx', 'src/cli/index.ts', ...args], {
@@ -75,6 +76,7 @@ afterEach(async () => {
   for (const p of alive) p.kill('SIGKILL');
   await Promise.all(alive.map(exited));
   procs.length = 0;
+  for (const s of opened.splice(0)) s.db.close(); // Windows cannot delete a database file that is still open
   removeTempDir(home);
 });
 
@@ -98,6 +100,7 @@ describe('E2E: assignment -> planned tasks -> executed -> VERIFYING, across a SI
     ok('plan:start', 'school-management-erp');
 
     const store = new Store(openDatabase(path.join(home, 'agent.db')));
+    opened.push(store);
     const wf = new WorkflowRepository(store);
     const project = store.listProjects()[0]!;
     const run = wf.listRuns({ projectId: project.id })[0]!;

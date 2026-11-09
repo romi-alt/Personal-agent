@@ -541,7 +541,8 @@ async function main(): Promise<void> {
             if (!depends.length) depends = j.dependsOn ?? [];
             if (!values.priority) priority = j.priority ?? 0;
           } else {
-            const m = text.match(/^#\s+(.+)\n([\s\S]*)$/);
+            // Windows checkouts and editors write CRLF line endings; normalise before parsing.
+            const m = text.replace(/\r\n/g, '\n').match(/^#\s+(.+)\n([\s\S]*)$/);
             title ??= m?.[1]?.trim() ?? path.basename(values.file);
             instructions ??= (m?.[2] ?? text).trim();
             // Acceptance criteria: an "## Acceptance criteria" section or an "Acceptance: ..." line (A6).

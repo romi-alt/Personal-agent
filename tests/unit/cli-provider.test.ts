@@ -239,6 +239,39 @@ describe('ClaudeCliProvider: capacity waits are not stalls and not completion', 
     expect(typeof waits[0]!.data['recheckAtMs']).toBe('number');
   });
 
+  it('a confirmed usage-limit wait is exempt from the inactivity (stall) timeout; plain silence is not', async () => {
+    // Fake clock: 20 minutes of silence pass in a few real milliseconds (stall timeout is 15 min by default).
+    const run = async (confirmedWait: boolean) => {
+      let t = 1_000_000;
+      const s = setup(
+        async (c) => {
+          c.emitLine(init());
+          if (confirmedWait)
+            c.emitLine({
+              type: 'rate_limit_event',
+              rate_limit_info: { status: 'rejected', rateLimitType: 'five_hour' },
+            });
+          for (let i = 0; i < 20; i++) {
+            t += 60_000; // one silent minute
+            await sleep(60); // let the supervision tick observe it
+            if (c.exitCode !== null) return; // terminated by the provider
+          }
+          c.emitLine(text('capacity is back'));
+          c.emitLine(success('finished after the reset'));
+          c.exit(0);
+        },
+        { now: () => t, tickMs: 10 },
+      );
+      return { out: await s.provider.run(s.req({ limits: { maxTurns: 5, timeoutMs: 3_600_000 } })), s };
+    };
+    const waited = await run(true);
+    expect(waited.out).toMatchObject({ kind: 'completed', summary: 'finished after the reset' });
+    expect(waited.s.calls).toHaveLength(1);
+    const silent = await run(false);
+    expect(silent.out).toMatchObject({ kind: 'failed', failure: { errorClass: 'TIMEOUT' } });
+    expect(silent.out.kind === 'failed' && silent.out.failure.message).toMatch(/stalled/);
+  });
+
   it('outside a capacity wait the execution timeout applies (TIMEOUT), not success', async () => {
     const s = setup(
       async (c) => {

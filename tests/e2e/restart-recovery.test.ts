@@ -34,7 +34,12 @@ const startSupervisor = (): ChildProcess => {
 };
 const exited = (p: ChildProcess) =>
   new Promise<number | null>((r) => (p.exitCode !== null ? r(p.exitCode) : p.once('exit', (c) => r(c))));
-const openStore = () => new Store(openDatabase(path.join(home, 'agent.db')));
+const opened: Store[] = [];
+const openStore = () => {
+  const s = new Store(openDatabase(path.join(home, 'agent.db')));
+  opened.push(s);
+  return s;
+};
 const taskId = (out: string) => out.match(/tsk_[a-z0-9]+/)![0];
 
 beforeEach(() => {
@@ -62,6 +67,7 @@ afterEach(async () => {
   for (const p of alive) p.kill('SIGKILL');
   await Promise.all(alive.map(exited));
   procs.length = 0;
+  for (const s of opened.splice(0)) s.db.close(); // Windows cannot delete a database file that is still open
   removeTempDir(home);
 });
 

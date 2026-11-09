@@ -15,3 +15,6 @@ export function removeTempDir(dir: string): void {
     throw err;
   }
 }
+
+/** Name used by the upstream Windows fixes (a98aa95); same behaviour. */
+export const removeDir = removeTempDir;

@@ -68,5 +68,6 @@ describe('multi-process database concurrency', () => {
       ]);
     }
     expect(setup.db.pragma('integrity_check', { simple: true })).toBe('ok');
+    setup.db.close(); // Windows cannot delete a database file that is still open
   }, 90_000);
 });

@@ -316,7 +316,7 @@ describe('durability: crashes, waits and replays', () => {
     const run = env.workflows.startPlanning(project.id);
     // run only the first step, then "crash"
     await env.supervisor.tick();
-    await waitFor(() => env.supervisor.activeWorkers === 0, 20_000);
+    await waitFor(() => env.supervisor.activeWorkers === 0, 20_000); // not a fixed sleep: Windows is slower
     env.workflows.advanceAll();
     expect(env.workflows.repo.latestStep(run.id, 'analyze')!.status).toBe('COMPLETED');
     expect(env.workflows.repo.latestStep(run.id, 'architect')).toBeNull();

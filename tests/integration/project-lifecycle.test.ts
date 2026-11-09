@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { mkdirSync } from 'node:fs';
+import { mkdirSync, realpathSync } from 'node:fs';
 import path from 'node:path';
 import { buildProjectContext, renderProjectContext } from '../../src/assignments/context.js';
 import { findByExternalId, registerAssignment } from '../../src/assignments/register.js';
@@ -130,7 +130,8 @@ describe('registering an assignment', () => {
     );
     env.registry.register(outside, 'approved', 'test');
     const ok = await register({ workspace: { type: 'existing', path: outside } });
-    expect(ok.project.repoPath).toBe(outside.replace(/\/$/, ''));
+    // The registry stores the canonical path (symlinks and Windows 8.3 short names resolved).
+    expect(ok.project.repoPath).toBe(realpathSync.native(outside));
   });
 });
 
