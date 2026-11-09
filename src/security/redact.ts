@@ -84,8 +84,11 @@ export function redactValue(value: unknown, depth = 0): unknown {
   if (value && typeof value === 'object') {
     const out: Record<string, unknown> = {};
     for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
+      // Numbers and booleans are not secrets: `inputTokens: 1234` (usage accounting) must survive the key-name rule,
+      // which matches "token" (Phase G finding: every execution's token counts were stored as [REDACTED]).
+      const scalar = typeof v === 'number' || typeof v === 'boolean';
       out[k] =
-        SENSITIVE_KEY.test(k) && v !== null && v !== undefined && v !== ''
+        SENSITIVE_KEY.test(k) && !scalar && v !== null && v !== undefined && v !== ''
           ? REDACTED
           : redactValue(v, depth + 1);
     }

@@ -320,4 +320,44 @@ describe('Phase E: the real hook process fails closed', () => {
   });
 });
 
+// ---------------------------------------------------------------------------------------------------------------
+describe('Phase G findings from the real Claude Code staging run', () => {
+  const home = path.join(tmpdir(), 'g-home');
+  const ws = path.join(home, 'workspaces', 'proj');
+  const o: PolicyOptions = { protectedPaths: [home] };
+  const bash = (c: string) => verdict(evaluateToolUse('Bash', { command: c }, ws, o));
+  it('a test file written through a data heredoc may import ../src (the exact pattern the worker used)', () => {
+    expect(
+      bash(
+        "mkdir -p src test && cat > test/slugify.test.ts <<'EOF'\nimport { test } from 'node:test';\nimport { slugify } from '../src/slugify.ts';\nEOF\nnode --test",
+      ),
+    ).toBe('ALLOW');
+  });
+  it('heredocs that may execute, and redirect targets, are still path-checked', () => {
+    expect(bash("node <<'EOF'\nconsole.log(require('fs').readFileSync('../../notes.txt','utf8'))\nEOF")).toBe(
+      'DENY',
+    );
+    expect(bash("cat > ../../planted.txt <<'EOF'\nhello\nEOF")).toBe('DENY');
+    expect(bash('cat > f.txt <<EOF\n$(cat ../../notes.txt)\nEOF')).toBe('DENY');
+    expect(bash("cat > run.sh <<'EOF'\ncat ../../notes.txt\nEOF\nbash run.sh")).toBe('DENY');
+  });
+  it('stripHeredocBodies keeps here-strings and the lines after a terminated body', async () => {
+    const { stripHeredocBodies } = await import('../../src/security/hardening.js');
+    expect(stripHeredocBodies("cat > a <<'EOF'\nbody ../x\nEOF\nls ../../y")).toBe(
+      "cat > a <<'EOF'\nls ../../y",
+    );
+    expect(stripHeredocBodies('cat <<< ../x\nls ../../y')).toBe('cat <<< ../x\nls ../../y');
+    expect(stripHeredocBodies('cat > a <<-EOF\n\tbody\n\tEOF\nls')).toBe('cat > a <<-EOF\nls');
+  });
+  it('usage token counts are not redacted by the key-name rule; string secrets under such keys still are', async () => {
+    const { redactValue } = await import('../../src/security/redact.js');
+    expect(redactValue({ inputTokens: 1234, outputTokens: 56, token: 'abc-secret', ok: true })).toEqual({
+      inputTokens: 1234,
+      outputTokens: 56,
+      token: '[REDACTED]',
+      ok: true,
+    });
+  });
+});
+
 void os;

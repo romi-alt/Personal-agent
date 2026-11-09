@@ -10,6 +10,7 @@ import {
   packageScriptBodies,
   reachesProtectedPath,
   stripEscapes,
+  stripHeredocBodies,
 } from './hardening.js';
 
 /**
@@ -292,10 +293,14 @@ export function evaluateToolUse(
       };
     const hard = hardDenyV21(command, toolName === 'Bash' ? commandTextForRules(expanded) : undefined);
     if (hard) return { allow: false, reason: `${hard.reason} (V2.1 class ${hard.cls})` };
+    // Phase G: heredoc bodies the analyzer classifies as data are not path arguments (the literal-substring check
+    // below still sees them, so a heredoc naming the agent home verbatim stays denied).
+    const pathText =
+      toolName === 'Bash' && !analyzeShellCommand(command).useRaw ? stripHeredocBodies(command) : command;
     if (
       options.protectedPaths?.length &&
       (views.some((v) => mentionsProtectedPath(v, workspace, options.protectedPaths!)) ||
-        reachesProtectedPath(command, workspace, options.protectedPaths) !== null)
+        reachesProtectedPath(pathText, workspace, options.protectedPaths) !== null)
     )
       return {
         allow: false,
