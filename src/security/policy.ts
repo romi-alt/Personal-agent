@@ -1,7 +1,7 @@
 ﻿import os from 'node:os';
 import path from 'node:path';
 import { isPathInside } from '../workspaces/paths.js';
-import { analyzeShellCommand } from './shell-normalize.js';
+import { analyzeShellCommand, withoutHeredocBodies } from './shell-normalize.js';
 import {
   approvalsV21,
   contentHardDeny,
@@ -10,7 +10,6 @@ import {
   packageScriptBodies,
   reachesProtectedPath,
   stripEscapes,
-  stripHeredocBodies,
 } from './hardening.js';
 
 /**
@@ -295,8 +294,12 @@ export function evaluateToolUse(
     if (hard) return { allow: false, reason: `${hard.reason} (V2.1 class ${hard.cls})` };
     // Phase G: heredoc bodies the analyzer classifies as data are not path arguments (the literal-substring check
     // below still sees them, so a heredoc naming the agent home verbatim stays denied).
+    // Finding 9 (trusted-execution baseline): bodies are removed by the LEXER's exact ranges (quote/comment aware),
+    // never by line matching; any parse doubt keeps the raw text.
     const pathText =
-      toolName === 'Bash' && !analyzeShellCommand(command).useRaw ? stripHeredocBodies(command) : command;
+      toolName === 'Bash' && !analyzeShellCommand(command).useRaw
+        ? (withoutHeredocBodies(command) ?? command)
+        : command;
     if (
       options.protectedPaths?.length &&
       (views.some((v) => mentionsProtectedPath(v, workspace, options.protectedPaths!)) ||

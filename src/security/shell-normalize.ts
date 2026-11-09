@@ -38,6 +38,26 @@ export interface ShellAnalysis {
   normalized: string;
   /** Why the raw view is required (empty when the normalized view may be used). */
   reasons: string[];
+  /**
+   * Exact [start, end) source ranges of heredoc BODIES (including the delimiter line) found by the lexer, which knows
+   * quoting, comments and here-strings. Empty when parsing failed. V2.1 trusted-execution fix for finding 9: the
+   * earlier line-based stripper treated `<<EOF` inside quotes or comments as a heredoc and hid later command lines.
+   */
+  heredocBodyRanges: [number, number][];
+}
+
+/** The command with exactly the lexer-identified heredoc bodies removed; null when the command could not be parsed. */
+export function withoutHeredocBodies(command: string): string | null {
+  const a = analyzeShellCommand(command);
+  if (a.reasons.some((r) => r.startsWith('unparseable')) || a.reasons.includes('arithmetic expression (( ))'))
+    return null;
+  let out = '';
+  let at = 0;
+  for (const [s, e] of a.heredocBodyRanges) {
+    out += command.slice(at, s);
+    at = e;
+  }
+  return out + command.slice(at);
 }
 
 export const STRING_PLACEHOLDER = '__STR__';
@@ -222,8 +242,12 @@ const programName = (value: string): string => {
 const ASSIGNMENT = /^[A-Za-z_][A-Za-z0-9_]*\+?=/;
 
 /** Lexes a Bash command into segments of words and builds the normalized text. Throws ParseError when unsure. */
-function lex(src: string, reasons: string[]): { normalized: string; segments: Segment[] } {
+function lex(
+  src: string,
+  reasons: string[],
+): { normalized: string; segments: Segment[]; heredocBodyRanges: [number, number][] } {
   const out: string[] = [];
+  const heredocBodyRanges: [number, number][] = [];
   const segments: Segment[] = [];
   let seg: Segment = { words: [], pipeTarget: false, stdinLiteral: false };
   const stack: string[] = []; // open '(' / '$(' / '<(' / '`'
@@ -244,6 +268,7 @@ function lex(src: string, reasons: string[]): { normalized: string; segments: Se
     while (pendingHeredocs.length) {
       const { delim, stripTabs, quoted, data } = pendingHeredocs.shift()!;
       const body: string[] = [];
+      const bodyStart = i;
       for (;;) {
         if (i >= n) throw new ParseError(`unterminated heredoc (${delim})`);
         let end = src.indexOf('\n', i);
@@ -254,6 +279,7 @@ function lex(src: string, reasons: string[]): { normalized: string; segments: Se
         if (line === delim) break;
         body.push(line);
       }
+      heredocBodyRanges.push([bodyStart, Math.min(i, n)]);
       // v2 review fix: Bash runs $(...) and backticks inside an UNQUOTED heredoc body before the program sees it.
       if (!quoted && /\$\(|`/.test(body.join('\n')))
         reasons.push('unquoted heredoc body contains command substitution (executed by the shell)');
@@ -563,7 +589,7 @@ function lex(src: string, reasons: string[]): { normalized: string; segments: Se
   if (pendingHeredocs.length) throw new ParseError('unterminated heredoc');
   if (redirectNext) throw new ParseError('redirection without target');
   segments.push(seg);
-  return { normalized: out.join('').trim(), segments };
+  return { normalized: out.join('').trim(), segments, heredocBodyRanges };
 }
 
 function executedTextReasons(segments: Segment[]): string[] {
@@ -597,9 +623,14 @@ export function analyzeShellCommand(command: string): ShellAnalysis {
   // v2 review fix: the lexer has no arithmetic context, so `<<` inside $((...)) / ((...)) would start a fake heredoc
   // and hide the following lines. Any arithmetic expression selects the strict raw view.
   if (/\$\(\(|(^|[\s;&|(!])\(\(/.test(command))
-    return { useRaw: true, normalized: command, reasons: ['arithmetic expression (( ))'] };
+    return {
+      useRaw: true,
+      normalized: command,
+      reasons: ['arithmetic expression (( ))'],
+      heredocBodyRanges: [],
+    };
   try {
-    const { normalized, segments } = lex(command, reasons);
+    const { normalized, segments, heredocBodyRanges } = lex(command, reasons);
     reasons.push(...executedTextReasons(segments));
     // v2 review fix: writing a file through a heredoc and running a script in the same command (`cat > x.sh <<EOF
     // ... EOF; chmod +x x.sh && ./x.sh`) executes the hidden body.
@@ -610,10 +641,20 @@ export function analyzeShellCommand(command: string): ShellAnalysis {
       return prog === 'chmod' || prog === 'make' || /^(\.{1,2}[\\/]|[\\/]|[A-Za-z]:[\\/])/.test(first);
     });
     if (hasHeredoc && runsScript) reasons.push('a heredoc-written file may be executed in the same command');
-    return { useRaw: reasons.length > 0, normalized, reasons: [...new Set(reasons)] };
+    return {
+      useRaw: reasons.length > 0,
+      normalized,
+      reasons: [...new Set(reasons)],
+      heredocBodyRanges,
+    };
   } catch (err) {
     if (err instanceof ParseError)
-      return { useRaw: true, normalized: command, reasons: [`unparseable: ${err.message}`] };
-    return { useRaw: true, normalized: command, reasons: ['unparseable'] };
+      return {
+        useRaw: true,
+        normalized: command,
+        reasons: [`unparseable: ${err.message}`],
+        heredocBodyRanges: [],
+      };
+    return { useRaw: true, normalized: command, reasons: ['unparseable'], heredocBodyRanges: [] };
   }
 }
