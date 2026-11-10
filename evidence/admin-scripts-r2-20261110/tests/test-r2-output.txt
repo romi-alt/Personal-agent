@@ -1,0 +1,108 @@
+﻿PASS r1 regex bug reproduced ("$script:X:\(N\)" -> "\(N\)")
+PASS r2 form keeps the name ("${script:X}:")
+PASS staging root accepted
+  REFUSED: outside C:\ElevariqStaging / C:\ElevariqStagingDisk (C:\ElevariqStagingEvil\x)
+PASS staging prefix trap rejected
+PASS disk dir accepted
+  REFUSED: production/owner path is never a privileged target (E:\Agent\Personal-agent\dist)
+PASS production checkout rejected
+  REFUSED: production/owner path is never a privileged target (C:\Users\Roman\.claude)
+PASS owner .claude rejected
+  REFUSED: production/owner path is never a privileged target (C:\Users\Roman\AppData\Local\ElevariqAgent\agent.db)
+PASS prod home rejected
+  REFUSED: outside C:\ElevariqStaging / C:\ElevariqStagingDisk (C:\ElevariqStaging\..\Windows)
+PASS dot-dot escape rejected
+PASS deny target E:\ accepted
+PASS deny target C:\Download accepted
+  REFUSED: not an approved DENY target (C:\Windows)
+PASS deny target C:\Windows rejected
+  REFUSED: production/owner path is never a privileged target (E:\Agent\Personal-agent\dist)
+PASS deny target inside prod rejected even if listed
+PASS deny target listed extra accepted
+PASS complement of loopback only
+PASS complement with allow CIDR
+PASS overlapping CIDRs merged
+PASS unaligned CIDR normalised
+PASS bad CIDR throws
+PASS host name rejected (r1 defect)
+PASS INF parse
+PASS INF add keeps existing, adds new right
+PASS INF remove
+PASS INF add idempotent
+PASS right held by SID or name
+PASS spec M
+PASS spec RX
+PASS spec W
+PASS spec DENY/none
+PASS E:\ grants broad groups write today (the finding)
+PASS owner profile denies broad groups
+PASS no group DENY exists yet on E:\ (nothing applied)
+  [WARN] R7 trusted script location + SHA256SUMS broad write on 
+E:\Agent\v2-staging\worker-isolation\admin-scripts-r2-20261110; broad write on 
+E:\Agent\v2-staging\worker-isolation\admin-scripts-r2-20261110\00-isolation-group-deny.ps1; broad write on 
+E:\Agent\v2-staging\worker-isolation\admin-scripts-r2-20261110\00a-remove-test-residue.ps1; broad write on 
+E:\Agent\v2-staging\worker-isolation\admin-scripts-r2-20261110\01-staging-volume.ps1; broad write on 
+E:\Agent\v2-staging\worker-isolation\admin-scripts-r2-20261110\02-identities-and-rights.ps1; broad write on 
+E:\Agent\v2-staging\worker-isolation\admin-scripts-r2-20261110\03-staging-layout.ps1; broad write on 
+E:\Agent\v2-staging\worker-isolation\admin-scripts-r2-20261110\04-broker-install.ps1; broad write on 
+E:\Agent\v2-staging\worker-isolation\admin-scripts-r2-20261110\05-firewall-egress.ps1; broad write on 
+E:\Agent\v2-staging\worker-isolation\admin-scripts-r2-20261110\06-worker-enable.ps1; broad write on 
+E:\Agent\v2-staging\worker-isolation\admin-scripts-r2-20261110\07-verify-config.ps1; broad write on 
+E:\Agent\v2-staging\worker-isolation\admin-scripts-r2-20261110\09-rollback.ps1; broad write on 
+E:\Agent\v2-staging\worker-isolation\admin-scripts-r2-20261110\Freeze-AdminScripts.ps1; broad write on 
+E:\Agent\v2-staging\worker-isolation\admin-scripts-r2-20261110\_common.ps1; SHA256SUMS missing
+PASS trusted-location check WARNs from E:\ in dry-run
+  REFUSED: broad write on E:\Agent\v2-staging\worker-isolation\admin-scripts-r2-20261110; broad write on 
+E:\Agent\v2-staging\worker-isolation\admin-scripts-r2-20261110\00-isolation-group-deny.ps1; broad write on 
+E:\Agent\v2-staging\worker-isolation\admin-scripts-r2-20261110\00a-remove-test-residue.ps1; broad write on 
+E:\Agent\v2-staging\worker-isolation\admin-scripts-r2-20261110\01-staging-volume.ps1; broad write on 
+E:\Agent\v2-staging\worker-isolation\admin-scripts-r2-20261110\02-identities-and-rights.ps1; broad write on 
+E:\Agent\v2-staging\worker-isolation\admin-scripts-r2-20261110\03-staging-layout.ps1; broad write on 
+E:\Agent\v2-staging\worker-isolation\admin-scripts-r2-20261110\04-broker-install.ps1; broad write on 
+E:\Agent\v2-staging\worker-isolation\admin-scripts-r2-20261110\05-firewall-egress.ps1; broad write on 
+E:\Agent\v2-staging\worker-isolation\admin-scripts-r2-20261110\06-worker-enable.ps1; broad write on 
+E:\Agent\v2-staging\worker-isolation\admin-scripts-r2-20261110\07-verify-config.ps1; broad write on 
+E:\Agent\v2-staging\worker-isolation\admin-scripts-r2-20261110\09-rollback.ps1; broad write on 
+E:\Agent\v2-staging\worker-isolation\admin-scripts-r2-20261110\Freeze-AdminScripts.ps1; broad write on 
+E:\Agent\v2-staging\worker-isolation\admin-scripts-r2-20261110\_common.ps1; SHA256SUMS missing 
+(E:\Agent\v2-staging\worker-isolation\admin-scripts-r2-20261110)
+PASS trusted-location check THROWS from E:\ for apply
+PASS -SweepRoots outside DENY targets refused
+PASS -SweepRoots without -Sweep refused
+PASS -SweepRoots with -Apply refused
+PASS parse 00-isolation-group-deny.ps1
+PASS parse 00a-remove-test-residue.ps1
+PASS parse 01-staging-volume.ps1
+PASS parse 02-identities-and-rights.ps1
+PASS parse 03-staging-layout.ps1
+PASS parse 04-broker-install.ps1
+PASS parse 05-firewall-egress.ps1
+PASS parse 06-worker-enable.ps1
+PASS parse 07-verify-config.ps1
+PASS parse 09-rollback.ps1
+PASS parse Freeze-AdminScripts.ps1
+PASS parse _common.ps1
+PASS dry-run 00-isolation-group-deny.ps1 
+PASS dry-run 00a-remove-test-residue.ps1 
+PASS dry-run 01-staging-volume.ps1 
+PASS dry-run 02-identities-and-rights.ps1 
+PASS dry-run 03-staging-layout.ps1 
+PASS dry-run 04-broker-install.ps1 
+PASS dry-run 05-firewall-egress.ps1 AllowIPv4Cidrs=160.79.104.0/23
+PASS dry-run 06-worker-enable.ps1 Mode=enable-for-login
+PASS dry-run 06-worker-enable.ps1 Mode=lockdown
+PASS dry-run 06-worker-enable.ps1 Mode=register-task
+PASS dry-run 07-verify-config.ps1 Stage=00
+PASS dry-run 09-rollback.ps1 
+PASS dry-run 09-rollback.ps1 IncludeProductionDeny=True
+PASS system unchanged after dry-runs: users
+PASS system unchanged after dry-runs: groups
+PASS system unchanged after dry-runs: tasks
+PASS system unchanged after dry-runs: fw
+PASS system unchanged after dry-runs: eRoot
+PASS system unchanged after dry-runs: staging
+PASS system unchanged after dry-runs: disk
+PASS production untouched (task Running, PID alive, HEAD e60278f)
+
+TEST-R2 pass=70 fail=0
+

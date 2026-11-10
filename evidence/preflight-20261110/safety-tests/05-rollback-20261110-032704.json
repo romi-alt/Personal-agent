@@ -1,0 +1,61 @@
+﻿{
+    "script":  "05-rollback",
+    "startedAt":  "2026-11-10T03:27:04.1601410+05:00",
+    "dryRun":  true,
+    "stagingOnly":  true,
+    "changes":  [
+                    {
+                        "action":  "unregister-scheduledtask",
+                        "target":  "ElevariqStagingWorker",
+                        "detail":  "remove",
+                        "applied":  false,
+                        "at":  "2026-11-10T03:27:04.2927742+05:00"
+                    },
+                    {
+                        "action":  "remove-netfirewallrule",
+                        "target":  "ELEVARIQ-STG-Worker-Allow-Anthropic",
+                        "detail":  "remove",
+                        "applied":  false,
+                        "at":  "2026-11-10T03:27:04.2967914+05:00"
+                    },
+                    {
+                        "action":  "remove-netfirewallrule",
+                        "target":  "ELEVARIQ-STG-Worker-Allow-Proxy",
+                        "detail":  "remove",
+                        "applied":  false,
+                        "at":  "2026-11-10T03:27:04.2967914+05:00"
+                    },
+                    {
+                        "action":  "remove-netfirewallrule",
+                        "target":  "ELEVARIQ-STG-Worker-Block-Other",
+                        "detail":  "remove",
+                        "applied":  false,
+                        "at":  "2026-11-10T03:27:04.2999913+05:00"
+                    },
+                    {
+                        "action":  "noop",
+                        "target":  "C:\\ElevariqStaging",
+                        "detail":  "staging tree absent",
+                        "applied":  false,
+                        "at":  "2026-11-10T03:27:04.3217546+05:00"
+                    },
+                    {
+                        "action":  "noop",
+                        "target":  "elv-stg-worker",
+                        "detail":  "account not present",
+                        "applied":  false,
+                        "at":  "2026-11-10T03:27:04.3217546+05:00"
+                    },
+                    {
+                        "action":  "verify-prod",
+                        "target":  "ElevariqPersonalAgent",
+                        "detail":  "state=Running; pid8992Alive=True",
+                        "applied":  false,
+                        "at":  "2026-11-10T03:27:05.2139462+05:00"
+                    }
+                ],
+    "refusals":  [
+
+                 ],
+    "path":  "E:\\Agent\\v2-staging\\trusted-execution-20261110-0249\\admin-scripts\\reports\\05-rollback-20261110-032704.json"
+}

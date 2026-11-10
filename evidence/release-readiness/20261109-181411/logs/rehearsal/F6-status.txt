@@ -1,0 +1,11 @@
+Supervisor        : IDLE (pid 8368, last heartbeat 0s ago (2026-11-09T13:32:40.172Z))
+Current worker    : -
+Current project   : -
+Current task      : -
+Queue length      : 0   waiting: 0   (COMPLETED=151 FAILED=1 BLOCKED=1)
+Owner inbox       : 4 item(s) waiting for you (2 high priority)  -> npm run agent -- inbox
+Last checkpoint   : chk_mw9awmu5c73c5852ab at 2026-11-09T13:32:39.197Z agent/staging-rehearsal@dca79fabf13dc866fb245d2bddafbfb1d5388cf8
+Last error        : PERMISSION_DENIED: mock permission denied for Bash(npm publish) [tsk_mw9ash0d641e321989]
+Next retry        : -
+Authentication    : ready - mock provider (no credentials required)
+Provider (mock)  : OK

@@ -1,0 +1,225 @@
+
+ RUN  v5.1.0 E:/Agent/v2-staging/hardening/repo
+
+ ✓ tests/integration/supervisor.test.ts (25 tests) 66799ms
+   ✓ mock execution through the supervisor (5)
+     ✓ claims, executes and completes a task with full state history, events, session and checkpoint 2507ms
+     ✓ runs tasks in priority order, sequentially with one worker 3099ms
+     ✓ failed execution: retries with backoff, then FAILS when retries are exhausted (no infinite loop) 3860ms
+     ✓ process crash (thrown error) is classified as PROCESS_CRASH and retried 3434ms
+     ✓ partial completion continues from checkpoint with the same session, then completes 4368ms
+   ✓ capacity exhaustion and waiting (4)
+     ✓ rate limit: honours retry-after, blocks the whole provider, then resumes the same session 4502ms
+     ✓ quota exhaustion uses the provider-reported reset time and never polls before it 2400ms
+     ✓ quota exhaustion without a reset time waits conservatively (no invented timestamp) 2559ms
+     ✓ consecutive rate limits back off exponentially 5703ms
+   ✓ authentication, permissions and budget (6)
+     ✓ missing authentication parks tasks in WAITING_FOR_AUTHENTICATION without calling the provider, then proceeds when fixed 2469ms
+     ✓ runtime auth rejection waits for a CHANGED credential; it does not hammer with the same bad key 3196ms
+     ✓ permission denial creates an approval request and waits; approval lets the task proceed with that action allowed 3733ms
+     ✓ budget exhaustion BLOCKS the task for owner decision (not retried, not failed) 2162ms
+     ✓ daily budget gate stops new work once estimated spend reaches the limit 1165ms
+     ✓ invalid stored session: records the reason and continues in a NEW session built from persisted context 3865ms
+   ✓ cancel, pause and shutdown (4)
+     ✓ cancelling a running task interrupts the worker and keeps the CANCELLED state 1783ms
+     ✓ graceful shutdown aborts the running execution, checkpoints, releases the lease and the singleton lock 1922ms
+     ✓ stop requested through the database (CLI path) stops the loop 1262ms
+     ✓ a second supervisor cannot start while one is live 1200ms
+   ✓ restart recovery (6)
+     ✓ interrupted task is reconciled on startup, resumed with its session, and not executed twice 2794ms
+     ✓ a task that completed (success recorded in transcript) before the crash is NOT re-run 1307ms
+     ✓ crash between the two durable steps (CHECKPOINTING with recorded outcome) re-applies the outcome 1406ms
+     ✓ sweep mode leaves tasks whose lease is still valid alone 1649ms
+     ✓ missing project directory after interruption BLOCKS the task instead of fabricating a workspace 1214ms
+     ✓ waiting state survives a supervisor restart (new Store/Supervisor on the same database) 3233ms
+ ✓ tests/integration/project-intelligence.test.ts (9 tests) 131000ms
+   ✓ Phase 2: natural-language intake (2)
+     ✓ turns free text + attachments into a validated assignment contract and continues planning 14412ms
+     ✓ an invalid intake reply is repaired with the validator errors, never accepted 16560ms
+   ✓ Phase 2: research with source tracking (2)
+     ✓ keeps "verified" only for citations the session actually retrieved; the rest become assumptions 13953ms
+     ✓ without web access (project requires web approval) nothing can be "verified" 12443ms
+   ✓ Phase 2: architecture specification and ADRs (2)
+     ✓ records ADRs, writes ADR/architecture files with diagrams, and requires owner review for significant decisions 13758ms
+     ✓ rejects a reply whose diagrams are not Mermaid 13720ms
+   ✓ Phase 2: planning review (2)
+     ✓ sends architecture gaps back to the architect, plan gaps back to decompose, and records every round 19294ms
+     ✓ is bounded: unresolved high-severity issues go to the owner instead of looping (even with auto approval) 11590ms
+   ✓ Phase 2: roadmap materialisation (1)
+     ✓ creates epics, links subtasks/testing to tasks and puts them in the coding instructions 15265ms
+ ✓ tests/integration/progress-dispatch.test.ts (25 tests) 238702ms
+   ✓ progress is derived from evidence, never from model claims (8)
+     ✓ verified vs claimed: a completed task whose required checks did not all PASS is only "claimed" 13087ms
+     ✓ configuring the test command and passing it makes the same project 100% verified 14190ms
+     ✓ a failing check stops the task from completing, so neither number rises (and the failure is explained) 11114ms
+     ✓ provider "success" with no file changes does not raise progress at all 10304ms
+     ✓ a task with no required verification can only ever be "claimed", never verified 2624ms
+     ✓ the latest evidence wins (a later failure demotes a verified task; a later pass promotes it) 14637ms
+     ✓ reports blockers with reasons and never invents an ETA 9636ms
+     ✓ milestone and requirement states follow the task evidence 12574ms
+   ✓ progress snapshots (3)
+     ✓ are recorded automatically by the supervisor, only when something changes, and never decrease in a clean run 13176ms
+     ✓ refresh the project summary, current milestone and milestone statuses 13173ms
+     ✓ history is bounded 14241ms
+   ✓ milestone-aware dispatch (4)
+     ✓ strict (default): later-milestone work does not start while an earlier milestone is open, even with higher priority 9956ms
+     ✓ strict: tasks run in milestone order even when a later task has a far higher priority 14683ms
+     ✓ off: only dependencies and priority order the work, so independent later-milestone tasks proceed 14852ms
+     ✓ manually added tasks (no plan link) are never gated 1210ms
+   ✓ owner inbox (9)
+     ✓ is empty when nothing needs a human 1235ms
+     ✓ plan approval appears with the resolving commands, and disappears once decided 9903ms
+     ✓ blocking clarification questions appear until answered 4007ms
+     ✓ a denied tool call becomes a permission approval item 2555ms
+     ✓ escalated and failed tasks are HIGH severity and sort before medium items 4941ms
+     ✓ project verification and acceptance appear in order and clear when resolved 16900ms
+     ✓ missing credentials surface as one high-priority item and clear when fixed 2568ms
+     ✓ a project that hit its budget shows a BUDGET_HELD item 3832ms
+     ✓ a failed planning workflow is surfaced once and cleared by a newer run 8344ms
+   ✓ end to end: everything an owner needs is in `progress` and `inbox` (1)
+     ✓ walks a project from planning to accepted, with the inbox always naming the next human step 14954ms
+ ✓ tests/integration/planning-workflow.test.ts (17 tests) 209860ms
+   ✓ planning workflow: analyse -> architect -> decompose -> tasks (3)
+     ✓ runs end to end: validated plan becomes ordered, linked coding tasks that the queue then executes; project is never auto-delivered 13238ms
+     ✓ planning prompts carry the assignment, refined requirements and the previous steps outputs 12695ms
+     ✓ startPlanning is idempotent, requires an assignment, and is refused for a project already in development 12782ms
+   ✓ owner approval and clarification gates (4)
+     ✓ with PLAN_APPROVAL=required no coding task exists until the owner approves the plan 13427ms
+     ✓ a rejected plan creates nothing and the owner can start a fresh planning run 9336ms
+     ✓ blocking questions pause the workflow; answers flow into the architecture prompt; assumptions can be accepted instead 13596ms
+     ✓ workflow:resume --assume continues without answers 15481ms
+   ✓ invalid model output is repaired or escalated, never accepted (5)
+     ✓ feeds the validator errors back and succeeds on the repair round 15787ms
+     ✓ a dependency cycle and prose-instead-of-JSON are both rejected 17602ms
+     ✓ after MAX_PLAN_REPAIRS invalid replies the run FAILS, the project is BLOCKED for the owner, and no task is created 9705ms
+     ✓ an analysis that drops an assignment requirement or invents one is repaired 16266ms
+     ✓ a planning task that fails outright (retries exhausted) fails the run instead of looping 6695ms
+   ✓ durability: crashes, waits and replays (5)
+     ✓ survives a supervisor restart mid-workflow without duplicating planning or coding tasks 14652ms
+     ✓ a rate limit during a planning step waits in the queue; the workflow neither fails nor polls 16600ms
+     ✓ materialising the same plan twice creates nothing new (idempotent keys) 15291ms
+     ✓ cancelling a run cancels its open planning task 2856ms
+     ✓ a planning task needing approval for a denied tool simply waits (the workflow does not fail) 3844ms
+ ✓ tests/integration/phase15-recovery.test.ts (16 tests) 47162ms
+   ✓ execution fencing (stale workers cannot corrupt newer state) (3)
+     ✓ a worker whose lease was reclaimed cannot heartbeat, transition or apply a decision 1805ms
+     ✓ a duplicated completion event for an already-completed task is a no-op 2537ms
+     ✓ the supervisor sweep never reclaims a task whose worker is alive in this process 1669ms
+   ✓ escalation instead of infinite retry loops (2)
+     ✓ a task that keeps killing its worker is BLOCKED after MAX_INTERRUPTIONS 2157ms
+     ✓ repeated network failures escalate after MAX_PROVIDER_FAILURE_STREAK; success resets the streak 6068ms
+   ✓ checkpoint integrity (3)
+     ✓ detects a tampered checkpoint, skips it, and falls back to the previous valid one 1489ms
+     ✓ with every checkpoint corrupt the worker still runs, rebuilding context from the working tree, and says so in the prompt 3655ms
+     ✓ a checkpoint that references a commit that no longer exists is flagged, not trusted 2665ms
+   ✓ incomplete tool execution (2)
+     ✓ a crash after a partial file write leaves a dirty-tree checkpoint, and the retry prompt warns about partial files 3832ms
+     ✓ a hard crash mid-execution yields a recovery checkpoint from the CURRENT working tree 1590ms
+   ✓ verification gating (a claim is not proof) (4)
+     ✓ a task required to change files FAILS when the provider claims success but nothing changed 4923ms
+     ✓ configured build/test commands gate completion; failing output is captured as evidence 4698ms
+     ✓ build/test commands never receive provider credentials 4330ms
+     ✓ unconfigured/unimplemented verifiers are recorded as unknown, never as passes 2759ms
+   ✓ real-restart reconciliation uses the same persistent state (1)
+     ✓ startup recovery after a dead supervisor resumes, and the hostname-scoped pid check is honoured 2889ms
+ ✓ tests/integration/verification-v2.test.ts (6 tests) 19600ms
+   ✓ A7: verification commands can be set after intake (authorised, audited) (1)
+     ✓ records who/why/before/after, validates, refuses no-ops and missing authorisation 3000ms
+   ✓ project:verify records real execution evidence when commands exist (A5/A7) (3)
+     ✓ PASSED / FAILED with exit codes; the browser suite is part of TESTS_PASS; nothing is NOT_CONFIGURED 5718ms
+     ✓ A5: with no commands configured they are derived from package.json once (audited) and then executed 6354ms
+   ✓ A6: manually added coding tasks get the same independent QA as planned tasks (2)
+     ✓ a task added the task:add way is independently reviewed before it counts as verified 4505ms
+ ✓ tests/integration/dashboard.test.ts (8 tests) 14242ms
+   ✓ Phase 5: owner command center (8)
+     ✓ requires the owner token, uses HttpOnly SameSite sessions, and locks out brute force 1844ms
+     ✓ rejects unexpected Host headers (DNS rebinding), cross-origin and CSRF-less mutations 1524ms
+     ✓ serves real data and applies owner controls with an audit trail 1777ms
+     ✓ approval inbox: decisions are recorded with note, actor and address 1419ms
+     ✓ assigns a project from natural language 3290ms
+     ✓ sends strict security headers and a self-contained page 1473ms
+     ✓ browser login: same-origin Origin header accepted, Origin null refused (regression from the real-browser check) 1520ms
+     ✓ refuses to bind to a non-loopback interface unless explicitly allowed 1390ms
+ ✓ tests/integration/project-lifecycle.test.ts (30 tests) 75874ms
+   ✓ registering an assignment (5)
+     ✓ creates an isolated project, persists the full contract and seeds durable memory, creating NO tasks 3193ms
+     ✓ context survives a restart (rebuilt from the database by a brand-new Store) 3004ms
+     ✓ the project context is included in the worker prompt 4210ms
+     ✓ is idempotent per source system + external id (prevents duplicate sync) 2846ms
+     ✓ an existing workspace must be approved first, and a dirty one is refused 2861ms
+   ✓ project lifecycle is separate from task completion (5)
+     ✓ REGISTERED -> IN_DEVELOPMENT (task added) -> VERIFYING (all tasks done), never auto-delivered 3823ms
+     ✓ one provider success does not complete a project that still has open tasks 4842ms
+     ✓ adding work re-opens a project that was awaiting verification/approval 4007ms
+     ✓ illegal lifecycle jumps are rejected centrally 2861ms
+     ✓ paused/blocked/cancelled projects are not executed 4035ms
+   ✓ independent verification and owner acceptance (6)
+     ✓ records evidence per level; requirements/security are honestly NOT_EVALUATED, so the project is never "ready" 5030ms
+     ✓ owner acceptance needs an explicit acknowledgement of unverified levels, and is recorded as evidence 5558ms
+     ✓ a failing build sends the project back to development and acceptance is refused 5021ms
+     ✓ missing build/test commands are NOT_CONFIGURED (unknown), not passes 4568ms
+     ✓ a repository with nothing beyond the initial commit FAILS CHANGES_EXIST at project level 4499ms
+     ✓ cannot accept a project that is not awaiting approval 3039ms
+   ✓ project budget constraints (3)
+     ✓ maxExecutions stops further tasks of that project from being started 3736ms
+     ✓ maxUsdTotal stops a project once estimated spend reaches the cap (other projects keep running) 4837ms
+     ✓ assignment approval policy: pre-approved categories reach the provider; web access can be forced to need approval 3846ms
+ ✓ tests/integration/qa-ownership.test.ts (1 test) 24178ms
+   ✓ A1: QA judges a task only on its own criteria and the requirements it owns (1)
+     ✓ a review whose failures cite only requirements owned by another task creates no correction task; a genuine failure of an own criterion still does 24172ms
+ ✓ tests/integration/erp-sync.test.ts (8 tests) 7610ms
+   ✓ Phase 4 preparation: read-only ERP sync (5)
+     ✓ paginates, is idempotent on re-sync, detects changes, and audits every run 1691ms
+     ✓ a failed page (rate limit) keeps the cursor; the next run resumes there without re-reading done pages 1492ms
+     ✓ runs are bounded (partial) and continue on the next run 1430ms
+     ✓ stores only minimal member data (no e-mail/phone) and suggests agent roles 1573ms
+     ✓ maps an ERP project to a valid DRAFT assignment carrying its external id 1410ms
+ ✓ tests/integration/independent-qa.test.ts (3 tests) 61757ms
+   ✓ Phase 3: independent QA of completed tasks (3)
+     ✓ reviews every task in a separate read-only session, corrects failures, and gates dependants on the review 26263ms
+     ✓ escalates to the owner when corrections are exhausted; dependants stay blocked until the owner decides 20184ms
+     ✓ assigns a bounded specialist role to every planned task and puts its brief in the worker prompt 15304ms
+ ✓ tests/integration/backup-restore.test.ts (6 tests) 20853ms
+   ✓ Phase 6: backups and restore (5)
+     ✓ takes a consistent online backup, verifies it, and restores it (restore drill) 1611ms
+     ✓ a corrupted or tampered backup is refused 1548ms
+     ✓ restore keeps the replaced database; retention prunes the oldest backups 1621ms
+     ✓ the supervisor takes scheduled backups and records them 1512ms
+     ✓ CLI: backup + verify + restore refuses while a supervisor is live and requires a reason 12621ms
+   ✓ Phase 6: owner notifications (1)
+     ✓ delivers error/escalation/approval events exactly once (cursor survives restarts) 1934ms
+ ✓ tests/integration/capacity-v2.test.ts (5 tests) 38954ms
+   ✓ capacity waits in the durable queue (v2) (5)
+     ✓ multiple consecutive resets: waits each time, resumes the same session, consumes no retry, one worker at a time 5085ms
+     ✓ A12 notify: a capacity streak past CAPACITY_ESCALATE_AFTER_MS is escalated ONCE and the task keeps waiting 7584ms
+     ✓ A12 default (24 h): a capacity streak past 24 h is delivered to the owner notification channel once 12709ms
+     ✓ A12 block: the escalation BLOCKS the task for owner review instead of waiting on 6407ms
+     ✓ supervisor restart while a task waits for capacity: the new instance keeps waiting, then resumes; no duplicate 7159ms
+ ✓ tests/integration/resource-gate.test.ts (3 tests) 9532ms
+   ✓ memory-pressure policy with hysteresis (A9) (3)
+     ✓ pauses below the low mark, stays paused in the band, resumes only above the high mark; no flapping 5490ms
+     ✓ memory pressure never kills a running worker; only new claims wait 4005ms
+ ✓ tests/integration/qa-review-atomic.test.ts (3 tests) 32232ms
+   ✓ A3: transactional review creation (3)
+     ✓ a failure between creating the review task and its qa_reviews row leaves neither behind 4213ms
+     ✓ a repair re-dispatch keeps the superseded review task linked to its round (the pilot orphan) 27977ms
+ ✓ tests/integration/capacity-watchdog.test.ts (1 test) 4122ms
+   ✓ official retry watchdog wait (simulated) (1)
+     ✓ preserves the task, keeps the supervisor healthy, sends no duplicate request, and resumes when capacity returns 4114ms
+ ✓ tests/integration/qa-needs-evidence.test.ts (3 tests) 23527ms
+   ✓ NEEDS_EVIDENCE (A): an unverifiable high-severity finding never becomes a pass (3)
+     ✓ persisting without evidence -> escalated to the owner, never PASSED, no correction task 8824ms
+     ✓ evidence supplied on request -> a confirmed defect FAILS the review and creates a correction 14693ms
+ ✓ tests/integration/progress-qa-integration.test.ts (4 tests) 15349ms
+   ✓ progress x independent QA (integration of stage 5 with v2) (4)
+     ✓ no review yet: CLAIMED, not VERIFIED (CHANGES_EXIST alone is not enough) 3999ms
+     ✓ independent PASS: VERIFIED 3897ms
+     ✓ owner acceptance (v2 and legacy) and NEEDS_EVIDENCE are never VERIFIED 3742ms
+     ✓ a FAILED review is FAILED_VERIFICATION 3704ms
+
+ Test Files  18 passed (18)
+      Tests  173 passed (173)
+   Start at  00:11:42
+   Duration  530.44s (tests 99%, import 1%)
+
+JSON report written to E:/Agent/v2-staging/hardening/20261109-234257/logs/regression-693058c/08-integration.json

@@ -1,0 +1,10 @@
+Supervisor        : STOPPED (pid 7760, last heartbeat 21s ago (2026-11-09T13:33:05.563Z))
+Current worker    : -
+Current project   : -
+Current task      : -
+Queue length      : 0   waiting: 0   (COMPLETED=153 FAILED=1 BLOCKED=1)
+Last checkpoint   : chk_mw9ax6o6541cf28a44 at 2026-11-09T13:33:04.902Z agent/staging-rehearsal@dca79fabf13dc866fb245d2bddafbfb1d5388cf8
+Last error        : PERMISSION_DENIED: mock permission denied for Bash(npm publish) [tsk_mw9ash0d641e321989]
+Next retry        : -
+Authentication    : ready - mock provider (no credentials required)
+Provider (mock)  : OK

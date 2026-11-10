@@ -1,0 +1,52 @@
+From 5f07b858f0e124d7b0216771e689ef5ebef7ce68 Mon Sep 17 00:00:00 2001
+From: "ELEVARIQ Agent (Claude)" <connectroman3@gmail.com>
+Date: Tue, 10 Nov 2026 03:14:40 +0500
+Subject: [PATCH 4/4] fix(security): bound the broker's seen-request set
+ (preflight D10)
+
+FIFO eviction at 10k entries so a long-running broker cannot grow memory without
+limit. The single-use approval grant remains the durable anti-replay guard for
+consequential actions; this set covers the recent request window.
+---
+ src/security/broker/broker.ts | 17 +++++++++++++++--
+ 1 file changed, 15 insertions(+), 2 deletions(-)
+
+diff --git a/src/security/broker/broker.ts b/src/security/broker/broker.ts
+index 664b46a..2609d31 100644
+--- a/src/security/broker/broker.ts
++++ b/src/security/broker/broker.ts
+@@ -57,8 +57,21 @@ export interface BrokerDeps {
+ export class ApprovalBroker {
+   constructor(private readonly d: BrokerDeps) {}
+ 
+-  /** Seen requestIds, to reject duplicate submissions (replay at the request layer). */
++  /**
++   * Seen requestIds, to reject duplicate submissions (replay at the request layer). Bounded (FIFO eviction) so a
++   * long-running broker cannot grow memory without limit (preflight D10). The single-use approval grant is the
++   * durable anti-replay guard for consequential actions; this set covers the recent request window.
++   */
+   private seenRequests = new Set<string>();
++  private static readonly MAX_SEEN_REQUESTS = 10_000;
++
++  private rememberRequest(requestId: string): void {
++    this.seenRequests.add(requestId);
++    if (this.seenRequests.size > ApprovalBroker.MAX_SEEN_REQUESTS) {
++      const oldest = this.seenRequests.values().next().value;
++      if (oldest !== undefined) this.seenRequests.delete(oldest);
++    }
++  }
+ 
+   private boundAction(req: BrokerRequest, cap: Capability): BoundAction {
+     return {
+@@ -98,7 +111,7 @@ export class ApprovalBroker {
+ 
+     const invalid = this.validate(req, cap);
+     if (invalid) return this.deny(req, invalid);
+-    this.seenRequests.add(req.requestId);
++    this.rememberRequest(req.requestId);
+ 
+     // Ordinary (non-consequential) call: capability governs it elsewhere (paths/execs/network). The broker records it.
+     if (!req.category) {
+-- 
+2.56.0.windows.4
+

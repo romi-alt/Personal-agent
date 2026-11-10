@@ -1,0 +1,33 @@
+﻿== 00a-remove-test-residue (DRY-RUN, revision r2-20261110) ==
+  [WARN] R7 trusted script location + SHA256SUMS broad write on 
+E:\Agent\v2-staging\worker-isolation\admin-scripts-r2-20261110; broad write on 
+E:\Agent\v2-staging\worker-isolation\admin-scripts-r2-20261110\00-isolation-group-deny.ps1; broad write on 
+E:\Agent\v2-staging\worker-isolation\admin-scripts-r2-20261110\00a-remove-test-residue.ps1; broad write on 
+E:\Agent\v2-staging\worker-isolation\admin-scripts-r2-20261110\01-staging-volume.ps1; broad write on 
+E:\Agent\v2-staging\worker-isolation\admin-scripts-r2-20261110\02-identities-and-rights.ps1; broad write on 
+E:\Agent\v2-staging\worker-isolation\admin-scripts-r2-20261110\03-staging-layout.ps1; broad write on 
+E:\Agent\v2-staging\worker-isolation\admin-scripts-r2-20261110\04-broker-install.ps1; broad write on 
+E:\Agent\v2-staging\worker-isolation\admin-scripts-r2-20261110\05-firewall-egress.ps1; broad write on 
+E:\Agent\v2-staging\worker-isolation\admin-scripts-r2-20261110\06-worker-enable.ps1; broad write on 
+E:\Agent\v2-staging\worker-isolation\admin-scripts-r2-20261110\07-verify-config.ps1; broad write on 
+E:\Agent\v2-staging\worker-isolation\admin-scripts-r2-20261110\09-rollback.ps1; broad write on 
+E:\Agent\v2-staging\worker-isolation\admin-scripts-r2-20261110\Freeze-AdminScripts.ps1; broad write on 
+E:\Agent\v2-staging\worker-isolation\admin-scripts-r2-20261110\_common.ps1; SHA256SUMS missing
+  DRY-RUN icacls: E:\Agent\v2-staging\hardening\isotest\outside -- remove explicit allow for S-1-1-0 [icacls 
+E:\Agent\v2-staging\hardening\isotest\outside /remove:g *S-1-1-0]
+  DRY-RUN icacls: E:\Agent\v2-staging\hardening\repo -- remove explicit allow for 
+S-1-15-2-2956649102-4223940443-41726279-2319145132-3979920432-1607303059-3113665130 [icacls 
+E:\Agent\v2-staging\hardening\repo /remove:g 
+*S-1-15-2-2956649102-4223940443-41726279-2319145132-3979920432-1607303059-3113665130]
+  DRY-RUN icacls: E:\Agent\v2-staging\hardening\isotest\tools -- remove explicit allow for 
+S-1-15-2-2956649102-4223940443-41726279-2319145132-3979920432-1607303059-3113665130 [icacls 
+E:\Agent\v2-staging\hardening\isotest\tools /remove:g 
+*S-1-15-2-2956649102-4223940443-41726279-2319145132-3979920432-1607303059-3113665130]
+  DRY-RUN manual: HKCU AppContainer mappings -- owner, non-elevated: Remove-Item HKCU:\Software\Classes\Local 
+Settings\Software\Microsoft\Windows\CurrentVersion\AppContainer\Mappings\<profile-SID> for elevariq-iso-smoke / 
+elevariq-worker-isotest (identify by Moniker value first)
+
+Report: 
+E:\Agent\v2-staging\worker-isolation\admin-scripts-r2-20261110\reports\00a-remove-test-residue-20261110-140327.json
+Changes: 4  Refusals: 0  Checks: 1  Mode: DRY-RUN
+

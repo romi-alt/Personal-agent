@@ -1,0 +1,3 @@
+﻿{"c":"rm -rf build && git push origin main","approved":["destructive_delete"],"v2":"BLOCK(protected_branch_push)","v21":"BLOCK(protected_branch_push)"}
+{"c":"git push origin main && rm -rf ~","approved":["protected_branch_push"],"v2":"ALLOW","v21":"BLOCK(destructive_delete)"}
+{"c":"npm publish && rm -rf ~","approved":["publish_release"],"v2":"ALLOW","v21":"BLOCK(destructive_delete)"}

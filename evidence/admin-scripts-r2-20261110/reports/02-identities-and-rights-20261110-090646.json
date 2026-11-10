@@ -1,0 +1,106 @@
+﻿{
+    "script":  "02-identities-and-rights",
+    "revision":  "r2-20261110",
+    "startedAt":  "2026-11-10T09:06:46.5595652+05:00",
+    "dryRun":  true,
+    "user":  "DESKTOP-QGGLG8D\\Roman",
+    "changes":  [
+                    {
+                        "action":  "new-localuser",
+                        "target":  "elv-stg-worker",
+                        "detail":  "standard user, DISABLED, random unstored password",
+                        "applied":  false,
+                        "at":  "2026-11-10T09:06:46.7831989+05:00"
+                    },
+                    {
+                        "action":  "add-localgroupmember",
+                        "target":  "Users/elv-stg-worker",
+                        "detail":  "add",
+                        "applied":  false,
+                        "at":  "2026-11-10T09:06:46.7831989+05:00"
+                    },
+                    {
+                        "action":  "add-localgroupmember",
+                        "target":  "ElevariqIsolatedIdentities/elv-stg-worker",
+                        "detail":  "add",
+                        "applied":  false,
+                        "at":  "2026-11-10T09:06:46.7831989+05:00"
+                    },
+                    {
+                        "action":  "new-localuser",
+                        "target":  "elv-stg-broker",
+                        "detail":  "standard user, DISABLED, random unstored password",
+                        "applied":  false,
+                        "at":  "2026-11-10T09:06:46.7985532+05:00"
+                    },
+                    {
+                        "action":  "add-localgroupmember",
+                        "target":  "Users/elv-stg-broker",
+                        "detail":  "add",
+                        "applied":  false,
+                        "at":  "2026-11-10T09:06:46.8003058+05:00"
+                    },
+                    {
+                        "action":  "add-localgroupmember",
+                        "target":  "ElevariqIsolatedIdentities/elv-stg-broker",
+                        "detail":  "add",
+                        "applied":  false,
+                        "at":  "2026-11-10T09:06:46.8003058+05:00"
+                    },
+                    {
+                        "action":  "secedit",
+                        "target":  "USER_RIGHTS",
+                        "detail":  "02 add=SeDenyRemoteInteractiveLogonRight:*\u003cworker-SID\u003e+*\u003cbroker-SID\u003e;SeDenyNetworkLogonRight:*\u003cworker-SID\u003e+*\u003cbroker-SID\u003e;SeBatchLogonRight:*\u003cworker-SID\u003e+*\u003cbroker-SID\u003e;SeDenyInteractiveLogonRight:*\u003cbroker-SID\u003e remove= (backup export to C:\\Users\\Roman\\ElevariqAdmin\\rights)",
+                        "applied":  false,
+                        "at":  "2026-11-10T09:06:46.8609760+05:00"
+                    }
+                ],
+    "refusals":  [
+
+                 ],
+    "checks":  [
+                   {
+                       "id":  "R7",
+                       "name":  "trusted script location + SHA256SUMS",
+                       "status":  "WARN",
+                       "detail":  "broad write on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r2-20261110; broad write on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r2-20261110\\00-isolation-group-deny.ps1; broad write on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r2-20261110\\00a-remove-test-residue.ps1; broad write on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r2-20261110\\01-staging-volume.ps1; broad write on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r2-20261110\\02-identities-and-rights.ps1; broad write on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r2-20261110\\03-staging-layout.ps1; broad write on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r2-20261110\\04-broker-install.ps1; broad write on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r2-20261110\\05-firewall-egress.ps1; broad write on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r2-20261110\\06-worker-enable.ps1; broad write on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r2-20261110\\07-verify-config.ps1; broad write on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r2-20261110\\09-rollback.ps1; broad write on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r2-20261110\\Freeze-AdminScripts.ps1; broad write on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r2-20261110\\_common.ps1; SHA256SUMS missing"
+                   },
+                   {
+                       "id":  "PRE00",
+                       "name":  "deny group + DENY on E:\\, F:\\",
+                       "status":  "FAIL",
+                       "detail":  ""
+                   },
+                   {
+                       "id":  "PRE01",
+                       "name":  "staging volume mounted",
+                       "status":  "FAIL",
+                       "detail":  ""
+                   },
+                   {
+                       "id":  "P0",
+                       "name":  "production task present and running",
+                       "status":  "PASS",
+                       "detail":  "Running"
+                   },
+                   {
+                       "id":  "P1",
+                       "name":  "production supervisor PID 8992 alive",
+                       "status":  "PASS",
+                       "detail":  ""
+                   },
+                   {
+                       "id":  "P2",
+                       "name":  "production HEAD = e60278f",
+                       "status":  "PASS",
+                       "detail":  "e60278f"
+                   },
+                   {
+                       "id":  "P3",
+                       "name":  "production task action still points at the checkout script",
+                       "status":  "PASS",
+                       "detail":  ""
+                   }
+               ],
+    "path":  "E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r2-20261110\\reports\\02-identities-and-rights-20261110-090646.json"
+}

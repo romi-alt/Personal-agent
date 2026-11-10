@@ -1,0 +1,88 @@
+﻿{
+    "script":  "06-worker-enable-for-login",
+    "revision":  "r2-20261110",
+    "startedAt":  "2026-11-10T14:03:34.6996593+05:00",
+    "dryRun":  true,
+    "user":  "DESKTOP-QGGLG8D\\Roman",
+    "changes":  [
+                    {
+                        "action":  "enable-localuser",
+                        "target":  "elv-stg-worker",
+                        "detail":  "owner sets password; enable; then runas + claude login (worker\u0027s own login)",
+                        "applied":  false,
+                        "at":  "2026-11-10T14:03:35.3329330+05:00"
+                    }
+                ],
+    "refusals":  [
+
+                 ],
+    "checks":  [
+                   {
+                       "id":  "R7",
+                       "name":  "trusted script location + SHA256SUMS",
+                       "status":  "WARN",
+                       "detail":  "broad write on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r2-20261110; broad write on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r2-20261110\\00-isolation-group-deny.ps1; broad write on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r2-20261110\\00a-remove-test-residue.ps1; broad write on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r2-20261110\\01-staging-volume.ps1; broad write on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r2-20261110\\02-identities-and-rights.ps1; broad write on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r2-20261110\\03-staging-layout.ps1; broad write on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r2-20261110\\04-broker-install.ps1; broad write on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r2-20261110\\05-firewall-egress.ps1; broad write on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r2-20261110\\06-worker-enable.ps1; broad write on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r2-20261110\\07-verify-config.ps1; broad write on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r2-20261110\\09-rollback.ps1; broad write on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r2-20261110\\Freeze-AdminScripts.ps1; broad write on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r2-20261110\\_common.ps1; SHA256SUMS missing"
+                   },
+                   {
+                       "id":  "GATE",
+                       "name":  "worker exists",
+                       "status":  "FAIL",
+                       "detail":  ""
+                   },
+                   {
+                       "id":  "GATE",
+                       "name":  "worker in deny group",
+                       "status":  "FAIL",
+                       "detail":  ""
+                   },
+                   {
+                       "id":  "GATE",
+                       "name":  "explicit DENY on E:\\ and F:\\",
+                       "status":  "FAIL",
+                       "detail":  ""
+                   },
+                   {
+                       "id":  "GATE",
+                       "name":  "staging work\\ exists",
+                       "status":  "FAIL",
+                       "detail":  ""
+                   },
+                   {
+                       "id":  "GATE",
+                       "name":  "worker DENY on broker\\",
+                       "status":  "FAIL",
+                       "detail":  ""
+                   },
+                   {
+                       "id":  "GATE",
+                       "name":  "worker firewall rules present",
+                       "status":  "FAIL",
+                       "detail":  ""
+                   },
+                   {
+                       "id":  "P0",
+                       "name":  "production task present and running",
+                       "status":  "PASS",
+                       "detail":  "Running"
+                   },
+                   {
+                       "id":  "P1",
+                       "name":  "production supervisor PID 8992 alive",
+                       "status":  "PASS",
+                       "detail":  ""
+                   },
+                   {
+                       "id":  "P2",
+                       "name":  "production HEAD = e60278f",
+                       "status":  "PASS",
+                       "detail":  "e60278f"
+                   },
+                   {
+                       "id":  "P3",
+                       "name":  "production task action still points at the checkout script",
+                       "status":  "PASS",
+                       "detail":  ""
+                   }
+               ],
+    "path":  "E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r2-20261110\\reports\\06-worker-enable-for-login-20261110-140334.json"
+}

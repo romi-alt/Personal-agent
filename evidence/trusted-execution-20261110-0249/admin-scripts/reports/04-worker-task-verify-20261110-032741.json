@@ -1,0 +1,70 @@
+﻿{
+    "script":  "04-worker-task-verify",
+    "startedAt":  "2026-11-10T03:27:41.7790669+05:00",
+    "dryRun":  true,
+    "stagingOnly":  true,
+    "changes":  [
+                    {
+                        "action":  "verify",
+                        "target":  "G1 worker account exists",
+                        "detail":  "result=False",
+                        "applied":  false,
+                        "at":  "2026-11-10T03:27:44.2475740+05:00"
+                    },
+                    {
+                        "action":  "verify",
+                        "target":  "G2 worker NOT an administrator",
+                        "detail":  "result=True",
+                        "applied":  false,
+                        "at":  "2026-11-10T03:27:44.2517234+05:00"
+                    },
+                    {
+                        "action":  "verify",
+                        "target":  "G3 broker root denies worker",
+                        "detail":  "result=False",
+                        "applied":  false,
+                        "at":  "2026-11-10T03:27:44.2532838+05:00"
+                    },
+                    {
+                        "action":  "verify",
+                        "target":  "G4 decoy credential denies worker",
+                        "detail":  "result=n/a (not created)",
+                        "applied":  false,
+                        "at":  "2026-11-10T03:27:44.2532838+05:00"
+                    },
+                    {
+                        "action":  "verify",
+                        "target":  "G9 staging egress block rule",
+                        "detail":  "result=False",
+                        "applied":  false,
+                        "at":  "2026-11-10T03:27:44.2532838+05:00"
+                    },
+                    {
+                        "action":  "verify",
+                        "target":  "P0 production task untouched",
+                        "detail":  "result=True",
+                        "applied":  false,
+                        "at":  "2026-11-10T03:27:44.2532838+05:00"
+                    },
+                    {
+                        "action":  "verify",
+                        "target":  "P1 production supervisor alive",
+                        "detail":  "result=True",
+                        "applied":  false,
+                        "at":  "2026-11-10T03:27:44.2532838+05:00"
+                    }
+                ],
+    "refusals":  [
+
+                 ],
+    "path":  "E:\\Agent\\v2-staging\\trusted-execution-20261110-0249\\admin-scripts\\reports\\04-worker-task-verify-20261110-032741.json",
+    "verifyResults":  {
+                          "G1 worker account exists":  false,
+                          "G2 worker NOT an administrator":  true,
+                          "G3 broker root denies worker":  false,
+                          "G4 decoy credential denies worker":  "n/a (not created)",
+                          "G9 staging egress block rule":  false,
+                          "P0 production task untouched":  true,
+                          "P1 production supervisor alive":  true
+                      }
+}

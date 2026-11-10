@@ -1,0 +1,40 @@
+﻿{
+    "script":  "03-firewall-rules",
+    "startedAt":  "2026-11-10T03:27:39.7623721+05:00",
+    "dryRun":  true,
+    "stagingOnly":  true,
+    "changes":  [
+                    {
+                        "action":  "new-netfirewallrule",
+                        "target":  "ELEVARIQ-STG-Worker-Allow-Anthropic",
+                        "detail":  "Outbound Allow; LocalUser=worker-SID; Remote=api.anthropic.com; staging worker -\u003e Anthropic API",
+                        "applied":  false,
+                        "at":  "2026-11-10T03:27:39.9053769+05:00"
+                    },
+                    {
+                        "action":  "new-netfirewallrule",
+                        "target":  "ELEVARIQ-STG-Worker-Allow-Proxy",
+                        "detail":  "Outbound Allow; LocalUser=worker-SID; Remote=127.0.0.1; staging worker -\u003e owner egress proxy",
+                        "applied":  false,
+                        "at":  "2026-11-10T03:27:39.9164957+05:00"
+                    },
+                    {
+                        "action":  "new-netfirewallrule",
+                        "target":  "ELEVARIQ-STG-Worker-Block-Other",
+                        "detail":  "Outbound Block; LocalUser=worker-SID; Remote=Any; staging worker -\u003e everything else (deny)",
+                        "applied":  false,
+                        "at":  "2026-11-10T03:27:39.9181949+05:00"
+                    },
+                    {
+                        "action":  "residual-gap",
+                        "target":  "egress",
+                        "detail":  "Image-based rules do not cover arbitrary child images. Force worker traffic through the authenticated proxy for complete control.",
+                        "applied":  false,
+                        "at":  "2026-11-10T03:27:39.9181949+05:00"
+                    }
+                ],
+    "refusals":  [
+
+                 ],
+    "path":  "E:\\Agent\\v2-staging\\trusted-execution-20261110-0249\\admin-scripts\\reports\\03-firewall-rules-20261110-032739.json"
+}

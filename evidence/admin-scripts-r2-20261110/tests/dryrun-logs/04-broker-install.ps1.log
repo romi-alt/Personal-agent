@@ -1,0 +1,30 @@
+﻿== 04-broker-install (DRY-RUN, revision r2-20261110) ==
+  [WARN] R7 trusted script location + SHA256SUMS broad write on 
+E:\Agent\v2-staging\worker-isolation\admin-scripts-r2-20261110; broad write on 
+E:\Agent\v2-staging\worker-isolation\admin-scripts-r2-20261110\00-isolation-group-deny.ps1; broad write on 
+E:\Agent\v2-staging\worker-isolation\admin-scripts-r2-20261110\00a-remove-test-residue.ps1; broad write on 
+E:\Agent\v2-staging\worker-isolation\admin-scripts-r2-20261110\01-staging-volume.ps1; broad write on 
+E:\Agent\v2-staging\worker-isolation\admin-scripts-r2-20261110\02-identities-and-rights.ps1; broad write on 
+E:\Agent\v2-staging\worker-isolation\admin-scripts-r2-20261110\03-staging-layout.ps1; broad write on 
+E:\Agent\v2-staging\worker-isolation\admin-scripts-r2-20261110\04-broker-install.ps1; broad write on 
+E:\Agent\v2-staging\worker-isolation\admin-scripts-r2-20261110\05-firewall-egress.ps1; broad write on 
+E:\Agent\v2-staging\worker-isolation\admin-scripts-r2-20261110\06-worker-enable.ps1; broad write on 
+E:\Agent\v2-staging\worker-isolation\admin-scripts-r2-20261110\07-verify-config.ps1; broad write on 
+E:\Agent\v2-staging\worker-isolation\admin-scripts-r2-20261110\09-rollback.ps1; broad write on 
+E:\Agent\v2-staging\worker-isolation\admin-scripts-r2-20261110\Freeze-AdminScripts.ps1; broad write on 
+E:\Agent\v2-staging\worker-isolation\admin-scripts-r2-20261110\_common.ps1; SHA256SUMS missing
+  [FAIL] PRE 03 applied (broker\bin exists, worker DENY present) 
+  DRY-RUN verify-release:  -- SHA256SUMS complete + matching; release dir not broad-writable
+  DRY-RUN copy: C:\ElevariqStaging\broker\bin -- replace broker\bin contents with the verified release; re-verify at 
+destination
+  DRY-RUN set-password+enable: elv-stg-broker -- owner types the broker password (not stored)
+  DRY-RUN register-scheduledtask: ElevariqStagingBroker -- principal=elv-stg-broker Password logon, Limited; 
+action=powershell -File C:\ElevariqStaging\broker\bin\run-broker.ps1; not started
+  [PASS] P0 production task present and running Running
+  [PASS] P1 production supervisor PID 8992 alive 
+  [PASS] P2 production HEAD = e60278f e60278f
+  [PASS] P3 production task action still points at the checkout script 
+
+Report: E:\Agent\v2-staging\worker-isolation\admin-scripts-r2-20261110\reports\04-broker-install-20261110-140332.json
+Changes: 4  Refusals: 0  Checks: 6  Mode: DRY-RUN
+

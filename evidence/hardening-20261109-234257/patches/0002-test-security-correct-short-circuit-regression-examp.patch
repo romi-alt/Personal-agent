@@ -1,0 +1,50 @@
+From 4d07438b0c479435c89d8d8d34cfe5d9bb994ac3 Mon Sep 17 00:00:00 2001
+From: "ELEVARIQ Agent (Claude)" <connectroman3@gmail.com>
+Date: Tue, 10 Nov 2026 00:10:49 +0500
+Subject: [PATCH 2/2] test(security): correct short-circuit regression example
+ (push approved, then rm -rf ~); verified V2 allowed it
+
+---
+ src/security/policy.ts                  |  2 +-
+ tests/unit/policy-v21-hardening.test.ts | 11 ++++++++---
+ 2 files changed, 9 insertions(+), 4 deletions(-)
+
+diff --git a/src/security/policy.ts b/src/security/policy.ts
+index e2c5689..a17a83e 100644
+--- a/src/security/policy.ts
++++ b/src/security/policy.ts
+@@ -309,7 +309,7 @@ export function evaluateToolUse(
+       if (!d.allow) return { ...d, reason: `package script "${s.name}": ${d.reason}` };
+     }
+     // V2.1 fix (approval short-circuit): EVERY matching category must be approved. V2 returned "allow" on the first
+-    // approved match, so `rm -rf build && git push` passed once only destructive_delete had been approved.
++    // approved match, so `git push origin main && rm -rf ~` passed once only protected_branch_push had been approved.
+     const matched: { type: string; description: string }[] = [];
+     const v21 = approvalV21(toolName === 'Bash' ? commandTextForRules(expanded) : expanded);
+     if (v21) matched.push(v21);
+diff --git a/tests/unit/policy-v21-hardening.test.ts b/tests/unit/policy-v21-hardening.test.ts
+index 117c68d..74a77bb 100644
+--- a/tests/unit/policy-v21-hardening.test.ts
++++ b/tests/unit/policy-v21-hardening.test.ts
+@@ -165,10 +165,15 @@ describe('V2.1 Write/Edit content', () => {
+ });
+ 
+ describe('V2.1 approval short-circuit fix', () => {
+-  it('every matching category must be approved (V2 allowed this after approving only destructive_delete)', () => {
+-    const d = bash('rm -rf build && git push origin main', ['destructive_delete']);
++  it('every matching category must be approved (V2 allowed these after approving only the first category)', () => {
++    // V2 (e60278f) returned ALLOW for both (evidence/approval-shortcircuit-check.txt).
++    const d = bash('git push origin main && rm -rf ~', ['protected_branch_push']);
+     expect(d.allow).toBe(false);
+-    expect(d.approvalType).toBe('protected_branch_push');
++    expect(d.approvalType).toBe('destructive_delete');
++    expect(bash('npm publish && rm -rf ~', ['publish_release']).approvalType).toBe('destructive_delete');
++    expect(bash('rm -rf build && git push origin main', ['destructive_delete']).approvalType).toBe(
++      'protected_branch_push',
++    );
+     expect(
+       bash('rm -rf build && git push origin main', ['destructive_delete', 'protected_branch_push']).allow,
+     ).toBe(true);
+-- 
+2.56.0.windows.4
+

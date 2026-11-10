@@ -1,0 +1,550 @@
+﻿{
+    "script":  "03-staging-layout",
+    "revision":  "r3-20261110",
+    "startedAt":  "2026-11-10T15:43:42.9956714+05:00",
+    "finishedAt":  "2026-11-10T15:43:45.4639175+05:00",
+    "dryRun":  true,
+    "user":  "DESKTOP-QGGLG8D\\Roman",
+    "elevated":  false,
+    "changes":  [
+                    {
+                        "action":  "icacls",
+                        "target":  "C:\\ElevariqStaging",
+                        "detail":  "clear prior worker/broker/OWNER RIGHTS ACEs (idempotent) [icacls C:\\ElevariqStaging /remove *\u003cworker-SID\u003e *\u003cbroker-SID\u003e *S-1-3-4]",
+                        "applied":  false,
+                        "at":  "2026-11-10T15:43:43.2093688+05:00"
+                    },
+                    {
+                        "action":  "icacls",
+                        "target":  "C:\\ElevariqStaging",
+                        "detail":  "SYSTEM + Administrators Full [icacls C:\\ElevariqStaging /grant:r *S-1-5-18:(OI)(CI)F *S-1-5-32-544:(OI)(CI)F]",
+                        "applied":  false,
+                        "at":  "2026-11-10T15:43:43.2206947+05:00"
+                    },
+                    {
+                        "action":  "icacls",
+                        "target":  "C:\\ElevariqStaging",
+                        "detail":  "O F [icacls C:\\ElevariqStaging /grant:r *S-1-5-21-3837883729-3478098758-1729361560-1001:(OI)(CI)F]",
+                        "applied":  false,
+                        "at":  "2026-11-10T15:43:43.2264893+05:00"
+                    },
+                    {
+                        "action":  "icacls",
+                        "target":  "C:\\ElevariqStaging",
+                        "detail":  "B RX-this [icacls C:\\ElevariqStaging /grant:r *\u003cbroker-SID\u003e:(RX)]",
+                        "applied":  false,
+                        "at":  "2026-11-10T15:43:43.2301738+05:00"
+                    },
+                    {
+                        "action":  "icacls",
+                        "target":  "C:\\ElevariqStaging",
+                        "detail":  "W RX-this [icacls C:\\ElevariqStaging /grant:r *\u003cworker-SID\u003e:(RX)]",
+                        "applied":  false,
+                        "at":  "2026-11-10T15:43:43.2338620+05:00"
+                    },
+                    {
+                        "action":  "icacls",
+                        "target":  "C:\\ElevariqStaging\\bin",
+                        "detail":  "inheritance reset [icacls C:\\ElevariqStaging\\bin /inheritance:r]",
+                        "applied":  false,
+                        "at":  "2026-11-10T15:43:43.3113198+05:00"
+                    },
+                    {
+                        "action":  "icacls",
+                        "target":  "C:\\ElevariqStaging\\bin",
+                        "detail":  "clear prior worker/broker/OWNER RIGHTS ACEs (idempotent) [icacls C:\\ElevariqStaging\\bin /remove *\u003cworker-SID\u003e *\u003cbroker-SID\u003e *S-1-3-4]",
+                        "applied":  false,
+                        "at":  "2026-11-10T15:43:43.3155487+05:00"
+                    },
+                    {
+                        "action":  "icacls",
+                        "target":  "C:\\ElevariqStaging\\bin",
+                        "detail":  "SYSTEM + Administrators Full [icacls C:\\ElevariqStaging\\bin /grant:r *S-1-5-18:(OI)(CI)F *S-1-5-32-544:(OI)(CI)F]",
+                        "applied":  false,
+                        "at":  "2026-11-10T15:43:43.3196015+05:00"
+                    },
+                    {
+                        "action":  "icacls",
+                        "target":  "C:\\ElevariqStaging\\bin",
+                        "detail":  "O RX [icacls C:\\ElevariqStaging\\bin /grant:r *S-1-5-21-3837883729-3478098758-1729361560-1001:(OI)(CI)RX]",
+                        "applied":  false,
+                        "at":  "2026-11-10T15:43:43.3315775+05:00"
+                    },
+                    {
+                        "action":  "icacls",
+                        "target":  "C:\\ElevariqStaging\\bin",
+                        "detail":  "W RX [icacls C:\\ElevariqStaging\\bin /grant:r *\u003cworker-SID\u003e:(OI)(CI)RX]",
+                        "applied":  false,
+                        "at":  "2026-11-10T15:43:43.3414136+05:00"
+                    },
+                    {
+                        "action":  "icacls",
+                        "target":  "C:\\ElevariqStaging\\work",
+                        "detail":  "inheritance reset [icacls C:\\ElevariqStaging\\work /inheritance:r]",
+                        "applied":  false,
+                        "at":  "2026-11-10T15:43:43.3827019+05:00"
+                    },
+                    {
+                        "action":  "icacls",
+                        "target":  "C:\\ElevariqStaging\\work",
+                        "detail":  "clear prior worker/broker/OWNER RIGHTS ACEs (idempotent) [icacls C:\\ElevariqStaging\\work /remove *\u003cworker-SID\u003e *\u003cbroker-SID\u003e *S-1-3-4]",
+                        "applied":  false,
+                        "at":  "2026-11-10T15:43:43.3885077+05:00"
+                    },
+                    {
+                        "action":  "icacls",
+                        "target":  "C:\\ElevariqStaging\\work",
+                        "detail":  "SYSTEM + Administrators Full [icacls C:\\ElevariqStaging\\work /grant:r *S-1-5-18:(OI)(CI)F *S-1-5-32-544:(OI)(CI)F]",
+                        "applied":  false,
+                        "at":  "2026-11-10T15:43:43.3971021+05:00"
+                    },
+                    {
+                        "action":  "icacls",
+                        "target":  "C:\\ElevariqStaging\\work",
+                        "detail":  "O F [icacls C:\\ElevariqStaging\\work /grant:r *S-1-5-21-3837883729-3478098758-1729361560-1001:(OI)(CI)F]",
+                        "applied":  false,
+                        "at":  "2026-11-10T15:43:43.4062002+05:00"
+                    },
+                    {
+                        "action":  "icacls",
+                        "target":  "C:\\ElevariqStaging\\work",
+                        "detail":  "W M [icacls C:\\ElevariqStaging\\work /grant:r *\u003cworker-SID\u003e:(OI)(CI)M]",
+                        "applied":  false,
+                        "at":  "2026-11-10T15:43:43.4122540+05:00"
+                    },
+                    {
+                        "action":  "icacls",
+                        "target":  "C:\\ElevariqStaging\\home",
+                        "detail":  "inheritance reset [icacls C:\\ElevariqStaging\\home /inheritance:r]",
+                        "applied":  false,
+                        "at":  "2026-11-10T15:43:43.4612285+05:00"
+                    },
+                    {
+                        "action":  "icacls",
+                        "target":  "C:\\ElevariqStaging\\home",
+                        "detail":  "clear prior worker/broker/OWNER RIGHTS ACEs (idempotent) [icacls C:\\ElevariqStaging\\home /remove *\u003cworker-SID\u003e *\u003cbroker-SID\u003e *S-1-3-4]",
+                        "applied":  false,
+                        "at":  "2026-11-10T15:43:43.4768555+05:00"
+                    },
+                    {
+                        "action":  "icacls",
+                        "target":  "C:\\ElevariqStaging\\home",
+                        "detail":  "SYSTEM + Administrators Full [icacls C:\\ElevariqStaging\\home /grant:r *S-1-5-18:(OI)(CI)F *S-1-5-32-544:(OI)(CI)F]",
+                        "applied":  false,
+                        "at":  "2026-11-10T15:43:43.4848242+05:00"
+                    },
+                    {
+                        "action":  "icacls",
+                        "target":  "C:\\ElevariqStaging\\home",
+                        "detail":  "O F [icacls C:\\ElevariqStaging\\home /grant:r *S-1-5-21-3837883729-3478098758-1729361560-1001:(OI)(CI)F]",
+                        "applied":  false,
+                        "at":  "2026-11-10T15:43:43.4939101+05:00"
+                    },
+                    {
+                        "action":  "icacls",
+                        "target":  "C:\\ElevariqStaging\\home",
+                        "detail":  "W M [icacls C:\\ElevariqStaging\\home /grant:r *\u003cworker-SID\u003e:(OI)(CI)M]",
+                        "applied":  false,
+                        "at":  "2026-11-10T15:43:43.5060767+05:00"
+                    },
+                    {
+                        "action":  "icacls",
+                        "target":  "C:\\ElevariqStaging\\broker",
+                        "detail":  "inheritance reset [icacls C:\\ElevariqStaging\\broker /inheritance:r]",
+                        "applied":  false,
+                        "at":  "2026-11-10T15:43:43.5472930+05:00"
+                    },
+                    {
+                        "action":  "icacls",
+                        "target":  "C:\\ElevariqStaging\\broker",
+                        "detail":  "clear prior worker/broker/OWNER RIGHTS ACEs (idempotent) [icacls C:\\ElevariqStaging\\broker /remove *\u003cworker-SID\u003e *\u003cbroker-SID\u003e *S-1-3-4]",
+                        "applied":  false,
+                        "at":  "2026-11-10T15:43:43.5513297+05:00"
+                    },
+                    {
+                        "action":  "icacls",
+                        "target":  "C:\\ElevariqStaging\\broker",
+                        "detail":  "SYSTEM + Administrators Full [icacls C:\\ElevariqStaging\\broker /grant:r *S-1-5-18:(OI)(CI)F *S-1-5-32-544:(OI)(CI)F]",
+                        "applied":  false,
+                        "at":  "2026-11-10T15:43:43.5588027+05:00"
+                    },
+                    {
+                        "action":  "icacls",
+                        "target":  "C:\\ElevariqStaging\\broker",
+                        "detail":  "O F [icacls C:\\ElevariqStaging\\broker /grant:r *S-1-5-21-3837883729-3478098758-1729361560-1001:(OI)(CI)F]",
+                        "applied":  false,
+                        "at":  "2026-11-10T15:43:43.5668831+05:00"
+                    },
+                    {
+                        "action":  "icacls",
+                        "target":  "C:\\ElevariqStaging\\broker",
+                        "detail":  "B RX-this [icacls C:\\ElevariqStaging\\broker /grant:r *\u003cbroker-SID\u003e:(RX)]",
+                        "applied":  false,
+                        "at":  "2026-11-10T15:43:43.5769800+05:00"
+                    },
+                    {
+                        "action":  "icacls",
+                        "target":  "C:\\ElevariqStaging\\broker",
+                        "detail":  "W DENY [icacls C:\\ElevariqStaging\\broker /deny *\u003cworker-SID\u003e:(OI)(CI)F]",
+                        "applied":  false,
+                        "at":  "2026-11-10T15:43:43.5884828+05:00"
+                    },
+                    {
+                        "action":  "icacls",
+                        "target":  "C:\\ElevariqStaging\\broker\\bin",
+                        "detail":  "inheritance reset [icacls C:\\ElevariqStaging\\broker\\bin /inheritance:r]",
+                        "applied":  false,
+                        "at":  "2026-11-10T15:43:43.6306941+05:00"
+                    },
+                    {
+                        "action":  "icacls",
+                        "target":  "C:\\ElevariqStaging\\broker\\bin",
+                        "detail":  "clear prior worker/broker/OWNER RIGHTS ACEs (idempotent) [icacls C:\\ElevariqStaging\\broker\\bin /remove *\u003cworker-SID\u003e *\u003cbroker-SID\u003e *S-1-3-4]",
+                        "applied":  false,
+                        "at":  "2026-11-10T15:43:43.6347170+05:00"
+                    },
+                    {
+                        "action":  "icacls",
+                        "target":  "C:\\ElevariqStaging\\broker\\bin",
+                        "detail":  "SYSTEM + Administrators Full [icacls C:\\ElevariqStaging\\broker\\bin /grant:r *S-1-5-18:(OI)(CI)F *S-1-5-32-544:(OI)(CI)F]",
+                        "applied":  false,
+                        "at":  "2026-11-10T15:43:43.6384873+05:00"
+                    },
+                    {
+                        "action":  "icacls",
+                        "target":  "C:\\ElevariqStaging\\broker\\bin",
+                        "detail":  "O RX [icacls C:\\ElevariqStaging\\broker\\bin /grant:r *S-1-5-21-3837883729-3478098758-1729361560-1001:(OI)(CI)RX]",
+                        "applied":  false,
+                        "at":  "2026-11-10T15:43:43.6425172+05:00"
+                    },
+                    {
+                        "action":  "icacls",
+                        "target":  "C:\\ElevariqStaging\\broker\\bin",
+                        "detail":  "B RX [icacls C:\\ElevariqStaging\\broker\\bin /grant:r *\u003cbroker-SID\u003e:(OI)(CI)RX]",
+                        "applied":  false,
+                        "at":  "2026-11-10T15:43:43.6456572+05:00"
+                    },
+                    {
+                        "action":  "icacls",
+                        "target":  "C:\\ElevariqStaging\\broker\\bin",
+                        "detail":  "W DENY [icacls C:\\ElevariqStaging\\broker\\bin /deny *\u003cworker-SID\u003e:(OI)(CI)F]",
+                        "applied":  false,
+                        "at":  "2026-11-10T15:43:43.6518047+05:00"
+                    },
+                    {
+                        "action":  "icacls",
+                        "target":  "C:\\ElevariqStaging\\broker\\state",
+                        "detail":  "inheritance reset [icacls C:\\ElevariqStaging\\broker\\state /inheritance:r]",
+                        "applied":  false,
+                        "at":  "2026-11-10T15:43:43.6912779+05:00"
+                    },
+                    {
+                        "action":  "icacls",
+                        "target":  "C:\\ElevariqStaging\\broker\\state",
+                        "detail":  "clear prior worker/broker/OWNER RIGHTS ACEs (idempotent) [icacls C:\\ElevariqStaging\\broker\\state /remove *\u003cworker-SID\u003e *\u003cbroker-SID\u003e *S-1-3-4]",
+                        "applied":  false,
+                        "at":  "2026-11-10T15:43:43.6953152+05:00"
+                    },
+                    {
+                        "action":  "icacls",
+                        "target":  "C:\\ElevariqStaging\\broker\\state",
+                        "detail":  "SYSTEM + Administrators Full [icacls C:\\ElevariqStaging\\broker\\state /grant:r *S-1-5-18:(OI)(CI)F *S-1-5-32-544:(OI)(CI)F]",
+                        "applied":  false,
+                        "at":  "2026-11-10T15:43:43.7031317+05:00"
+                    },
+                    {
+                        "action":  "icacls",
+                        "target":  "C:\\ElevariqStaging\\broker\\state",
+                        "detail":  "O F [icacls C:\\ElevariqStaging\\broker\\state /grant:r *S-1-5-21-3837883729-3478098758-1729361560-1001:(OI)(CI)F]",
+                        "applied":  false,
+                        "at":  "2026-11-10T15:43:43.7051489+05:00"
+                    },
+                    {
+                        "action":  "icacls",
+                        "target":  "C:\\ElevariqStaging\\broker\\state",
+                        "detail":  "B M [icacls C:\\ElevariqStaging\\broker\\state /grant:r *\u003cbroker-SID\u003e:(OI)(CI)M]",
+                        "applied":  false,
+                        "at":  "2026-11-10T15:43:43.7051489+05:00"
+                    },
+                    {
+                        "action":  "icacls",
+                        "target":  "C:\\ElevariqStaging\\broker\\state",
+                        "detail":  "W DENY [icacls C:\\ElevariqStaging\\broker\\state /deny *\u003cworker-SID\u003e:(OI)(CI)F]",
+                        "applied":  false,
+                        "at":  "2026-11-10T15:43:43.7051489+05:00"
+                    },
+                    {
+                        "action":  "icacls",
+                        "target":  "C:\\ElevariqStaging\\spool",
+                        "detail":  "inheritance reset [icacls C:\\ElevariqStaging\\spool /inheritance:r]",
+                        "applied":  false,
+                        "at":  "2026-11-10T15:43:43.7360893+05:00"
+                    },
+                    {
+                        "action":  "icacls",
+                        "target":  "C:\\ElevariqStaging\\spool",
+                        "detail":  "clear prior worker/broker/OWNER RIGHTS ACEs (idempotent) [icacls C:\\ElevariqStaging\\spool /remove *\u003cworker-SID\u003e *\u003cbroker-SID\u003e *S-1-3-4]",
+                        "applied":  false,
+                        "at":  "2026-11-10T15:43:43.7360893+05:00"
+                    },
+                    {
+                        "action":  "icacls",
+                        "target":  "C:\\ElevariqStaging\\spool",
+                        "detail":  "SYSTEM + Administrators Full [icacls C:\\ElevariqStaging\\spool /grant:r *S-1-5-18:(OI)(CI)F *S-1-5-32-544:(OI)(CI)F]",
+                        "applied":  false,
+                        "at":  "2026-11-10T15:43:43.7360893+05:00"
+                    },
+                    {
+                        "action":  "icacls",
+                        "target":  "C:\\ElevariqStaging\\spool",
+                        "detail":  "O F [icacls C:\\ElevariqStaging\\spool /grant:r *S-1-5-21-3837883729-3478098758-1729361560-1001:(OI)(CI)F]",
+                        "applied":  false,
+                        "at":  "2026-11-10T15:43:43.7514882+05:00"
+                    },
+                    {
+                        "action":  "icacls",
+                        "target":  "C:\\ElevariqStaging\\spool",
+                        "detail":  "B RX-this [icacls C:\\ElevariqStaging\\spool /grant:r *\u003cbroker-SID\u003e:(RX)]",
+                        "applied":  false,
+                        "at":  "2026-11-10T15:43:43.7531500+05:00"
+                    },
+                    {
+                        "action":  "icacls",
+                        "target":  "C:\\ElevariqStaging\\spool",
+                        "detail":  "W RX-this [icacls C:\\ElevariqStaging\\spool /grant:r *\u003cworker-SID\u003e:(RX)]",
+                        "applied":  false,
+                        "at":  "2026-11-10T15:43:43.7531500+05:00"
+                    },
+                    {
+                        "action":  "icacls",
+                        "target":  "C:\\ElevariqStaging\\spool\\requests",
+                        "detail":  "inheritance reset [icacls C:\\ElevariqStaging\\spool\\requests /inheritance:r]",
+                        "applied":  false,
+                        "at":  "2026-11-10T15:43:43.7805439+05:00"
+                    },
+                    {
+                        "action":  "icacls",
+                        "target":  "C:\\ElevariqStaging\\spool\\requests",
+                        "detail":  "clear prior worker/broker/OWNER RIGHTS ACEs (idempotent) [icacls C:\\ElevariqStaging\\spool\\requests /remove *\u003cworker-SID\u003e *\u003cbroker-SID\u003e *S-1-3-4]",
+                        "applied":  false,
+                        "at":  "2026-11-10T15:43:43.7874361+05:00"
+                    },
+                    {
+                        "action":  "icacls",
+                        "target":  "C:\\ElevariqStaging\\spool\\requests",
+                        "detail":  "SYSTEM + Administrators Full [icacls C:\\ElevariqStaging\\spool\\requests /grant:r *S-1-5-18:(OI)(CI)F *S-1-5-32-544:(OI)(CI)F]",
+                        "applied":  false,
+                        "at":  "2026-11-10T15:43:43.7874361+05:00"
+                    },
+                    {
+                        "action":  "icacls",
+                        "target":  "C:\\ElevariqStaging\\spool\\requests",
+                        "detail":  "O F [icacls C:\\ElevariqStaging\\spool\\requests /grant:r *S-1-5-21-3837883729-3478098758-1729361560-1001:(OI)(CI)F]",
+                        "applied":  false,
+                        "at":  "2026-11-10T15:43:43.7874361+05:00"
+                    },
+                    {
+                        "action":  "icacls",
+                        "target":  "C:\\ElevariqStaging\\spool\\requests",
+                        "detail":  "B M [icacls C:\\ElevariqStaging\\spool\\requests /grant:r *\u003cbroker-SID\u003e:(OI)(CI)M]",
+                        "applied":  false,
+                        "at":  "2026-11-10T15:43:43.7988710+05:00"
+                    },
+                    {
+                        "action":  "icacls",
+                        "target":  "C:\\ElevariqStaging\\spool\\requests",
+                        "detail":  "W WD-this [icacls C:\\ElevariqStaging\\spool\\requests /grant:r *\u003cworker-SID\u003e:(WD)]",
+                        "applied":  false,
+                        "at":  "2026-11-10T15:43:43.8034536+05:00"
+                    },
+                    {
+                        "action":  "icacls",
+                        "target":  "C:\\ElevariqStaging\\spool\\requests",
+                        "detail":  "OWNER RIGHTS inherit-only RC: creators get NO implicit WRITE_DAC on their files (M9) [icacls C:\\ElevariqStaging\\spool\\requests /grant *S-1-3-4:(OI)(IO)(RC)]",
+                        "applied":  false,
+                        "at":  "2026-11-10T15:43:43.8034536+05:00"
+                    },
+                    {
+                        "action":  "icacls",
+                        "target":  "C:\\ElevariqStaging\\spool\\approvals",
+                        "detail":  "inheritance reset [icacls C:\\ElevariqStaging\\spool\\approvals /inheritance:r]",
+                        "applied":  false,
+                        "at":  "2026-11-10T15:43:43.8279750+05:00"
+                    },
+                    {
+                        "action":  "icacls",
+                        "target":  "C:\\ElevariqStaging\\spool\\approvals",
+                        "detail":  "clear prior worker/broker/OWNER RIGHTS ACEs (idempotent) [icacls C:\\ElevariqStaging\\spool\\approvals /remove *\u003cworker-SID\u003e *\u003cbroker-SID\u003e *S-1-3-4]",
+                        "applied":  false,
+                        "at":  "2026-11-10T15:43:43.8361620+05:00"
+                    },
+                    {
+                        "action":  "icacls",
+                        "target":  "C:\\ElevariqStaging\\spool\\approvals",
+                        "detail":  "SYSTEM + Administrators Full [icacls C:\\ElevariqStaging\\spool\\approvals /grant:r *S-1-5-18:(OI)(CI)F *S-1-5-32-544:(OI)(CI)F]",
+                        "applied":  false,
+                        "at":  "2026-11-10T15:43:43.8379732+05:00"
+                    },
+                    {
+                        "action":  "icacls",
+                        "target":  "C:\\ElevariqStaging\\spool\\approvals",
+                        "detail":  "O M [icacls C:\\ElevariqStaging\\spool\\approvals /grant:r *S-1-5-21-3837883729-3478098758-1729361560-1001:(OI)(CI)M]",
+                        "applied":  false,
+                        "at":  "2026-11-10T15:43:43.8379732+05:00"
+                    },
+                    {
+                        "action":  "icacls",
+                        "target":  "C:\\ElevariqStaging\\spool\\approvals",
+                        "detail":  "B RX+D [icacls C:\\ElevariqStaging\\spool\\approvals /grant:r *\u003cbroker-SID\u003e:(OI)(CI)(RX,DE)]",
+                        "applied":  false,
+                        "at":  "2026-11-10T15:43:43.8437479+05:00"
+                    },
+                    {
+                        "action":  "icacls",
+                        "target":  "C:\\ElevariqStaging\\spool\\approvals",
+                        "detail":  "W DENY [icacls C:\\ElevariqStaging\\spool\\approvals /deny *\u003cworker-SID\u003e:(OI)(CI)F]",
+                        "applied":  false,
+                        "at":  "2026-11-10T15:43:43.8437479+05:00"
+                    },
+                    {
+                        "action":  "icacls",
+                        "target":  "C:\\ElevariqStaging\\spool\\decisions",
+                        "detail":  "inheritance reset [icacls C:\\ElevariqStaging\\spool\\decisions /inheritance:r]",
+                        "applied":  false,
+                        "at":  "2026-11-10T15:43:43.8758399+05:00"
+                    },
+                    {
+                        "action":  "icacls",
+                        "target":  "C:\\ElevariqStaging\\spool\\decisions",
+                        "detail":  "clear prior worker/broker/OWNER RIGHTS ACEs (idempotent) [icacls C:\\ElevariqStaging\\spool\\decisions /remove *\u003cworker-SID\u003e *\u003cbroker-SID\u003e *S-1-3-4]",
+                        "applied":  false,
+                        "at":  "2026-11-10T15:43:43.8791394+05:00"
+                    },
+                    {
+                        "action":  "icacls",
+                        "target":  "C:\\ElevariqStaging\\spool\\decisions",
+                        "detail":  "SYSTEM + Administrators Full [icacls C:\\ElevariqStaging\\spool\\decisions /grant:r *S-1-5-18:(OI)(CI)F *S-1-5-32-544:(OI)(CI)F]",
+                        "applied":  false,
+                        "at":  "2026-11-10T15:43:43.8791394+05:00"
+                    },
+                    {
+                        "action":  "icacls",
+                        "target":  "C:\\ElevariqStaging\\spool\\decisions",
+                        "detail":  "O F [icacls C:\\ElevariqStaging\\spool\\decisions /grant:r *S-1-5-21-3837883729-3478098758-1729361560-1001:(OI)(CI)F]",
+                        "applied":  false,
+                        "at":  "2026-11-10T15:43:43.8791394+05:00"
+                    },
+                    {
+                        "action":  "icacls",
+                        "target":  "C:\\ElevariqStaging\\spool\\decisions",
+                        "detail":  "B M [icacls C:\\ElevariqStaging\\spool\\decisions /grant:r *\u003cbroker-SID\u003e:(OI)(CI)M]",
+                        "applied":  false,
+                        "at":  "2026-11-10T15:43:43.8901937+05:00"
+                    },
+                    {
+                        "action":  "icacls",
+                        "target":  "C:\\ElevariqStaging\\spool\\decisions",
+                        "detail":  "W RX [icacls C:\\ElevariqStaging\\spool\\decisions /grant:r *\u003cworker-SID\u003e:(OI)(CI)RX]",
+                        "applied":  false,
+                        "at":  "2026-11-10T15:43:43.8937215+05:00"
+                    },
+                    {
+                        "action":  "icacls",
+                        "target":  "C:\\ElevariqStaging\\decoys",
+                        "detail":  "inheritance reset [icacls C:\\ElevariqStaging\\decoys /inheritance:r]",
+                        "applied":  false,
+                        "at":  "2026-11-10T15:43:43.9229591+05:00"
+                    },
+                    {
+                        "action":  "icacls",
+                        "target":  "C:\\ElevariqStaging\\decoys",
+                        "detail":  "clear prior worker/broker/OWNER RIGHTS ACEs (idempotent) [icacls C:\\ElevariqStaging\\decoys /remove *\u003cworker-SID\u003e *\u003cbroker-SID\u003e *S-1-3-4]",
+                        "applied":  false,
+                        "at":  "2026-11-10T15:43:43.9247356+05:00"
+                    },
+                    {
+                        "action":  "icacls",
+                        "target":  "C:\\ElevariqStaging\\decoys",
+                        "detail":  "SYSTEM + Administrators Full [icacls C:\\ElevariqStaging\\decoys /grant:r *S-1-5-18:(OI)(CI)F *S-1-5-32-544:(OI)(CI)F]",
+                        "applied":  false,
+                        "at":  "2026-11-10T15:43:43.9247356+05:00"
+                    },
+                    {
+                        "action":  "icacls",
+                        "target":  "C:\\ElevariqStaging\\decoys",
+                        "detail":  "O F [icacls C:\\ElevariqStaging\\decoys /grant:r *S-1-5-21-3837883729-3478098758-1729361560-1001:(OI)(CI)F]",
+                        "applied":  false,
+                        "at":  "2026-11-10T15:43:43.9247356+05:00"
+                    },
+                    {
+                        "action":  "icacls",
+                        "target":  "C:\\ElevariqStaging\\decoys",
+                        "detail":  "W DENY [icacls C:\\ElevariqStaging\\decoys /deny *\u003cworker-SID\u003e:(OI)(CI)F]",
+                        "applied":  false,
+                        "at":  "2026-11-10T15:43:43.9247356+05:00"
+                    },
+                    {
+                        "action":  "write-decoy",
+                        "target":  "C:\\ElevariqStaging\\decoys\\fake-claude\\.credentials.json",
+                        "detail":  "synthetic marker file",
+                        "applied":  false,
+                        "at":  "2026-11-10T15:43:43.9670560+05:00"
+                    },
+                    {
+                        "action":  "write-decoy",
+                        "target":  "C:\\ElevariqStaging\\decoys\\fake-prod-checkout\\.env",
+                        "detail":  "synthetic marker file",
+                        "applied":  false,
+                        "at":  "2026-11-10T15:43:43.9929883+05:00"
+                    }
+                ],
+    "refusals":  [
+
+                 ],
+    "checks":  [
+                   {
+                       "id":  "R7",
+                       "name":  "trusted admin-only script location + canonical SHA256SUMS + out-of-band manifest hash",
+                       "status":  "WARN",
+                       "detail":  "owner S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110; inheritance not cut on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110; write 0x10116 for S-1-5-11 on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110; write 0x10116 for S-1-5-11(IO) on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110; owner S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110\\00-isolation-group-deny.ps1; write 0x10116 for S-1-5-11 on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110\\00-isolation-group-deny.ps1; owner S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110\\00a-remove-test-residue.ps1; write 0x10116 for S-1-5-11 on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110\\00a-remove-test-residue.ps1; owner S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110\\01-staging-volume.ps1; write 0x10116 for S-1-5-11 on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110\\01-staging-volume.ps1; owner S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110\\02-identities-and-rights.ps1; write 0x10116 for S-1-5-11 on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110\\02-identities-and-rights.ps1; owner S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110\\03-staging-layout.ps1; write 0x10116 for S-1-5-11 on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110\\03-staging-layout.ps1; owner S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110\\04-broker-install.ps1; write 0x10116 for S-1-5-11 on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110\\04-broker-install.ps1; owner S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110\\05-firewall-egress.ps1; write 0x10116 for S-1-5-11 on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110\\05-firewall-egress.ps1; owner S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110\\06-worker-enable.ps1; write 0x10116 for S-1-5-11 on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110\\06-worker-enable.ps1; owner S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110\\07-verify-config.ps1; write 0x10116 for S-1-5-11 on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110\\07-verify-config.ps1; owner S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110\\09-rollback.ps1; write 0x10116 for S-1-5-11 on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110\\09-rollback.ps1; owner S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110\\Freeze-AdminScripts.ps1; write 0x10116 for S-1-5-11 on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110\\Freeze-AdminScripts.ps1; owner S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110\\_common.ps1; write 0x10116 for S-1-5-11 on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110\\_common.ps1; SHA256SUMS missing"
+                   },
+                   {
+                       "id":  "PRE",
+                       "name":  "01 + 02 applied (volume mounted, identities exist)",
+                       "status":  "FAIL",
+                       "detail":  ""
+                   },
+                   {
+                       "id":  "L12",
+                       "name":  "no reparse points under worker-writable directories",
+                       "status":  "PASS",
+                       "detail":  ""
+                   },
+                   {
+                       "id":  "P0",
+                       "name":  "production task present and running",
+                       "status":  "PASS",
+                       "detail":  "Running"
+                   },
+                   {
+                       "id":  "P1",
+                       "name":  "production supervisor process alive (found by command line)",
+                       "status":  "PASS",
+                       "detail":  "pids=8992"
+                   },
+                   {
+                       "id":  "P2",
+                       "name":  "production HEAD = e60278f",
+                       "status":  "PASS",
+                       "detail":  "e60278f"
+                   },
+                   {
+                       "id":  "P3",
+                       "name":  "production task action still points at the checkout script",
+                       "status":  "PASS",
+                       "detail":  ""
+                   }
+               ],
+    "error":  null,
+    "path":  "E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110\\reports\\03-staging-layout-20261110-154342-1308.json"
+}

@@ -1,0 +1,26 @@
+{
+  "title": "Staging Slugify Utility",
+  "description": "Disposable V2.1 staging acceptance project: a tiny zero-dependency TypeScript utility with tests, run on Node's built-in TypeScript support.",
+  "businessObjectives": ["Exercise one genuine Claude Code worker task and the independent QA lifecycle in staging"],
+  "functionalRequirements": [
+    { "id": "FR-1", "text": "A slugify(text) function that lower-cases, transliterates nothing, replaces runs of non-alphanumeric characters with a single hyphen and trims leading/trailing hyphens", "priority": "must" },
+    { "id": "FR-2", "text": "slugify throws a TypeError when the argument is not a string", "priority": "must" }
+  ],
+  "nonFunctionalRequirements": [
+    { "id": "NFR-1", "text": "No third-party dependencies; tests use node:test and node:assert", "priority": "must" }
+  ],
+  "technicalConstraints": ["TypeScript run directly by Node.js 26 (built-in type stripping)", "No npm install", "No network access"],
+  "workspace": { "type": "managed" },
+  "expectedDeliverables": ["src/slugify.ts", "test/slugify.test.ts", "package.json with \"type\": \"module\""],
+  "acceptanceCriteria": [
+    { "id": "AC-1", "text": "src/slugify.ts parses (node --check)", "verifiedBy": "build" },
+    { "id": "AC-2", "text": "node --test passes", "verifiedBy": "tests" },
+    { "id": "AC-3", "text": "FR-1 and FR-2 are implemented and covered by tests", "verifiedBy": "review" }
+  ],
+  "priority": 0,
+  "budget": { "maxUsdTotal": 5, "maxUsdPerExecution": 1, "maxExecutions": 8 },
+  "approvalPolicy": { "preApproved": [], "alsoRequire": [] },
+  "requiredIntegrations": [],
+  "verification": { "buildCommand": "node --check src/slugify.ts", "testCommand": "node --test" },
+  "source": { "system": "manual" }
+}

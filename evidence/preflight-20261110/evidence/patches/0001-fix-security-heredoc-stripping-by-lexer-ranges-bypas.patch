@@ -1,0 +1,241 @@
+From 1d5bda94139e57c48f232e281ef496fe0e4ddcd2 Mon Sep 17 00:00:00 2001
+From: "ELEVARIQ Agent (Claude)" <connectroman3@gmail.com>
+Date: Tue, 10 Nov 2026 02:25:42 +0500
+Subject: [PATCH 1/4] fix(security): heredoc stripping by lexer ranges (bypass
+ in 1e5b7d4, now on main)
+
+The line-based stripHeredocBodies added in 1e5b7d4 treated `<<EOF` inside a quoted
+string or a comment as a heredoc and dropped the following command lines from the
+protected-path check: `echo "x<<EOF"` then `cat ../../notes.txt` was ALLOWED.
+Heredoc bodies are now removed only at the exact source ranges recorded by the shell
+lexer (quote, comment and here-string aware); any parse doubt keeps the raw text.
+Probe H1-H7: 3 bypasses -> 0; the legitimate ../src import in a data heredoc stays allowed.
+---
+ src/security/hardening.ts        | 26 ++-------------
+ src/security/policy.ts           |  9 ++++--
+ src/security/shell-normalize.ts  | 55 ++++++++++++++++++++++++++++----
+ tests/unit/phase-bde-v21.test.ts | 23 ++++++++++---
+ 4 files changed, 75 insertions(+), 38 deletions(-)
+
+diff --git a/src/security/hardening.ts b/src/security/hardening.ts
+index 7261ccf..3a63837 100644
+--- a/src/security/hardening.ts
++++ b/src/security/hardening.ts
+@@ -249,29 +249,9 @@ function tokens(segment: string): string[] {
+   return out.map((t) => t.replace(/^--?[\w-]+=/, '').replace(/^@/, '')).filter(Boolean);
+ }
+ 
+-/**
+- * Removes heredoc BODIES (keeps the `cat > f <<'EOF'` line, so the redirect target is still checked). Phase G finding:
+- * a real worker wrote a test file through a heredoc whose body contained `import ... from '../src/slugify.ts'`; the
+- * body was tokenized as paths, `../src` resolved to `<agent home>/workspaces/src` and the call was denied. Callers
+- * must only use this when the shell analyzer classified the heredoc as DATA (`useRaw` false): heredocs fed to an
+- * interpreter, unquoted bodies with substitutions and files executed in the same command keep the raw text.
+- */
+-export function stripHeredocBodies(command: string): string {
+-  const out: string[] = [];
+-  const pending: { delim: string; tabs: boolean }[] = [];
+-  for (const line of command.split('\n')) {
+-    if (pending.length) {
+-      const h = pending[0]!;
+-      const cmp = (h.tabs ? line.replace(/^\t+/, '') : line).replace(/\r$/, '');
+-      if (cmp === h.delim) pending.shift();
+-      continue;
+-    }
+-    out.push(line);
+-    for (const m of line.matchAll(/(?<!<)<<(-?)\s*(['"]?)([A-Za-z_][\w.-]*)\2/g))
+-      pending.push({ delim: m[3]!, tabs: m[1] === '-' });
+-  }
+-  return out.join('\n');
+-}
++// The line-based `stripHeredocBodies` (1e5b7d4) was REMOVED: it treated `<<EOF` inside quotes or comments as a
++// heredoc and dropped the following command lines from the path check (finding 9 bypass). Use
++// `withoutHeredocBodies` from shell-normalize.ts, which removes only the lexer's exact heredoc-body ranges.
+ 
+ /**
+  * Resolves path-like words of a command (tracking `cd`) and reports whether any of them names a protected
+diff --git a/src/security/policy.ts b/src/security/policy.ts
+index e27276d..f3aaa02 100644
+--- a/src/security/policy.ts
++++ b/src/security/policy.ts
+@@ -1,7 +1,7 @@
+ ﻿import os from 'node:os';
+ import path from 'node:path';
+ import { isPathInside } from '../workspaces/paths.js';
+-import { analyzeShellCommand } from './shell-normalize.js';
++import { analyzeShellCommand, withoutHeredocBodies } from './shell-normalize.js';
+ import {
+   approvalsV21,
+   contentHardDeny,
+@@ -10,7 +10,6 @@ import {
+   packageScriptBodies,
+   reachesProtectedPath,
+   stripEscapes,
+-  stripHeredocBodies,
+ } from './hardening.js';
+ 
+ /**
+@@ -295,8 +294,12 @@ export function evaluateToolUse(
+     if (hard) return { allow: false, reason: `${hard.reason} (V2.1 class ${hard.cls})` };
+     // Phase G: heredoc bodies the analyzer classifies as data are not path arguments (the literal-substring check
+     // below still sees them, so a heredoc naming the agent home verbatim stays denied).
++    // Finding 9 (trusted-execution baseline): bodies are removed by the LEXER's exact ranges (quote/comment aware),
++    // never by line matching; any parse doubt keeps the raw text.
+     const pathText =
+-      toolName === 'Bash' && !analyzeShellCommand(command).useRaw ? stripHeredocBodies(command) : command;
++      toolName === 'Bash' && !analyzeShellCommand(command).useRaw
++        ? (withoutHeredocBodies(command) ?? command)
++        : command;
+     if (
+       options.protectedPaths?.length &&
+       (views.some((v) => mentionsProtectedPath(v, workspace, options.protectedPaths!)) ||
+diff --git a/src/security/shell-normalize.ts b/src/security/shell-normalize.ts
+index d68fb7f..54d57ae 100644
+--- a/src/security/shell-normalize.ts
++++ b/src/security/shell-normalize.ts
+@@ -38,6 +38,26 @@ export interface ShellAnalysis {
+   normalized: string;
+   /** Why the raw view is required (empty when the normalized view may be used). */
+   reasons: string[];
++  /**
++   * Exact [start, end) source ranges of heredoc BODIES (including the delimiter line) found by the lexer, which knows
++   * quoting, comments and here-strings. Empty when parsing failed. V2.1 trusted-execution fix for finding 9: the
++   * earlier line-based stripper treated `<<EOF` inside quotes or comments as a heredoc and hid later command lines.
++   */
++  heredocBodyRanges: [number, number][];
++}
++
++/** The command with exactly the lexer-identified heredoc bodies removed; null when the command could not be parsed. */
++export function withoutHeredocBodies(command: string): string | null {
++  const a = analyzeShellCommand(command);
++  if (a.reasons.some((r) => r.startsWith('unparseable')) || a.reasons.includes('arithmetic expression (( ))'))
++    return null;
++  let out = '';
++  let at = 0;
++  for (const [s, e] of a.heredocBodyRanges) {
++    out += command.slice(at, s);
++    at = e;
++  }
++  return out + command.slice(at);
+ }
+ 
+ export const STRING_PLACEHOLDER = '__STR__';
+@@ -222,8 +242,12 @@ const programName = (value: string): string => {
+ const ASSIGNMENT = /^[A-Za-z_][A-Za-z0-9_]*\+?=/;
+ 
+ /** Lexes a Bash command into segments of words and builds the normalized text. Throws ParseError when unsure. */
+-function lex(src: string, reasons: string[]): { normalized: string; segments: Segment[] } {
++function lex(
++  src: string,
++  reasons: string[],
++): { normalized: string; segments: Segment[]; heredocBodyRanges: [number, number][] } {
+   const out: string[] = [];
++  const heredocBodyRanges: [number, number][] = [];
+   const segments: Segment[] = [];
+   let seg: Segment = { words: [], pipeTarget: false, stdinLiteral: false };
+   const stack: string[] = []; // open '(' / '$(' / '<(' / '`'
+@@ -244,6 +268,7 @@ function lex(src: string, reasons: string[]): { normalized: string; segments: Se
+     while (pendingHeredocs.length) {
+       const { delim, stripTabs, quoted, data } = pendingHeredocs.shift()!;
+       const body: string[] = [];
++      const bodyStart = i;
+       for (;;) {
+         if (i >= n) throw new ParseError(`unterminated heredoc (${delim})`);
+         let end = src.indexOf('\n', i);
+@@ -254,6 +279,7 @@ function lex(src: string, reasons: string[]): { normalized: string; segments: Se
+         if (line === delim) break;
+         body.push(line);
+       }
++      heredocBodyRanges.push([bodyStart, Math.min(i, n)]);
+       // v2 review fix: Bash runs $(...) and backticks inside an UNQUOTED heredoc body before the program sees it.
+       if (!quoted && /\$\(|`/.test(body.join('\n')))
+         reasons.push('unquoted heredoc body contains command substitution (executed by the shell)');
+@@ -563,7 +589,7 @@ function lex(src: string, reasons: string[]): { normalized: string; segments: Se
+   if (pendingHeredocs.length) throw new ParseError('unterminated heredoc');
+   if (redirectNext) throw new ParseError('redirection without target');
+   segments.push(seg);
+-  return { normalized: out.join('').trim(), segments };
++  return { normalized: out.join('').trim(), segments, heredocBodyRanges };
+ }
+ 
+ function executedTextReasons(segments: Segment[]): string[] {
+@@ -597,9 +623,14 @@ export function analyzeShellCommand(command: string): ShellAnalysis {
+   // v2 review fix: the lexer has no arithmetic context, so `<<` inside $((...)) / ((...)) would start a fake heredoc
+   // and hide the following lines. Any arithmetic expression selects the strict raw view.
+   if (/\$\(\(|(^|[\s;&|(!])\(\(/.test(command))
+-    return { useRaw: true, normalized: command, reasons: ['arithmetic expression (( ))'] };
++    return {
++      useRaw: true,
++      normalized: command,
++      reasons: ['arithmetic expression (( ))'],
++      heredocBodyRanges: [],
++    };
+   try {
+-    const { normalized, segments } = lex(command, reasons);
++    const { normalized, segments, heredocBodyRanges } = lex(command, reasons);
+     reasons.push(...executedTextReasons(segments));
+     // v2 review fix: writing a file through a heredoc and running a script in the same command (`cat > x.sh <<EOF
+     // ... EOF; chmod +x x.sh && ./x.sh`) executes the hidden body.
+@@ -610,10 +641,20 @@ export function analyzeShellCommand(command: string): ShellAnalysis {
+       return prog === 'chmod' || prog === 'make' || /^(\.{1,2}[\\/]|[\\/]|[A-Za-z]:[\\/])/.test(first);
+     });
+     if (hasHeredoc && runsScript) reasons.push('a heredoc-written file may be executed in the same command');
+-    return { useRaw: reasons.length > 0, normalized, reasons: [...new Set(reasons)] };
++    return {
++      useRaw: reasons.length > 0,
++      normalized,
++      reasons: [...new Set(reasons)],
++      heredocBodyRanges,
++    };
+   } catch (err) {
+     if (err instanceof ParseError)
+-      return { useRaw: true, normalized: command, reasons: [`unparseable: ${err.message}`] };
+-    return { useRaw: true, normalized: command, reasons: ['unparseable'] };
++      return {
++        useRaw: true,
++        normalized: command,
++        reasons: [`unparseable: ${err.message}`],
++        heredocBodyRanges: [],
++      };
++    return { useRaw: true, normalized: command, reasons: ['unparseable'], heredocBodyRanges: [] };
+   }
+ }
+diff --git a/tests/unit/phase-bde-v21.test.ts b/tests/unit/phase-bde-v21.test.ts
+index 08bbb4a..fe10f9a 100644
+--- a/tests/unit/phase-bde-v21.test.ts
++++ b/tests/unit/phase-bde-v21.test.ts
+@@ -341,13 +341,26 @@ describe('Phase G findings from the real Claude Code staging run', () => {
+     expect(bash('cat > f.txt <<EOF\n$(cat ../../notes.txt)\nEOF')).toBe('DENY');
+     expect(bash("cat > run.sh <<'EOF'\ncat ../../notes.txt\nEOF\nbash run.sh")).toBe('DENY');
+   });
+-  it('stripHeredocBodies keeps here-strings and the lines after a terminated body', async () => {
+-    const { stripHeredocBodies } = await import('../../src/security/hardening.js');
+-    expect(stripHeredocBodies("cat > a <<'EOF'\nbody ../x\nEOF\nls ../../y")).toBe(
++  it('withoutHeredocBodies removes exactly the lexer-identified bodies', async () => {
++    const { withoutHeredocBodies } = await import('../../src/security/shell-normalize.js');
++    expect(withoutHeredocBodies("cat > a <<'EOF'\nbody ../x\nEOF\nls ../../y")).toBe(
+       "cat > a <<'EOF'\nls ../../y",
+     );
+-    expect(stripHeredocBodies('cat <<< ../x\nls ../../y')).toBe('cat <<< ../x\nls ../../y');
+-    expect(stripHeredocBodies('cat > a <<-EOF\n\tbody\n\tEOF\nls')).toBe('cat > a <<-EOF\nls');
++    expect(withoutHeredocBodies('cat <<< ../x\nls ../../y')).toBe('cat <<< ../x\nls ../../y');
++    expect(withoutHeredocBodies('cat > a <<-EOF\n\tbody\n\tEOF\nls')).toBe('cat > a <<-EOF\nls');
++    // `<<EOF` inside quotes or a comment is not a heredoc: nothing may be removed
++    for (const c of ['echo "x<<EOF"\ncat ../../y', "echo 'a <<EOF'\ncat ../../y", '# see <<EOF\ncat ../../y'])
++      expect(withoutHeredocBodies(c)).toBe(c);
++    expect(withoutHeredocBodies("cat > a <<'EOF'\nunterminated")).toBeNull();
++  });
++  it('finding 9: a quoted or commented <<EOF cannot hide the next command line from the path check', () => {
++    for (const c of [
++      'echo "x<<EOF"\ncat ../../notes.txt',
++      "echo 'a <<EOF'\ncat ../../notes.txt",
++      '# see <<EOF\ncat ../../notes.txt',
++      'echo "<<EOF" && cat ../../notes.txt',
++    ])
++      expect(bash(c), c).toBe('DENY');
+   });
+   it('usage token counts are not redacted by the key-name rule; string secrets under such keys still are', async () => {
+     const { redactValue } = await import('../../src/security/redact.js');
+-- 
+2.56.0.windows.4
+

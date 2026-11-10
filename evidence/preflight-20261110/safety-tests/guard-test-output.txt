@@ -1,0 +1,20 @@
+﻿WARNING:   REFUSED: refuses a production path (E:\Agent\Personal-agent)
+OK (rejected): E:\Agent\Personal-agent
+WARNING:   REFUSED: refuses a production path (E:\Agent\Personal-agent\dist\cli\index.js)
+OK (rejected): E:\Agent\Personal-agent\dist\cli\index.js
+WARNING:   REFUSED: refuses a production path (C:\Users\Roman\AppData\Local\ElevariqAgent)
+OK (rejected): C:\Users\Roman\AppData\Local\ElevariqAgent
+WARNING:   REFUSED: StagingOnly: target is outside C:\ElevariqStaging (C:\Users\Roman\.ssh)
+OK (rejected): C:\Users\Roman\.ssh
+WARNING:   REFUSED: StagingOnly: target is outside C:\ElevariqStaging (C:\Windows\System32)
+OK (rejected): C:\Windows\System32
+WARNING:   REFUSED: StagingOnly: target is outside C:\ElevariqStaging (D:\whatever)
+OK (rejected): D:\whatever
+WARNING:   REFUSED: StagingOnly: target is outside C:\ElevariqStaging (C:\ElevariqStagingEvil)
+OK (rejected): C:\ElevariqStagingEvil
+OK (accepted): C:\ElevariqStaging
+OK (accepted): C:\ElevariqStaging\work\task1
+OK (accepted): C:\ElevariqStaging\broker
+WARNING:   REFUSED: refuses a production path (E:\Agent\Personal-agent)
+OK (prod always rejected, even non-staging): E:\Agent\Personal-agent
+GUARD-TEST pass=11 fail=0

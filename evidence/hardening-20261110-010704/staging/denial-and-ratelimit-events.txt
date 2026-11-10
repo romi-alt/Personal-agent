@@ -1,0 +1,3 @@
+﻿2026-11-09T20:40:36.645Z provider.rate_limit {"status":"allowed","type":"five_hour","resetsAtMs":1794262800000}
+2026-11-09T20:41:05.362Z task.completed_with_denials {"denied":["Bash: Commands that reference the agent home or the agent repository outside the project workspace are not permitted"]}
+2026-11-09T20:41:13.454Z provider.rate_limit {"status":"allowed","type":"five_hour","resetsAtMs":1794262800000}

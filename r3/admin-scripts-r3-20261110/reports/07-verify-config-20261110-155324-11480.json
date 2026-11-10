@@ -1,0 +1,55 @@
+﻿{
+    "script":  "07-verify-config",
+    "revision":  "r3-20261110",
+    "startedAt":  "2026-11-10T15:53:24.2879355+05:00",
+    "finishedAt":  "2026-11-10T15:53:25.7639933+05:00",
+    "dryRun":  true,
+    "user":  "DESKTOP-QGGLG8D\\Roman",
+    "elevated":  false,
+    "changes":  [
+
+                ],
+    "refusals":  [
+
+                 ],
+    "checks":  [
+                   {
+                       "id":  "C00.1",
+                       "name":  "group ElevariqIsolatedIdentities exists",
+                       "status":  "FAIL",
+                       "detail":  ""
+                   },
+                   {
+                       "id":  "C00.5",
+                       "name":  "test residue Everyone:F removed (00a)",
+                       "status":  "FAIL",
+                       "detail":  ""
+                   },
+                   {
+                       "id":  "P0",
+                       "name":  "production task present and running",
+                       "status":  "PASS",
+                       "detail":  "Running"
+                   },
+                   {
+                       "id":  "P1",
+                       "name":  "production supervisor process alive (found by command line)",
+                       "status":  "PASS",
+                       "detail":  "pids=8992"
+                   },
+                   {
+                       "id":  "P2",
+                       "name":  "production HEAD = e60278f",
+                       "status":  "PASS",
+                       "detail":  "e60278f"
+                   },
+                   {
+                       "id":  "P3",
+                       "name":  "production task action still points at the checkout script",
+                       "status":  "PASS",
+                       "detail":  ""
+                   }
+               ],
+    "error":  null,
+    "path":  "E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110\\reports\\07-verify-config-20261110-155324-11480.json"
+}

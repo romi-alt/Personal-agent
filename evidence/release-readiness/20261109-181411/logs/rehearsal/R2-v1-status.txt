@@ -1,0 +1,10 @@
+Supervisor        : STOPPED (pid 999999, last heartbeat 498397.6h ago (-))
+Current worker    : -
+Current project   : -
+Current task      : -
+Queue length      : 0   waiting: 0   (COMPLETED=141)
+Last checkpoint   : chk_mw8df2ugc015f6a248 at 2026-11-08T21:55:12.808Z agent/elevariq-retail-operations-portal@1ae7d2fe0cb82c2afc9c7e66f9e344e0f5c3591d
+Last error        : -
+Next retry        : -
+Authentication    : ready - mock provider (no credentials required)
+Provider (mock)  : OK

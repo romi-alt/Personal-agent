@@ -1,0 +1,592 @@
+From 7de4d666a9cc4ca4898fc85cfa8e643af2c30bde Mon Sep 17 00:00:00 2001
+From: "ELEVARIQ Agent (Claude)" <connectroman3@gmail.com>
+Date: Tue, 10 Nov 2026 01:20:15 +0500
+Subject: [PATCH 3/4] fix(security): V2.1 Phase B/E Rule K matrix false
+ negatives; unrecognized remote operations
+
+Phase B (Rule K, 120-case expected-vs-actual matrix): a command-only K rule closes
+14 false negatives (interpreter/nested-shell environment dumps, /proc/*/environ,
+[Environment]::GetEnvironmentVariables, gh auth token, npm auth config, macOS
+keychain, keymgr, Windows Credentials/Protect). Not applied to Write/Edit content,
+so source that passes process.env to a child process may still be written.
+Matrix with the providers' protected list: 0 FN, 4 accepted conservative FP.
+69-probe suite unchanged: 0 V2.1 bypasses, 0 legitimate regressions.
+
+Phase E: gh pr merge / repo sync / repo delete / repo edit / release delete,
+gh secret|variable set, npm unpublish / deprecate / dist-tag now need approval.
+Tests characterize approval semantics through the runner, including the documented
+gaps (approvals never expire; a category, not a command, is approved).
+---
+ src/security/hardening.ts                     |  34 +-
+ .../approval-semantics-v21.test.ts            | 151 ++++++++
+ tests/unit/phase-bde-v21.test.ts              | 323 ++++++++++++++++++
+ 3 files changed, 503 insertions(+), 5 deletions(-)
+ create mode 100644 tests/integration/approval-semantics-v21.test.ts
+ create mode 100644 tests/unit/phase-bde-v21.test.ts
+
+diff --git a/src/security/hardening.ts b/src/security/hardening.ts
+index 29c1a8c..0bbc33d 100644
+--- a/src/security/hardening.ts
++++ b/src/security/hardening.ts
+@@ -54,7 +54,7 @@ export function stripEscapes(command: string): string {
+   return command.replace(/\^(?=\S)/g, '').replace(/`(?=[A-Za-z])/g, '');
+ }
+ 
+-const HARD_DENY_RULES: { cls: string; reason: string; re: RegExp }[] = [
++const HARD_DENY_RULES: { cls: string; reason: string; re: RegExp; commandOnly?: boolean }[] = [
+   {
+     cls: 'E',
+     reason: 'encoded or obfuscated command execution is not permitted',
+@@ -78,6 +78,14 @@ const HARD_DENY_RULES: { cls: string; reason: string; re: RegExp }[] = [
+     // PR #5 review fix (finding 4): every common per-user credential store, not only Claude's.
+     re: /(\.credentials(\.json)?\b|(~|\$HOME|\$\{HOME\}|%USERPROFILE%|\$env:USERPROFILE|\$USERPROFILE|[a-z]:[\\/]+users[\\/]+[^\\/'"]+?|\/[a-z]\/users\/[^/'"]+?|\/home\/[^/\s'"]+|\/root)[\\/]+(\.claude|\.ssh|\.npmrc|\.yarnrc(\.yml)?|\.pypirc|\.netrc|_netrc|\.git-credentials|\.aws|\.azure|\.kube|\.gnupg|\.docker[\\/]+config\.json|\.config[\\/]+gh|AppData[\\/]+Roaming[\\/]+GitHub CLI|AppData[\\/]+Roaming[\\/]+npm[\\/]+etc)\b|\bid_(rsa|ed25519|ecdsa|dsa)\b|\bCLAUDE_CODE_OAUTH_TOKEN\b|\bCLAUDE_CONFIG_DIR\b|\bANTHROPIC_(API_KEY|AUTH_TOKEN)\b|\.git-credentials\b|\bgit\s+credential\b|\bcmdkey(\.exe)?\b|\bvaultcmd(\.exe)?\b|\bGet-StoredCredential\b|(^|[;&|(]|&&|\|\|)\s*(printenv|env|set|export\s+-p|declare\s+-x|(Get-ChildItem|gci|dir|ls)\s+env:\\?)\s*($|[;&|>)]))/i,
+   },
++  {
++    // Phase B (Rule K matrix): environment dumps through an interpreter or a nested shell, credential CLIs and OS
++    // credential stores. COMMAND text only: source files legitimately pass `process.env` to child processes.
++    cls: 'K',
++    reason: 'reading credentials, credential stores or dumping the environment is not permitted',
++    commandOnly: true,
++    re: /(\b(node|nodejs|deno|bun)(\.exe)?\b[^;&|\n]*\bprocess\.env\b(?![.[\w])|\bos\.environ\b(?!\s*(\.get\b|\[))|\/proc\/(self|\d+|\$\$)\/environ\b|\bGetEnvironmentVariables\s*\(|\b(ba|z|da|k)?sh(\.exe)?\s+-c\s+["']\s*(printenv|env|set|export\s+-p|declare\s+-x)\s*($|["';&|>)])|\bcmd(\.exe)?\s+\/[ck]\s+["']?\s*set\s*($|["'&|>])|\b(Get-ChildItem|gci|dir|ls)\s+env:\\?\s*($|["';&|>)])|\bgh(\.exe)?\s+auth\s+(token\b|status\b[^;&|\n]*(\s-t\b|--show-token))|\b(npm|pnpm|yarn)\s+config\s+(get|list|ls)\b[^;&|\n]*(_auth|token|\s(-l|--long|--json)\b)|\bsecurity\s+(find-(generic|internet)-password|dump-keychain)\b|\bkeymgr\.dll\b|\bcredwiz(\.exe)?\b|[\\/]Microsoft[\\/]+(Credentials|Protect|Vault)\b)/i,
++  },
+ ];
+ 
+ /** Hard denials added by V2.1 (never approvable). Checked against raw, expanded and de-escaped command text. */
+@@ -114,20 +122,34 @@ export const V21_APPROVAL_RULES: { type: string; description: string; re: RegExp
+   {
+     type: 'destructive_delete',
+     description: 'Deleting substantial data',
+-    re: /(\brm\b[^;&|\n]*\s(-[a-zA-Z]*[rR][a-zA-Z]*|--recursive)\b|\b(rd|rmdir|del|erase)\b[^;&|\n]*\s\/s\b|\b(Remove-Item|ri|rm|rmdir|rd|del|erase)\b[^;&|\n]*\s-r(e(c(u(r(se?)?)?)?)?)?\b|\b(rmSync|rmdirSync|fs\.rm|fs\.promises\.rm|fsp\.rm|rmdir)\s*\([^)]*recursive|\bshutil\.rmtree\b|\bos\.removedirs\b|\bIO\.Directory\]::Delete\([^)]*\$true|\brimraf\b|\bdel-cli\b|\bgit\s+clean\b[^;&|\n]*\s-[a-zA-Z]*f)/i,
++    re: /(\bgh(\.exe)?\s+(repo|release)\s+delete\b|\brm\b[^;&|\n]*\s(-[a-zA-Z]*[rR][a-zA-Z]*|--recursive)\b|\b(rd|rmdir|del|erase)\b[^;&|\n]*\s\/s\b|\b(Remove-Item|ri|rm|rmdir|rd|del|erase)\b[^;&|\n]*\s-r(e(c(u(r(se?)?)?)?)?)?\b|\b(rmSync|rmdirSync|fs\.rm|fs\.promises\.rm|fsp\.rm|rmdir)\s*\([^)]*recursive|\bshutil\.rmtree\b|\bos\.removedirs\b|\bIO\.Directory\]::Delete\([^)]*\$true|\brimraf\b|\bdel-cli\b|\bgit\s+clean\b[^;&|\n]*\s-[a-zA-Z]*f)/i,
+   },
+   {
+     type: 'protected_branch_push',
+     description: 'Pushing to a remote / protected branch',
+-    re: /(\bgit\b(\s+(-C|-c|--git-dir|--work-tree|--namespace)\s+\S+|\s+--[\w-]+(=\S+)?)+\s+push\b|\bgit\b[^;&|\n]*\s-c\s+["']?alias\.|\bgit\s+config\b[^;&|\n]*\balias\.|\bgit\s+send-pack\b|\bgit\s+remote\s+(add|set-url)\b)/i,
++    re: /(\bgh(\.exe)?\s+(pr\s+merge|repo\s+sync)\b|\bgit\b(\s+(-C|-c|--git-dir|--work-tree|--namespace)\s+\S+|\s+--[\w-]+(=\S+)?)+\s+push\b|\bgit\b[^;&|\n]*\s-c\s+["']?alias\.|\bgit\s+config\b[^;&|\n]*\balias\.|\bgit\s+send-pack\b|\bgit\s+remote\s+(add|set-url)\b)/i,
+   },
+   {
+     type: 'system_modification',
+     description: 'Modifying the host system outside the workspace',
+-    re: /(\bgit\b[^;&|\n]*\s-c\s+["']?(core\.(hooksPath|sshCommand|fsmonitor|gitProxy|editor|pager|askPass)|credential\.|protocol\.[\w.-]*allow|uploadpack\.|receivepack\.)|\bgit\s+config\b[^;&|\n]*\b(core\.(hooksPath|sshCommand|fsmonitor|gitProxy|askPass)|credential\.|include\.path)|\bschtasks(\.exe)?\b|\bRegister-ScheduledTask\b|\breg(\.exe)?\s+(add|delete|import)\b|\bSet-ItemProperty\b[^;&|\n]*HK(CU|LM):|\bNew-ItemProperty\b[^;&|\n]*HK(CU|LM):|\bsetx\b|\bnetsh\b|\bStart-Process\b[^;&|\n]*-Verb\s+RunAs)/i,
++    re: /(\bgh(\.exe)?\s+repo\s+(archive|rename|edit)\b|\bgit\b[^;&|\n]*\s-c\s+["']?(core\.(hooksPath|sshCommand|fsmonitor|gitProxy|editor|pager|askPass)|credential\.|protocol\.[\w.-]*allow|uploadpack\.|receivepack\.)|\bgit\s+config\b[^;&|\n]*\b(core\.(hooksPath|sshCommand|fsmonitor|gitProxy|askPass)|credential\.|include\.path)|\bschtasks(\.exe)?\b|\bRegister-ScheduledTask\b|\breg(\.exe)?\s+(add|delete|import)\b|\bSet-ItemProperty\b[^;&|\n]*HK(CU|LM):|\bNew-ItemProperty\b[^;&|\n]*HK(CU|LM):|\bsetx\b|\bnetsh\b|\bStart-Process\b[^;&|\n]*-Verb\s+RunAs)/i,
+   },
+ ];
+ 
++// Phase E: consequential remote operations that matched no category (unrecognized => allowed) in the V2.1 matrix.
++V21_APPROVAL_RULES.push(
++  {
++    type: 'publish_release',
++    description: 'Publishing a release or package',
++    re: /(\b(npm|pnpm|yarn)\s+(unpublish|deprecate)\b|\bnpm\s+dist-tag\s+(add|rm)\b|\bgh(\.exe)?\s+release\s+(edit|upload)\b)/i,
++  },
++  {
++    type: 'production_credentials',
++    description: 'Changing production credentials/secrets',
++    re: /\bgh(\.exe)?\s+(secret|variable)\s+(set|delete|remove)\b/i,
++  },
++);
++
+ /**
+  * PR #5 review fix (finding 1): returns EVERY matching V2.1 category. The first version returned only the first
+  * match, which re-created the approval short-circuit for commands combining two V2.1-only categories
+@@ -310,7 +332,9 @@ export function contentHardDeny(
+   workspace: string,
+   protectedPaths: readonly string[],
+ ): HardDeny | null {
+-  const k = HARD_DENY_RULES.find((r) => (r.cls === 'K' || r.cls === 'W') && r.re.test(content));
++  const k = HARD_DENY_RULES.find(
++    (r) => (r.cls === 'K' || r.cls === 'W') && !r.commandOnly && r.re.test(content),
++  );
+   if (
+     k &&
+     !/^\s*[;&|(]?\s*(printenv|env|set|export|declare|Get-ChildItem|gci|dir|ls)\b/i.test(
+diff --git a/tests/integration/approval-semantics-v21.test.ts b/tests/integration/approval-semantics-v21.test.ts
+new file mode 100644
+index 0000000..a098b71
+--- /dev/null
++++ b/tests/integration/approval-semantics-v21.test.ts
+@@ -0,0 +1,151 @@
++/**
++ * V2.1 Phase E: approval lifecycle through the real supervisor/runner (mock-free provider that records what the
++ * runner grants). Characterizes CURRENT behaviour, including the documented gaps (no expiry, no argument binding).
++ */
++import { afterEach, describe, expect, it } from 'vitest';
++import { drain, makeEnv, type TestEnv } from '../helpers/env.js';
++import { decideApproval } from '../../src/control/owner-actions.js';
++import type {
++  ExecutionProvider,
++  PermissionDenial,
++  RunOutcome,
++  RunRequest,
++} from '../../src/providers/types.js';
++
++let env: TestEnv | undefined;
++afterEach(async () => {
++  await env?.cleanup();
++  env = undefined;
++});
++
++/** Each run: record the granted categories; deny with `denial` until it has been granted, then complete. */
++function recordingProvider(denials: Record<string, PermissionDenial[]>) {
++  const seen: { title: string; approved: string[] }[] = [];
++  const provider: ExecutionProvider = {
++    name: 'mock',
++    preflight: async () => ({ ready: true, detail: 'synthetic', missing: [], local: true }),
++    run: async (req: RunRequest): Promise<RunOutcome> => {
++      seen.push({ title: req.taskTitle, approved: [...req.approvedActionTypes].sort() });
++      const wanted = (denials[req.taskTitle] ?? []).filter(
++        (d) => !d.approvalType || !req.approvedActionTypes.includes(d.approvalType),
++      );
++      if (wanted.length)
++        return {
++          kind: 'failed',
++          failure: { errorClass: 'PERMISSION_DENIED', message: 'tool call denied by policy' },
++          denials: wanted,
++        };
++      return { kind: 'completed', summary: 'done' };
++    },
++  };
++  return { provider, seen };
++}
++const owner = { by: 'owner-test', channel: 'cli' as const };
++const push: PermissionDenial = {
++  tool: 'Bash',
++  reason: 'Pushing to a remote / protected branch requires owner approval',
++  approvalType: 'protected_branch_push',
++  input: { command: 'git push origin feature/x' },
++};
++const del: PermissionDenial = {
++  tool: 'Bash',
++  reason: 'Deleting substantial data requires owner approval',
++  approvalType: 'destructive_delete',
++  input: { command: 'rm -rf build' },
++};
++
++describe('V2.1 Phase E: approval lifecycle', () => {
++  it('two categories in one run => two approvals; approving only one keeps the task waiting', async () => {
++    const { provider, seen } = recordingProvider({ A: [push, del] });
++    env = await makeEnv({ provider });
++    const a = env.store.enqueueTask({
++      projectId: env.project.id,
++      title: 'A',
++      instructions: 'x',
++      maxRetries: 3,
++    }).task;
++    await drain(env);
++    expect(env.store.requireTask(a.id).status).toBe('WAITING_FOR_APPROVAL');
++    const pending = env.store.listApprovals('PENDING');
++    expect(pending.map((p) => p.actionType).sort()).toEqual(['destructive_delete', 'protected_branch_push']);
++    decideApproval(
++      env.store,
++      pending.find((p) => p.actionType === 'protected_branch_push')!.id,
++      'APPROVED',
++      owner,
++    );
++    expect(env.store.requireTask(a.id).status).toBe('WAITING_FOR_APPROVAL'); // one still open
++    decideApproval(
++      env.store,
++      pending.find((p) => p.actionType === 'destructive_delete')!.id,
++      'APPROVED',
++      owner,
++    );
++    expect(env.store.requireTask(a.id).status).toBe('READY');
++    await drain(env);
++    expect(seen.at(-1)!.approved).toEqual(['destructive_delete', 'protected_branch_push']);
++  });
++
++  it('a denial blocks the task; a decided approval cannot be decided again (no replay of the decision)', async () => {
++    const { provider } = recordingProvider({ A: [push] });
++    env = await makeEnv({ provider });
++    const a = env.store.enqueueTask({
++      projectId: env.project.id,
++      title: 'A',
++      instructions: 'x',
++      maxRetries: 3,
++    }).task;
++    await drain(env);
++    const [p] = env.store.listApprovals('PENDING');
++    decideApproval(env.store, p!.id, 'DENIED', owner);
++    expect(env.store.requireTask(a.id).status).toBe('BLOCKED');
++    expect(() => decideApproval(env!.store, p!.id, 'APPROVED', owner)).toThrow(/already decided/);
++  });
++
++  it('approvals are task-scoped: an approval for task A is not granted to task B', async () => {
++    const { provider, seen } = recordingProvider({ A: [push], B: [] });
++    env = await makeEnv({ provider });
++    env.store.enqueueTask({ projectId: env.project.id, title: 'A', instructions: 'x', maxRetries: 3 });
++    await drain(env);
++    decideApproval(env.store, env.store.listApprovals('PENDING')[0]!.id, 'APPROVED', owner);
++    env.store.enqueueTask({ projectId: env.project.id, title: 'B', instructions: 'y', maxRetries: 3 });
++    await drain(env);
++    expect(seen.filter((s) => s.title === 'B').every((s) => s.approved.length === 0)).toBe(true);
++    expect(seen.filter((s) => s.title === 'A').at(-1)!.approved).toEqual(['protected_branch_push']);
++  });
++
++  it('GAP (documented): an approval never expires and is re-granted to every later execution of the task', async () => {
++    const { provider, seen } = recordingProvider({ A: [push] });
++    env = await makeEnv({ provider });
++    const a = env.store.enqueueTask({
++      projectId: env.project.id,
++      title: 'A',
++      instructions: 'x',
++      maxRetries: 3,
++    }).task;
++    await drain(env);
++    decideApproval(env.store, env.store.listApprovals('PENDING')[0]!.id, 'APPROVED', owner);
++    env.clock.advance(30 * 24 * 3600 * 1000); // 30 days later
++    await drain(env);
++    expect(env.store.requireTask(a.id).status).not.toBe('WAITING_FOR_APPROVAL');
++    expect(seen.at(-1)!.approved).toEqual(['protected_branch_push']);
++  });
++
++  it('a hard-denied call (no category) becomes a tool:<name> approval that unlocks nothing', async () => {
++    const hard: PermissionDenial = {
++      tool: 'Bash',
++      reason: 'credential read (class K)',
++      input: { command: 'printenv' },
++    };
++    const { provider, seen } = recordingProvider({ A: [hard] });
++    env = await makeEnv({ provider });
++    env.store.enqueueTask({ projectId: env.project.id, title: 'A', instructions: 'x', maxRetries: 3 });
++    await drain(env);
++    const [p] = env.store.listApprovals('PENDING');
++    expect(p!.actionType).toBe('tool:Bash');
++    decideApproval(env.store, p!.id, 'APPROVED', owner);
++    await drain(env);
++    // The granted string is not a policy category: evaluateToolUse still hard-denies (tests/unit/phase-bde-v21).
++    expect(seen.at(-1)!.approved).toEqual(['tool:Bash']);
++  });
++});
+diff --git a/tests/unit/phase-bde-v21.test.ts b/tests/unit/phase-bde-v21.test.ts
+new file mode 100644
+index 0000000..ac0657f
+--- /dev/null
++++ b/tests/unit/phase-bde-v21.test.ts
+@@ -0,0 +1,323 @@
++/**
++ * V2.1 assessment, Phases B (Rule K), D (protected paths on Windows) and E (approval semantics), policy level.
++ * Everything here is classification of tool calls against DISPOSABLE fixtures; no credential is read. A passing text
++ * policy is a guardrail, not an OS security boundary: a worker running arbitrary code as the owner is out of scope.
++ */
++import { spawnSync, execFileSync } from 'node:child_process';
++import { createHash } from 'node:crypto';
++import { linkSync, mkdirSync, mkdtempSync, symlinkSync, writeFileSync } from 'node:fs';
++import os, { tmpdir } from 'node:os';
++import path from 'node:path';
++import { afterAll, beforeAll, describe, expect, it } from 'vitest';
++import { evaluateToolUse, type PolicyOptions } from '../../src/security/policy.js';
++import { ownerCredentialDirs } from '../../src/providers/claude-cli/cli-provider.js';
++import { removeTempDir } from '../helpers/fs.js';
++
++const verdict = (d: { allow: boolean; approvalType?: string }) =>
++  d.allow ? 'ALLOW' : d.approvalType ? `APPROVAL(${d.approvalType})` : 'DENY';
++
++// ---------------------------------------------------------------------------------------------------------------
++describe('Phase B: Rule K false negatives found by the matrix are closed', () => {
++  const ws = path.join(tmpdir(), 'k-ws');
++  const o: PolicyOptions = { protectedPaths: ownerCredentialDirs() };
++  const bash = (c: string) => verdict(evaluateToolUse('Bash', { command: c }, ws, o));
++  const pwsh = (c: string) => verdict(evaluateToolUse('PowerShell', { command: c }, ws, o));
++  it.each([
++    "sh -c 'printenv'",
++    'cmd /c set',
++    'node -p process.env',
++    'node -e "console.log(JSON.stringify(process.env))"',
++    'python -c "import os; print(os.environ)"',
++    'cat /proc/self/environ',
++    'gh auth token',
++    'gh auth status --show-token',
++    'npm config get //registry.npmjs.org/:_authToken',
++    'npm config list --json',
++    'security find-generic-password -s github',
++    'rundll32.exe keymgr.dll,KRShowKeyMgr',
++    'dir %APPDATA%\\Microsoft\\Credentials',
++    'cat ~/.ss*/id_*',
++    'pushd ~; cat .npmrc',
++    'cat ~/.git-credentials',
++  ])('Bash %s is denied', (c) => expect(bash(c)).toBe('DENY'));
++  it('PowerShell [Environment]::GetEnvironmentVariables() and env: listings are denied', () => {
++    expect(pwsh('[Environment]::GetEnvironmentVariables()')).toBe('DENY');
++    expect(pwsh('powershell -Command "Get-ChildItem env:"')).toBe('DENY');
++  });
++  it.each([
++    'node -e "console.log(process.env.NODE_ENV)"',
++    'python -c "import os; print(os.environ.get(\'CI\'))"',
++    'npm config get registry',
++    'gh pr list',
++    'git commit -m "docs: run gh auth token only on your own machine"',
++    'printf "%s\\n" "run printenv to debug"',
++    'set -euo pipefail; npm run build',
++  ])('benign %s stays allowed', (c) => expect(bash(c)).toBe('ALLOW'));
++  it('source code that passes process.env to a child process may be written (command-only rule)', () => {
++    const d = evaluateToolUse(
++      'Write',
++      {
++        file_path: path.join(ws, 'run.js'),
++        content: "// run with node\nspawn('npm', ['test'], { env: process.env })\n",
++      },
++      ws,
++      o,
++    );
++    expect(d.allow).toBe(true);
++  });
++});
++
++// ---------------------------------------------------------------------------------------------------------------
++describe('Phase D: provider-level protected paths on Windows (disposable fixtures)', () => {
++  let root: string;
++  let agentHome: string;
++  let ws: string;
++  let owner: string;
++  let opts: PolicyOptions;
++  const can = { junction: false, symlink: false, hardlink: false };
++  beforeAll(() => {
++    root = mkdtempSync(path.join(tmpdir(), 'phase-d-'));
++    agentHome = path.join(root, 'AgentHome');
++    ws = path.join(agentHome, 'workspaces', 'proj');
++    owner = path.join(root, 'Owner Profile', '.ssh'); // a space in the path on purpose
++    mkdirSync(ws, { recursive: true });
++    mkdirSync(owner, { recursive: true });
++    writeFileSync(path.join(agentHome, 'agent.db'), 'synthetic');
++    writeFileSync(path.join(owner, 'id_synthetic'), 'SYNTHETIC-KEY-MATERIAL');
++    opts = { protectedPaths: [agentHome, owner] };
++    try {
++      execFileSync('cmd.exe', ['/d', '/c', 'mklink', '/J', path.join(ws, 'jn'), owner], { stdio: 'ignore' });
++      can.junction = true;
++    } catch {
++      /* not Windows */
++    }
++    try {
++      symlinkSync(owner, path.join(ws, 'sl'), 'dir');
++      can.symlink = true;
++    } catch {
++      /* EPERM without Developer Mode / admin: recorded by the test below */
++    }
++    linkSync(path.join(owner, 'id_synthetic'), path.join(ws, 'hl.txt'));
++    can.hardlink = true;
++  });
++  afterAll(() => removeTempDir(root));
++  const file = (tool: string, p: string) => verdict(evaluateToolUse(tool, { file_path: p }, ws, opts));
++  const bash = (c: string) => verdict(evaluateToolUse('Bash', { command: c }, ws, opts));
++
++  it('file tools: absolute, case-varied, slash-varied, relative-traversal and UNC spellings are outside the workspace', () => {
++    const key = path.join(owner, 'id_synthetic');
++    for (const p of [
++      key,
++      key.toUpperCase(),
++      key.replace(/\\/g, '/'),
++      path.relative(ws, key),
++      `..\\..\\..\\Owner Profile\\.ssh\\id_synthetic`,
++      path.join(ws, '..', '..', 'agent.db'),
++      `\\\\?\\${key}`,
++      `\\\\localhost\\${key[0]}$\\${key.slice(3)}`,
++    ])
++      for (const tool of ['Read', 'Write', 'Edit', 'Grep', 'Glob'])
++        expect(verdict(evaluateToolUse(tool, { file_path: p, path: p }, ws, opts)), `${tool} ${p}`).toBe(
++          'DENY',
++        );
++  });
++  it('file tools: a leading ~ is the home directory, not a folder in the workspace', () => {
++    expect(file('Read', '~/.ssh/id_rsa')).toBe('DENY');
++    expect(file('Read', '~\\.aws\\credentials')).toBe('DENY');
++    expect(file('Read', path.join(ws, 'src', 'a.ts'))).toBe('ALLOW');
++  });
++  it('file tools: a worker-made junction inside the workspace does not reach the target', () => {
++    if (!can.junction) return;
++    expect(file('Read', path.join(ws, 'jn', 'id_synthetic'))).toBe('DENY');
++    expect(file('Write', path.join(ws, 'jn', 'planted'))).toBe('DENY');
++  });
++  it('file tools: a symbolic link is resolved the same way (when the OS allows creating one)', () => {
++    if (!can.symlink) {
++      expect(process.platform).toBe('win32'); // only Windows without Developer Mode refuses symlinks
++      return;
++    }
++    expect(file('Read', path.join(ws, 'sl', 'id_synthetic'))).toBe('DENY');
++  });
++  it('RESIDUAL (documented): a hard link inside the workspace is an ordinary workspace file to the file tools', () => {
++    expect(can.hardlink).toBe(true);
++    expect(file('Read', path.join(ws, 'hl.txt'))).toBe('ALLOW');
++  });
++  it('shell commands: case, separators, quotes with spaces, traversal, globs, drive prefixes, ADS and cd tracking', () => {
++    const k = path.join(owner, 'id_synthetic');
++    const fwd = k.replace(/\\/g, '/');
++    const msys = `/${fwd[0]!.toLowerCase()}/${fwd.slice(3)}`;
++    for (const c of [
++      `type "${k}"`,
++      `type "${k.toUpperCase()}"`,
++      `cat "${fwd}"`,
++      `cat "${msys}"`,
++      `cat ${msys.replace(/ /g, '\\ ')}`,
++      `type "${k}::$DATA"`,
++      `cat ../../../"Owner Profile"/.ssh/id_synthetic`,
++      `cd ../../.. && cat "Owner Profile/.ssh/id_synthetic"`,
++      `cat "${path.dirname(owner).replace(/\\/g, '/')}/.ss*/id_*"`,
++      `cat ../../agent.d?`,
++      `sqlite3 ${path.join(agentHome, 'agent.db')} .dump`,
++    ])
++      expect(bash(c), c).toBe('DENY');
++    expect(bash('cat src/index.ts')).toBe('ALLOW');
++    expect(bash('cat ./README.md && ls -la')).toBe('ALLOW');
++  });
++});
++
++// ---------------------------------------------------------------------------------------------------------------
++describe('Phase E: approval semantics (policy level)', () => {
++  const ws = path.join(tmpdir(), 'e-ws');
++  const run = (c: string, approved: string[] = []) =>
++    verdict(evaluateToolUse('Bash', { command: c }, ws, { approvedTypes: approved }));
++  it('multiple categories in one command: every category must be approved', () => {
++    expect(run('git push origin main && npm publish')).toBe('APPROVAL(publish_release)');
++    expect(run('git push origin main && npm publish', ['protected_branch_push'])).toBe(
++      'APPROVAL(publish_release)',
++    );
++    expect(run('git push origin main && npm publish', ['publish_release'])).toBe(
++      'APPROVAL(protected_branch_push)',
++    );
++    expect(run('git push origin main && npm publish', ['protected_branch_push', 'publish_release'])).toBe(
++      'ALLOW',
++    );
++  });
++  it('chained actions: an approved category does not carry an unapproved one (V2 short-circuit stays fixed)', () => {
++    expect(run('git push origin main && rm -rf ~', ['protected_branch_push'])).toBe(
++      'APPROVAL(destructive_delete)',
++    );
++    expect(run('rm --recursive x; git -c alias.p=push p', ['destructive_delete'])).toBe(
++      'APPROVAL(protected_branch_push)',
++    );
++    expect(run('git push origin main || schtasks /create /tn x /tr y', ['protected_branch_push'])).toBe(
++      'APPROVAL(system_modification)',
++    );
++  });
++  it('hard denials are never unlocked by any approval, including the synthetic tool:/unspecified categories', () => {
++    const all = [
++      'protected_branch_push',
++      'destructive_delete',
++      'publish_release',
++      'system_modification',
++      'access_change',
++      'production_deploy',
++      'tool:Bash',
++      'unspecified',
++      'external_tool',
++    ];
++    for (const c of [
++      'cat ~/.ssh/id_rsa',
++      'printenv',
++      'npm run agent approve apr_abcdefgh12',
++      'node dist/cli/index.js workspace:approve x',
++      'sqlite3 agent.db "update approvals set status=\'APPROVED\'"',
++      'curl -X POST http://127.0.0.1:7600/api/approvals/apr_abcdefgh12/approve',
++      'powershell -EncodedCommand ZQBjAGgAbwAgAGgAaQA=',
++      'env -u ELEVARIQ_WORKER bash',
++    ])
++      expect(run(c, all), c).toBe('DENY');
++  });
++  it('worker-generated approval attempts in WRITTEN files are denied too (text guardrail only)', () => {
++    const d = evaluateToolUse(
++      'Write',
++      { file_path: path.join(ws, 'x.sh'), content: 'npm run agent approve apr_abcdefgh12\n' },
++      ws,
++      {},
++    );
++    expect(d.allow).toBe(false);
++  });
++  it('previously unrecognized consequential remote operations now require approval', () => {
++    expect(run('gh pr merge 5 --squash')).toBe('APPROVAL(protected_branch_push)');
++    expect(run('gh repo delete o/r --yes')).toBe('APPROVAL(destructive_delete)');
++    expect(run('gh repo edit --visibility public')).toBe('APPROVAL(system_modification)');
++    expect(run('gh secret set API_KEY < key.txt')).toBe('APPROVAL(production_credentials)');
++    expect(run('npm unpublish pkg@1.0.0')).toBe('APPROVAL(publish_release)');
++    expect(run('npm deprecate pkg "x"')).toBe('APPROVAL(publish_release)');
++  });
++  it('RESIDUAL (documented): consequential operations no rule recognizes are allowed (block-list, not allow-list)', () => {
++    for (const c of [
++      'curl -X DELETE https://api.example.invalid/v1/customers/42',
++      'ssh deploy@prod.example.invalid sudo systemctl restart app',
++      'scp build.tar deploy@prod.example.invalid:/srv/app',
++      'psql "$PROD_DATABASE_URL" -c "DELETE FROM users"',
++      'node scripts/release.js',
++    ])
++      expect(run(c), c).not.toBe('DENY'); // not denied; most are allowed outright
++  });
++  it('RESIDUAL (documented): an approval names a CATEGORY, not the command or its arguments', () => {
++    // Approved for one push, every later push (other remote, force, other branch) in the same task is allowed.
++    expect(run('git push origin feature/x', ['protected_branch_push'])).toBe('ALLOW');
++    expect(
++      run('git push --force https://example.invalid/other.git HEAD:main', ['protected_branch_push']),
++    ).toBe('ALLOW');
++  });
++});
++
++// ---------------------------------------------------------------------------------------------------------------
++describe('Phase E: the real hook process fails closed', () => {
++  const script = path.resolve(__dirname, '../../src/providers/claude-cli/pretooluse-hook.ts');
++  let dir: string;
++  beforeAll(() => {
++    dir = mkdtempSync(path.join(tmpdir(), 'hook-e-'));
++  });
++  afterAll(() => removeTempDir(dir));
++  const hook = (policyFile: string, sha: string | undefined, payload: string) =>
++    spawnSync(process.execPath, ['--import', 'tsx', script, policyFile, ...(sha ? [sha] : [])], {
++      input: payload,
++      encoding: 'utf8',
++      timeout: 60_000,
++    });
++  it('a policy rewritten after launch (approval widened) blocks every call with exit 2', () => {
++    const pf = path.join(dir, 'p.policy.json');
++    const policy = {
++      workspace: dir,
++      approvedTypes: [],
++      alsoRequire: [],
++      readOnly: false,
++      decisionsFile: path.join(dir, 'd.jsonl'),
++      protectedPaths: [],
++    };
++    const text = JSON.stringify(policy);
++    writeFileSync(pf, text);
++    const sha = createHash('sha256').update(text).digest('hex');
++    const ok = hook(pf, sha, JSON.stringify({ tool_name: 'Bash', tool_input: { command: 'ls' } }));
++    expect(ok.status).toBe(0);
++    const push = hook(
++      pf,
++      sha,
++      JSON.stringify({ tool_name: 'Bash', tool_input: { command: 'git push origin main' } }),
++    );
++    expect(push.status).toBe(0);
++    expect(JSON.parse(push.stdout).hookSpecificOutput.permissionDecision).toBe('deny');
++    // worker replays the same call after widening its own approvals in the policy file
++    writeFileSync(pf, JSON.stringify({ ...policy, approvedTypes: ['protected_branch_push'] }));
++    const replay = hook(
++      pf,
++      sha,
++      JSON.stringify({ tool_name: 'Bash', tool_input: { command: 'git push origin main' } }),
++    );
++    expect(replay.status).toBe(2);
++    const harmless = hook(pf, sha, JSON.stringify({ tool_name: 'Bash', tool_input: { command: 'ls' } }));
++    expect(harmless.status).toBe(2);
++  });
++  it('unknown tools are denied; MCP tools need approval; a payload without a tool name is denied', () => {
++    expect(verdict(evaluateToolUse('SomeNewTool', {}, dir, {}))).toBe('DENY');
++    expect(verdict(evaluateToolUse('mcp__x__y', {}, dir, {}))).toBe('APPROVAL(external_tool)');
++    const pf = path.join(dir, 'p2.policy.json');
++    writeFileSync(
++      pf,
++      JSON.stringify({
++        workspace: dir,
++        approvedTypes: [],
++        alsoRequire: [],
++        readOnly: false,
++        decisionsFile: path.join(dir, 'd2.jsonl'),
++      }),
++    );
++    const r = hook(pf, undefined, JSON.stringify({ tool_input: {} }));
++    expect(r.status).toBe(0);
++    expect(JSON.parse(r.stdout).hookSpecificOutput.permissionDecision).toBe('deny');
++  });
++});
++
++void os;
+-- 
+2.56.0.windows.4
+

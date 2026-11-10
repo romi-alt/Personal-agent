@@ -1,0 +1,1 @@
+supervisor launching in background (pid 18468). Check: npm run agent -- status

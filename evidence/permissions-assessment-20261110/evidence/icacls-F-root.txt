@@ -1,0 +1,10 @@
+﻿F:\ BUILTIN\Administrators:(F)
+    BUILTIN\Administrators:(OI)(CI)(IO)(F)
+    NT AUTHORITY\SYSTEM:(F)
+    NT AUTHORITY\SYSTEM:(OI)(CI)(IO)(F)
+    NT AUTHORITY\Authenticated Users:(M)
+    NT AUTHORITY\Authenticated Users:(OI)(CI)(IO)(M)
+    BUILTIN\Users:(RX)
+    BUILTIN\Users:(OI)(CI)(IO)(GR,GE)
+
+Successfully processed 1 files; Failed processing 0 files

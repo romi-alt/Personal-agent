@@ -1,0 +1,1 @@
+{"database":true,"supervisorLive":true,"authenticationReady":true,"providerState":"OK"}

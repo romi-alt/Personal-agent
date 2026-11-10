@@ -1,0 +1,86 @@
+
+ RUN  v5.1.0 E:/Agent/v2-staging/hardening/repo
+
+ ✓ tests/unit/cli-provider.test.ts (18 tests) 4138ms
+   ✓ ClaudeCliProvider: capacity waits are not stalls and not completion (5)
+     ✓ a usage-limit wait suspends the execution timeout; the same process continues when capacity returns 941ms
+     ✓ a confirmed usage-limit wait is exempt from the inactivity (stall) timeout; plain silence is not 1361ms
+     ✓ outside a capacity wait the execution timeout applies (TIMEOUT), not success 319ms
+   ✓ policy hook command (2)
+     ✓ fails closed: a broken invocation exits 2 (blocking), never 0 or 1 966ms
+ ✓ tests/unit/capacity-sleep.test.ts (13 tests) 4160ms
+   ✓ A11: host sleep is not charged to the execution budget or the stall window (3)
+     ✓ 11 min of work, 3 h asleep, then finishes: completed (v1: TIMEOUT 15 s after wake, retry consumed) 632ms
+     ✓ a genuine active-time overrun still times out after a sleep, and the message says the sleep was not charged 648ms
+   ✓ A10: the in-process wait ends once the reported reset has passed (sleep-safe resume) (2)
+     ✓ without sleep, a reset that has not yet passed keeps the same process waiting (no premature kill) 651ms
+   ✓ v2 review: stale or unrelated reset times do not steer the wait (2)
+     ✓ a 429 after a non-rejected (warning) event with a far reset is NOT handed off for hours 444ms
+     ✓ a rejected event whose reset is already in the past cannot trigger a capacity_resume loop 547ms
+   ✓ A12: bounded in-process capacity waits and escalation (6)
+     ✓ a wait with no reported reset ends at the ceiling (CLAUDE_CLI_MAX_CAPACITY_WAIT_MS) 333ms
+     ✓ CLAUDE_CLI_MAX_CAPACITY_WAIT_MS=0 restores the v1 unbounded in-process wait (owner opt-out) 543ms
+ ✓ tests/unit/claude-provider.test.ts (15 tests) 68ms
+ ✓ tests/unit/policy-normalize.test.ts (159 tests) 119ms
+ ✓ tests/unit/scratch-cleanup.test.ts (18 tests) 682ms
+ ✓ tests/unit/status-reconcile.test.ts (2 tests) 167ms
+ ✓ tests/unit/policy-v21-hardening.test.ts (81 tests) 117ms
+ ✓ tests/unit/planning.test.ts (24 tests) 156ms
+ ✓ tests/unit/project-intelligence.test.ts (12 tests) 49ms
+ ✓ tests/unit/decide.test.ts (12 tests) 24ms
+ ✓ tests/unit/qa-ownership.test.ts (8 tests) 76ms
+ ✓ tests/unit/readiness-and-hooks.test.ts (16 tests) 10509ms
+   ✓ provider readiness report (5)
+     ✓ importing the SDK is NOT enough: everything else is NO / NOT_VERIFIED by default 1605ms
+     ✓ credentials + budget configured still does not make the provider operational without live evidence 1309ms
+     ✓ becomes operational only after API access AND a live execution were verified; recovery is a separate level 1222ms
+     ✓ evidence goes STALE when the SDK version or the credential changes 1309ms
+     ✓ a subscription OAuth token is never accepted as configured credentials 1239ms
+   ✓ verifyApiAccess (non-billable, explicit, never automatic) (3)
+     ✓ records evidence only on HTTP 200 1314ms
+     ✓ sends only a models-list request (no inference) and reports network errors without leaking the key 1345ms
+     ✓ refuses with no key or a subscription token before any request 1114ms
+ ✓ tests/unit/redact-and-paths.test.ts (14 tests) 90ms
+ ✓ tests/unit/store.test.ts (12 tests) 13771ms
+   ✓ projects and tasks (6)
+     ✓ creates an isolated, git-initialised project workspace 1369ms
+     ✓ adds a task in QUEUED with a persisted initial transition 1301ms
+     ✓ orders the queue by project priority, task priority, then insertion order 1411ms
+     ✓ rejects duplicate tasks (idempotent enqueue) and supports explicit dedupe keys 1176ms
+     ✓ does not claim a task until its dependencies are COMPLETED 1176ms
+     ✓ respects scheduled start and next-eligible time 1205ms
+   ✓ state machine (3)
+     ✓ rejects invalid transitions centrally and keeps history 1219ms
+     ✓ persists timestamp, reason and execution id for each transition 1220ms
+   ✓ worker leasing (3)
+     ✓ lets only one claimer win when two supervisors race for the same task 1296ms
+     ✓ enforces max concurrency and extends the lease on heartbeat only for the holder 1229ms
+     ✓ allows only one live supervisor instance 1158ms
+ ✓ tests/unit/requirement-coverage.test.ts (3 tests) 157ms
+ ✓ tests/unit/windows-scripts.test.ts (12 tests) 19ms
+ ✓ tests/unit/policy-v2-review.test.ts (18 tests) 53ms
+ ✓ tests/unit/agent-control-policy.test.ts (14 tests) 45ms
+ ✓ tests/unit/integrations.test.ts (6 tests) 35ms
+ ✓ tests/unit/process-tree.test.ts (5 tests) 10888ms
+   ✓ process identity (real processes) (1)
+     ✓ reads image name and OS creation time of a live process 2272ms
+   ✓ identity-verified orphan stop (real processes) (4)
+     ✓ never kills a process whose identity differs from the recorded worker 7334ms
+     ✓ accepts the fallback window when the identity was never recorded 1275ms
+ ✓ tests/unit/config.test.ts (5 tests) 30ms
+ ✓ tests/unit/text-and-git.test.ts (4 tests) 1287ms
+   ✓ gitState (single git call) (1)
+     ✓ reports head, branch and changes for a real repository; non-repos are not repos 1274ms
+ ✓ tests/unit/security-verifier.test.ts (2 tests) 28ms
+ ✓ tests/unit/database.test.ts (3 tests) 100ms
+ ✓ tests/unit/verifier-env-v21.test.ts (1 test) 178ms
+
+ Test Files  25 passed (25)
+      Tests  477 passed (477)
+   Start at  00:11:09
+   Duration  30.13s (tests 89%, import 7%, transform 3%, worker 1%)
+
+    Isolate  25 workers spawned · ~270ms startup each (spawn + environment, per file)
+             at least ~3.11s faster with isolate: false — reuses workers across files instead of one per file
+
+JSON report written to E:/Agent/v2-staging/hardening/20261109-234257/logs/regression-693058c/07-unit.json

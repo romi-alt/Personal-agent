@@ -1,0 +1,383 @@
+From c447cdbaa1da2fb7ad1a1828169be550007f64dd Mon Sep 17 00:00:00 2001
+From: "ELEVARIQ Agent (Claude)" <connectroman3@gmail.com>
+Date: Tue, 10 Nov 2026 00:48:52 +0500
+Subject: [PATCH 1/4] fix(security): PR #5 review findings 1-6 (proposed
+ correction, separate from PR #5)
+
+1. approvalsV21 returns every matching V2.1 category; the first-match version
+   re-created the approval short-circuit (rm --recursive && git -c alias push).
+2. Computed command names: quoted $(...) in command position and variables
+   assigned from a substitution used as the command name are hard-denied.
+3. Path tokenizer keeps quoted words and escaped spaces (protected paths with spaces).
+4. All per-user credential stores (.ssh, .npmrc, .aws, .azure, .kube, .gnupg,
+   .docker, gh, id_*) denied; provider protects the credential directories.
+5. Audit tool_use input: redact before truncating (no secret fragment at the cut).
+6. Credential rule ignores quoted message data (git commit -m, echo, printf).
+Tests: +24 (tests/unit/pr5-review-fixes.test.ts); unit 501/501.
+---
+ src/providers/claude-cli/cli-provider.ts |  17 +++-
+ src/security/hardening.ts                |  77 ++++++++++++----
+ src/security/policy.ts                   |  10 +--
+ tests/unit/cli-provider.test.ts          |  14 +--
+ tests/unit/pr5-review-fixes.test.ts      | 109 +++++++++++++++++++++++
+ 5 files changed, 197 insertions(+), 30 deletions(-)
+ create mode 100644 tests/unit/pr5-review-fixes.test.ts
+
+diff --git a/src/providers/claude-cli/cli-provider.ts b/src/providers/claude-cli/cli-provider.ts
+index 3e8f8c1..3980572 100644
+--- a/src/providers/claude-cli/cli-provider.ts
++++ b/src/providers/claude-cli/cli-provider.ts
+@@ -1,4 +1,4 @@
+-import { type ChildProcess, execFile, spawn } from 'node:child_process';
++﻿import { type ChildProcess, execFile, spawn } from 'node:child_process';
+ import { createHash, randomUUID } from 'node:crypto';
+ import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+ import os from 'node:os';
+@@ -146,6 +146,16 @@ export function scratchCleanEnv(
+   };
+ }
+ 
++/**
++ * Owner credential stores a worker shell command must not reference (PR #5 review fix, finding 4). Guardrail only:
++ * the OS-level worker identity (V2.2) is what actually denies access.
++ */
++export function ownerCredentialDirs(home = os.homedir()): string[] {
++  return ['.claude', '.ssh', '.aws', '.azure', '.kube', '.gnupg', '.docker', path.join('.config', 'gh')].map(
++    (d) => path.join(home, d),
++  );
++}
++
+ /** Root of this agent's own repository/installation (two levels above src|dist/providers/claude-cli). */
+ export function agentRepoRoot(): string {
+   return path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
+@@ -279,7 +289,7 @@ export class ClaudeCliProvider implements ExecutionProvider {
+       allowWeb: !!req.allowWeb,
+       decisionsFile,
+       // V2.1: the owner's Claude login directory is protected too (credential exposure, class K).
+-      protectedPaths: [cfg.agentHome, agentRepoRoot(), path.join(os.homedir(), '.claude')],
++      protectedPaths: [cfg.agentHome, agentRepoRoot(), ...ownerCredentialDirs()],
+     };
+     // Read-only: a worker must not be able to widen its own policy by rewriting this file (guardrail; it is also
+     // outside the workspace and commands naming *.policy.json are denied).
+@@ -537,7 +547,8 @@ export class ClaudeCliProvider implements ExecutionProvider {
+               data: {
+                 tool: block.name,
+                 id: block.id,
+-                input: redactString(JSON.stringify(block.input ?? {}).slice(0, 2000)),
++                // PR #5 review fix (finding 5): redact BEFORE truncating, so a secret cut at the limit cannot leave a fragment.
++                input: redactString(JSON.stringify(block.input ?? {})).slice(0, 2000),
+               },
+             });
+             if ((block.name === 'WebFetch' || block.name === 'WebSearch') && block.id) {
+diff --git a/src/security/hardening.ts b/src/security/hardening.ts
+index 91ca0f5..29c1a8c 100644
+--- a/src/security/hardening.ts
++++ b/src/security/hardening.ts
+@@ -64,7 +64,8 @@ const HARD_DENY_RULES: { cls: string; reason: string; re: RegExp }[] = [
+     cls: 'V',
+     reason:
+       'a command whose name is computed at run time (command substitution in command position) cannot be verified',
+-    re: /(^|[;&|(]|&&|\|\|)\s*(\$\(|`)/,
++    // PR #5 review fix (finding 2): an optional opening quote before the substitution (`"$(tr …)" -rf`).
++    re: /(^|[;&|(]|&&|\|\|)\s*["']?\s*(\$\(|`)/,
+   },
+   {
+     cls: 'W',
+@@ -74,15 +75,34 @@ const HARD_DENY_RULES: { cls: string; reason: string; re: RegExp }[] = [
+   {
+     cls: 'K',
+     reason: 'reading credentials, credential stores or dumping the environment is not permitted',
+-    re: /(\.credentials(\.json)?\b|(~|\$HOME|\$\{HOME\}|%USERPROFILE%|\$env:USERPROFILE|\$USERPROFILE|[a-z]:[\\/]+users[\\/]+[^\\/\s'"]+|\/[a-z]\/users\/[^/\s'"]+|\/home\/[^/\s'"]+|\/root)[\\/]+\.claude\b|\bCLAUDE_CODE_OAUTH_TOKEN\b|\bCLAUDE_CONFIG_DIR\b|\bANTHROPIC_(API_KEY|AUTH_TOKEN)\b|\.git-credentials\b|\bgit\s+credential\b|\bcmdkey(\.exe)?\b|\bvaultcmd(\.exe)?\b|\bGet-StoredCredential\b|(^|[;&|(]|&&|\|\|)\s*(printenv|env|set|export\s+-p|declare\s+-x|(Get-ChildItem|gci|dir|ls)\s+env:\\?)\s*($|[;&|>)]))/i,
++    // PR #5 review fix (finding 4): every common per-user credential store, not only Claude's.
++    re: /(\.credentials(\.json)?\b|(~|\$HOME|\$\{HOME\}|%USERPROFILE%|\$env:USERPROFILE|\$USERPROFILE|[a-z]:[\\/]+users[\\/]+[^\\/'"]+?|\/[a-z]\/users\/[^/'"]+?|\/home\/[^/\s'"]+|\/root)[\\/]+(\.claude|\.ssh|\.npmrc|\.yarnrc(\.yml)?|\.pypirc|\.netrc|_netrc|\.git-credentials|\.aws|\.azure|\.kube|\.gnupg|\.docker[\\/]+config\.json|\.config[\\/]+gh|AppData[\\/]+Roaming[\\/]+GitHub CLI|AppData[\\/]+Roaming[\\/]+npm[\\/]+etc)\b|\bid_(rsa|ed25519|ecdsa|dsa)\b|\bCLAUDE_CODE_OAUTH_TOKEN\b|\bCLAUDE_CONFIG_DIR\b|\bANTHROPIC_(API_KEY|AUTH_TOKEN)\b|\.git-credentials\b|\bgit\s+credential\b|\bcmdkey(\.exe)?\b|\bvaultcmd(\.exe)?\b|\bGet-StoredCredential\b|(^|[;&|(]|&&|\|\|)\s*(printenv|env|set|export\s+-p|declare\s+-x|(Get-ChildItem|gci|dir|ls)\s+env:\\?)\s*($|[;&|>)]))/i,
+   },
+ ];
+ 
+ /** Hard denials added by V2.1 (never approvable). Checked against raw, expanded and de-escaped command text. */
+-export function hardDenyV21(command: string): HardDeny | null {
+-  const views = [command, expandIndirection(command), stripEscapes(expandIndirection(command))];
++export function hardDenyV21(command: string, dataStripped?: string): HardDeny | null {
++  const expanded = expandIndirection(command);
++  const views = [command, expanded, stripEscapes(expanded)];
++  // PR #5 review fix (finding 6): credential rule K ignores quoted multi-word DATA (commit messages, echo text):
++  // it sees the normalized view, which keeps every executed word and switches to raw whenever text may execute.
++  const messageless = (v: string) =>
++    v.replace(/((?:^|\s)(?:echo|printf|-m|--message)(?:=|\s+))("[^"$`]*"|'[^']*')/g, '$1__MSG__');
++  const kViews = dataStripped !== undefined ? [dataStripped, ...views.map(messageless)] : views;
+   for (const r of HARD_DENY_RULES)
+-    if (views.some((v) => r.re.test(v))) return { cls: r.cls, reason: r.reason };
++    if ((r.cls === 'K' ? kViews : views).some((v) => r.re.test(v))) return { cls: r.cls, reason: r.reason };
++  // PR #5 review fix (finding 2): a variable assigned from a substitution and then used as the command name
++  // (`x=$(printf '\x72\x6d'); $x -rf /tmp/x`).
++  const computed = [...command.matchAll(/(?:^|[\s;&|(])([A-Za-z_]\w*)=["']?(\$\(|`)/g)].map((m) => m[1]!);
++  for (const v of computed) {
++    const use = new RegExp(`(^|[;&|(]|&&|\\|\\|)\\s*["']?\\$\\{?${v}\\}?(?![\\w])`);
++    if (use.test(command))
++      return {
++        cls: 'V',
++        reason:
++          'a command whose name is computed at run time (variable assigned from a substitution) cannot be verified',
++      };
++  }
+   return null;
+ }
+ 
+@@ -108,10 +128,19 @@ export const V21_APPROVAL_RULES: { type: string; description: string; re: RegExp
+   },
+ ];
+ 
+-export function approvalV21(text: string): { type: string; description: string } | null {
++/**
++ * PR #5 review fix (finding 1): returns EVERY matching V2.1 category. The first version returned only the first
++ * match, which re-created the approval short-circuit for commands combining two V2.1-only categories
++ * (`rm --recursive x && git -c alias.p=push p` was allowed once destructive_delete had been approved).
++ */
++export function approvalsV21(text: string): { type: string; description: string }[] {
+   const views = [text, stripEscapes(text)];
+-  for (const r of V21_APPROVAL_RULES) if (views.some((v) => r.re.test(v))) return r;
+-  return null;
++  return V21_APPROVAL_RULES.filter((r) => views.some((v) => r.re.test(v)));
++}
++
++/** @deprecated first match only; use approvalsV21. Kept for callers/tests of the PR #5 API. */
++export function approvalV21(text: string): { type: string; description: string } | null {
++  return approvalsV21(text)[0] ?? null;
+ }
+ 
+ // ---------------------------------------------------------------------------------------------------------------
+@@ -172,16 +201,30 @@ function literalPrefixInside(p: string, dir: string): boolean {
+   return prefix === d || prefix.startsWith(`${d}/`);
+ }
+ 
++/**
++ * Shell-like word splitting. PR #5 review fix (finding 3): quoted words and backslash-escaped spaces stay one
++ * word, so protected paths containing spaces (`"/c/Users/John Smith/.cla*"`, `John\ Smith`) are resolved whole.
++ */
+ function tokens(segment: string): string[] {
+-  return segment
+-    .split(/[\s<>()]+/)
+-    .map((t) =>
+-      t
+-        .replace(/^["'@]+|["']+$/g, '')
+-        .replace(/^--?[\w-]+=/, '')
+-        .replace(/^@/, ''),
+-    )
+-    .filter(Boolean);
++  const out: string[] = [];
++  let cur = '';
++  let q: string | null = null;
++  for (let i = 0; i < segment.length; i++) {
++    const c = segment[i]!;
++    if (q) {
++      if (c === q) q = null;
++      else cur += c;
++    } else if (c === '"' || c === "'") q = c;
++    else if (c === '\\' && segment[i + 1] === ' ') {
++      cur += ' ';
++      i++;
++    } else if (/[\s<>()]/.test(c)) {
++      if (cur) out.push(cur);
++      cur = '';
++    } else cur += c;
++  }
++  if (cur) out.push(cur);
++  return out.map((t) => t.replace(/^--?[\w-]+=/, '').replace(/^@/, '')).filter(Boolean);
+ }
+ 
+ /**
+diff --git a/src/security/policy.ts b/src/security/policy.ts
+index a17a83e..067e17d 100644
+--- a/src/security/policy.ts
++++ b/src/security/policy.ts
+@@ -1,8 +1,8 @@
+-import path from 'node:path';
++﻿import path from 'node:path';
+ import { isPathInside } from '../workspaces/paths.js';
+ import { analyzeShellCommand } from './shell-normalize.js';
+ import {
+-  approvalV21,
++  approvalsV21,
+   contentHardDeny,
+   expandIndirection,
+   hardDenyV21,
+@@ -287,7 +287,7 @@ export function evaluateToolUse(
+         reason:
+           'Commands that operate on the agent itself (approvals, owner token, agent database, policy) are not permitted',
+       };
+-    const hard = hardDenyV21(command);
++    const hard = hardDenyV21(command, toolName === 'Bash' ? commandTextForRules(expanded) : undefined);
+     if (hard) return { allow: false, reason: `${hard.reason} (V2.1 class ${hard.cls})` };
+     if (
+       options.protectedPaths?.length &&
+@@ -311,8 +311,8 @@ export function evaluateToolUse(
+     // V2.1 fix (approval short-circuit): EVERY matching category must be approved. V2 returned "allow" on the first
+     // approved match, so `git push origin main && rm -rf ~` passed once only protected_branch_push had been approved.
+     const matched: { type: string; description: string }[] = [];
+-    const v21 = approvalV21(toolName === 'Bash' ? commandTextForRules(expanded) : expanded);
+-    if (v21) matched.push(v21);
++    for (const r of approvalsV21(toolName === 'Bash' ? commandTextForRules(expanded) : expanded))
++      matched.push(r);
+     // Normalized view only for the Bash tool; PowerShell quoting/here-strings differ, so it keeps the raw text.
+     const ruleTexts =
+       toolName === 'Bash'
+diff --git a/tests/unit/cli-provider.test.ts b/tests/unit/cli-provider.test.ts
+index e0c04fc..20f3726 100644
+--- a/tests/unit/cli-provider.test.ts
++++ b/tests/unit/cli-provider.test.ts
+@@ -1,13 +1,17 @@
+-import { describe, expect, it } from 'vitest';
++﻿import { describe, expect, it } from 'vitest';
+ import { spawnSync, type ChildProcess } from 'node:child_process';
+ import { EventEmitter } from 'node:events';
+ import { mkdtempSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
+-import os, { tmpdir } from 'node:os';
++import { tmpdir } from 'node:os';
+ import { createHash } from 'node:crypto';
+ import path from 'node:path';
+ import { PassThrough, Writable } from 'node:stream';
+ import { loadConfig } from '../../src/config/index.js';
+-import { ClaudeCliProvider, type CliDeps } from '../../src/providers/claude-cli/cli-provider.js';
++import {
++  ClaudeCliProvider,
++  ownerCredentialDirs,
++  type CliDeps,
++} from '../../src/providers/claude-cli/cli-provider.js';
+ import { buildWorkerEnv, compareVersions } from '../../src/providers/claude-cli/env.js';
+ import { decide } from '../../src/providers/claude-cli/pretooluse-hook.js';
+ import type { ExecutionEvent, RunRequest } from '../../src/providers/types.js';
+@@ -187,7 +191,7 @@ describe('ClaudeCliProvider: launch contract', () => {
+     expect(policy['protectedPaths']).toEqual([
+       home,
+       path.resolve(__dirname, '../..'),
+-      path.join(os.homedir(), '.claude'),
++      ...ownerCredentialDirs(),
+     ]);
+     const env = s.calls[0]!.env;
+     expect(Object.values(env).some((v) => v.endsWith('.policy.json'))).toBe(false);
+@@ -363,7 +367,7 @@ describe('ClaudeCliProvider: authentication and failures', () => {
+ 
+   it('classifies a not-logged-in exit as AUTHENTICATION and a silent crash as PROCESS_CRASH', async () => {
+     const a = setup((c) => {
+-      c.stderr.write('Not logged in · Please run /login\n');
++      c.stderr.write('Not logged in Â· Please run /login\n');
+       c.exit(1);
+     });
+     expect(await a.provider.run(a.req())).toMatchObject({
+diff --git a/tests/unit/pr5-review-fixes.test.ts b/tests/unit/pr5-review-fixes.test.ts
+new file mode 100644
+index 0000000..e4d02a5
+--- /dev/null
++++ b/tests/unit/pr5-review-fixes.test.ts
+@@ -0,0 +1,109 @@
++import { mkdtempSync, writeFileSync } from 'node:fs';
++import os from 'node:os';
++import path from 'node:path';
++import { describe, expect, it } from 'vitest';
++import { evaluateToolUse } from '../../src/security/policy.js';
++import { ownerCredentialDirs } from '../../src/providers/claude-cli/cli-provider.js';
++import { redactString } from '../../src/security/redact.js';
++
++/** Regression tests for the independent PR #5 security review (worker-isolation/01_PR5_SECURITY_REVIEW.md). */
++const home = path.resolve('C:/Users/owner/AppData/Local/ElevariqAgent');
++const repo = path.resolve('E:/Agent/Personal-agent');
++const ws = path.join(home, 'workspaces', 'proj');
++const prot = [home, repo, ...ownerCredentialDirs(path.resolve('C:/Users/owner'))];
++const kind = (d: { allow: boolean; approvalType?: string }) =>
++  d.allow ? 'ALLOW' : d.approvalType ? `APPROVAL(${d.approvalType})` : 'DENY';
++const bash = (command: string, approvedTypes: string[] = [], protectedPaths = prot) =>
++  kind(evaluateToolUse('Bash', { command }, ws, { approvedTypes, protectedPaths }));
++
++describe('finding 1: every V2.1 category in a chained command must be approved', () => {
++  it.each([
++    [
++      'rm --recursive x && git -c alias.p=push p origin main',
++      ['destructive_delete'],
++      'APPROVAL(protected_branch_push)',
++    ],
++    [
++      'git -c alias.p=push p && schtasks /create /tn x /tr y',
++      ['protected_branch_push'],
++      'APPROVAL(system_modification)',
++    ],
++    [
++      'schtasks /create /tn x /tr y && rm --recursive x',
++      ['system_modification'],
++      'APPROVAL(destructive_delete)',
++    ],
++  ])('%s with %j approved -> %s', (c, a, k) => expect(bash(c, a)).toBe(k));
++  it('all categories approved -> allowed', () =>
++    expect(
++      bash('rm --recursive x && git -c alias.p=push p', ['destructive_delete', 'protected_branch_push']),
++    ).toBe('ALLOW'));
++});
++
++describe('finding 2: computed command names', () => {
++  it.each([
++    '"$(tr a-z n-za-m <<< ez)" --recursive /tmp/x',
++    "x=$(printf '\\x72\\x6d'); $x -rf /tmp/x",
++    'c=`printf rm`; "$c" -rf /tmp/x',
++  ])('%s -> DENY', (c) => expect(bash(c)).toBe('DENY'));
++  it('ordinary substitutions as arguments stay allowed', () => {
++    expect(bash('X=$(git rev-parse HEAD); echo $X')).toBe('ALLOW');
++    expect(bash('echo "built at $(date)"')).toBe('ALLOW');
++  });
++});
++
++describe('finding 3: protected paths containing spaces', () => {
++  const spaced = path.resolve('C:/Users/John Smith/.claude');
++  it.each([
++    'cat "/c/Users/John Smith/.cla*/x"',
++    'cat /c/Users/John\\ Smith/.claude/x',
++    "cat 'C:/Users/John Smith/.claude/x'",
++  ])('%s -> DENY', (c) => expect(bash(c, [], [home, repo, spaced])).toBe('DENY'));
++});
++
++describe('finding 4: every per-user credential store', () => {
++  it.each([
++    'cat ~/.ssh/id_ed25519',
++    'cat ~/.npmrc',
++    'cat ~/.config/gh/hosts.yml',
++    'cat ~/.aws/credentials',
++    'type %USERPROFILE%\\.docker\\config.json',
++    'cat "/c/Users/owner/.ssh/known_hosts"',
++    'cp /c/Users/owner/.kube/config ./k',
++  ])('%s -> DENY', (c) => expect(bash(c)).toBe('DENY'));
++  it('the provider protects the credential directories', () =>
++    expect(ownerCredentialDirs('C:/h').map((p) => path.basename(p))).toEqual(
++      expect.arrayContaining(['.claude', '.ssh', '.aws', '.docker', 'gh']),
++    ));
++});
++
++describe('finding 5: redact before truncating audit input', () => {
++  it('no secret fragment survives the cut', () => {
++    const key = 'sk-ant-' + 'A'.repeat(40);
++    const input = JSON.stringify({ command: 'x'.repeat(1975) + ' ' + key });
++    expect(redactString(input).slice(0, 2000)).not.toContain('sk-ant-A');
++  });
++});
++
++describe('finding 6: credential markers inside quoted data are not commands', () => {
++  it.each([
++    'git commit -m "docs: explain ~/.claude settings for contributors"',
++    'echo "store your key in ~/.ssh with mode 600"',
++  ])('%s -> ALLOW', (c) => expect(bash(c)).toBe('ALLOW'));
++  it('but executed forms stay denied', () => {
++    expect(bash('cat ~/.claude/settings.json')).toBe('DENY');
++    expect(bash('bash -c "cat ~/.ssh/id_rsa"')).toBe('DENY');
++  });
++});
++
++describe('npm script bodies (review confirmation)', () => {
++  const dir = mkdtempSync(path.join(os.tmpdir(), 'pr5r-'));
++  writeFileSync(
++    path.join(dir, 'package.json'),
++    JSON.stringify({ scripts: { deploy: 'git -c alias.p=push p' } }),
++  );
++  it('V2.1-only categories inside bodies are found', () =>
++    expect(evaluateToolUse('Bash', { command: 'npm run deploy' }, dir, {}).approvalType).toBe(
++      'protected_branch_push',
++    ));
++});
+-- 
+2.56.0.windows.4
+

@@ -1,0 +1,4 @@
+verification commands for staging-rehearsal updated (audited as assignment.verification_changed)
+  buildCommand        (none)  ->  node --version
+  testCommand         (none)  ->  node --version
+  browserTestCommand  (none)  ->  (none)

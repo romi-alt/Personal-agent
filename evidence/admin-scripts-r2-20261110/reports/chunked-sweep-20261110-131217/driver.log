@@ -1,0 +1,5 @@
+﻿13:12:19 plan: 1 chunks; run dir E:\Agent\v2-staging\worker-isolation\admin-scripts-r2-20261110\reports\chunked-sweep-20261110-131217; task=Running pid8992=True; free=1244 MB
+13:12:25 [1/1] ok items=3 findings=2 5s free=1312MB task=Running pid8992=True :: C:\Intel
+13:12:26 DONE chunks ok=1/1 items=3 findings=2 task=Running pid8992=True
+13:12:26   explicit-broad-allow: 1
+13:12:26   unreadable: 1

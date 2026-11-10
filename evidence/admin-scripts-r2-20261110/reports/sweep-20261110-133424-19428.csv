@@ -1,0 +1,3 @@
+﻿"path","issue","detail"
+"E:\Agent\v2-staging\hardening\isotest\outside","explicit-broad-allow","S-1-1-0:0x1F01FF"
+"E:\Agent\v2-staging\worker-isolation\fixtures\qa-deputy\ws\leakdir","reparse-point","Junction -> E:\Agent\v2-staging\worker-isolation\fixtures\qa-deputy\owner-only (target inside a DENY target)"

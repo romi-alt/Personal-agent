@@ -1,0 +1,184 @@
+﻿start 2026-11-09T18:29:11.3393643+05:00 V2=e60278f V1=1b07468 prodSupervisorPid=8992 started=11/9/2026 6:07:57 PM
+E1 golden copy of production pre-upgrade backup: sha256=B7ED5834716D6B224C32D04D7C0884DAA7E4BF76B91E42DF120AA7EE4FE0ED22 expected=B7ED5834716D6B224C32D04D7C0884DAA7E4BF76B91E42DF120AA7EE4FE0ED22 match=True copyMs=13
+E2 golden integrity=ok fk=0 versions=1:initial_schema 2:phase_1_5_fencing_lifecycle_assignments_verification 3:phase_2_planning_workflows 4:phase_1_5_cli_worker_supervision 5:worker_process_identity 6:phase_2_project_intelligence 7:phase_3_engineering 8:phase_4_integration_sync tasks=141 approvals=9 executions=157
+repointed 1
+supervisor_state neutralised 1
+E3 staging baseline versions=1:initial_schema 2:phase_1_5_fencing_lifecycle_assignments_verification 3:phase_2_planning_workflows 4:phase_1_5_cli_worker_supervision 5:worker_process_identity 6:phase_2_project_intelligence 7:phase_3_engineering 8:phase_4_integration_sync schemaHash=3eee365ef9b54fd4
+E4-v1-backup exit=0 ms=640 [V1 backup --path "E:\Agent\v2-staging\rr\stage\home\pre-v2-backup"]
+E4-v1-backup-verify exit=0 ms=468 [V1 backup:verify "E:\Agent\v2-staging\rr\stage\home\pre-v2-backup\agent-2026-11-09T13-29-13-225Z.db"]
+E4 pre-v2 backup agent-2026-11-09T13-29-13-225Z.db bytes=7684096 sha256=F5BAA207E72C0CF2F11C284237D70DE504CBC67BE6F7E9079C3DBE7F4D9249D8
+E5-v2-doctor-migrate exit=0 ms=919 [V2 doctor]
+E5 versions=1:initial_schema 2:phase_1_5_fencing_lifecycle_assignments_verification 3:phase_2_planning_workflows 4:phase_1_5_cli_worker_supervision 5:worker_process_identity 6:phase_2_project_intelligence 7:phase_3_engineering 8:phase_4_integration_sync 10:qa_requirement_ownership_and_review_links 11:phase_2_stage_5_progress_snapshots integrity=ok fk=0 dupNames=0 qa_review_tasks=66
+E6 schema objects added=index:idx_progress_project,index:idx_qa_review_tasks_task,table:progress_snapshots,table:qa_review_tasks removed=
+  E7 history projects               7ca5da72bd16e14a vs 7ca5da72bd16e14a equal=True
+  E7 history tasks                  91b5a52838569965 vs 91b5a52838569965 equal=True
+  E7 history executions             b4f2daeb33828286 vs b4f2daeb33828286 equal=True
+  E7 history checkpoints            458051e370fd181b vs 458051e370fd181b equal=True
+  E7 history approvals              5fbbf5c428ece749 vs 5fbbf5c428ece749 equal=True
+  E7 history qa_reviews             8b543f92f00b20cf vs 8b543f92f00b20cf equal=True
+  E7 history task_transitions       f9da04f70c3498a2 vs f9da04f70c3498a2 equal=True
+  E7 history verification_evidence  6034a7f5a1bcad11 vs 6034a7f5a1bcad11 equal=True
+  E7 history assignments            28ae6620e9641dca vs 28ae6620e9641dca equal=True
+  E7 history plan_tasks             1ed786c578b4eebd vs 1ed786c578b4eebd equal=True
+  E7 history requirements           cd198dff90f55650 vs cd198dff90f55650 equal=True
+  E7 history task_outputs           fea4c521625bbc01 vs fea4c521625bbc01 equal=True
+  E7 history project_documents      710e8c2b1fd168b7 vs 710e8c2b1fd168b7 equal=True
+  E7 history adrs                   329b0d822fdbe03e vs 329b0d822fdbe03e equal=True
+  E7 history workflow_runs          3495b5986d257465 vs 3495b5986d257465 equal=True
+  E7 history workflow_steps         74df102d361ce1a4 vs 74df102d361ce1a4 equal=True
+E7 all history fingerprints intact after migration: True
+E6-v2-fresh-doctor exit=0 ms=612 [V2 doctor]
+E6 schemaHash migrated=94805f79a0e8abc4 fresh=94805f79a0e8abc4 liveProduction=94805f79a0e8abc4 migrated==fresh:True migrated==live:True
+E8-projects exit=0 ms=395 [V2 projects]
+E8-project-status exit=0 ms=471 [V2 project:status elevariq-retail-operations-portal]
+E8-tasks exit=0 ms=502 [V2 tasks]
+E8-qa exit=0 ms=472 [V2 qa]
+E8-approvals exit=0 ms=554 [V2 approvals]
+E8-roadmap exit=0 ms=571 [V2 roadmap elevariq-retail-operations-portal]
+E8-inbox exit=0 ms=546 [V2 inbox]
+E8-recovery exit=0 ms=490 [V2 recovery]
+E8 tasks listed=141 approvals listed=9 qa rows listed=65
+F1-assignment-add exit=0 ms=1,079 [V2 assignment:add --file "E:\Agent\v2-staging\rr\stage\assignment.json"]
+F2-setverif-unauthorised exit=2 ms=407 [V2 assignment:set-verification staging-rehearsal --test "node --version"]
+F2-setverif exit=0 ms=473 [V2 assignment:set-verification staging-rehearsal --by staging-owner --reason "release-readiness rehearsal" --build "node --version" --test "node --version"]
+F3-task-no-criteria exit=2 ms=426 [V2 task:add --project staging-rehearsal --title "No Criteria" --instructions x]
+F3-task-A exit=0 ms=448 [V2 task:add --project staging-rehearsal --title "Feature A" --instructions x --criteria "src/a.ts exists" --key feat-a --verify CHANGES_EXIST]
+F3-task-A-duplicate exit=0 ms=444 [V2 task:add --project staging-rehearsal --title "Feature A" --instructions x --criteria "src/a.ts exists" --key feat-a --verify CHANGES_EXIST]
+F3-task-B exit=0 ms=433 [V2 task:add --project staging-rehearsal --title "Flaky B" --instructions x --criteria "src/b.ts exists" --verify CHANGES_EXIST]
+F3-task-C exit=0 ms=436 [V2 task:add --project staging-rehearsal --title "Fatal C" --instructions x --criteria x --max-retries 1]
+F3-task-E exit=0 ms=432 [V2 task:add --project staging-rehearsal --title "Deploy E" --instructions x --criteria x]
+F4-start exit=0 ms=412 [V2 start --detach]
+F4-start supervisor pid=15748 (recorded, rehearsal-owned)
+F4 staging supervisor idle WS MB=145
+  TIMEOUT (180 s) waiting for: A,B reviewed (B after a QA rejection + correction); C failed; E awaiting approval
+F4 supervisor WS MB after work=84
+F5-approvals exit=0 ms=501 [V2 approvals]
+F5-worker-approve-refused exit=2 ms=387 [V2 approve apr_mw9asjtqcbe91e2e15]
+F5-worker-accept-refused exit=2 ms=361 [V2 project:accept staging-rehearsal]
+F5-owner-deny exit=0 ms=412 [V2 deny apr_mw9asjtqcbe91e2e15]
+F5 statuses: Feature A=COMPLETED/att0/startLatencyMs=2637; Flaky B=COMPLETED/att1/startLatencyMs=3103; Fatal C=FAILED/att2/startLatencyMs=3149; Deploy E=BLOCKED/att0/startLatencyMs=3160; Review: Feature A=COMPLETED/att0/startLatencyMs=25; Review: Flaky B=COMPLETED/att0/startLatencyMs=47; Fix: Flaky B (QA round 1)=COMPLETED/att0/startLatencyMs=30; Review: Flaky B (round 2)=COMPLETED/att0/startLatencyMs=45; Review: Flaky B (round 2) (repair 1)=COMPLETED/att0/startLatencyMs=24; Review: Flaky B (round 2) (repair 2)=COMPLETED/att0/startLatencyMs=22
+F5 qa: Feature A#1=PASSED, Flaky B#1=FAILED, Flaky B#2=ESCALATED
+F6-task-D exit=0 ms=413 [V2 task:add --project staging-rehearsal --title "Long D" --instructions x --criteria "src/d.ts exists" --verify CHANGES_EXIST]
+  reached in 1.1s: Long D RUNNING
+F6 killed rehearsal-owned supervisor pid=15748 (simulated crash); prod pid 8992 alive=True
+F6 after crash: Long D = RUNNING
+F6-restart exit=0 ms=427 [V2 start --detach]
+F6-restart supervisor pid=8368 (recorded, rehearsal-owned)
+F6-second-start exit=0 ms=469 [V2 start --detach]
+  reached in 1.2s: Long D reconciled after restart
+F6 recovery latency from crash to reconciliation: 3.4s
+  reached in 1.1s: Long D recovered, completed and independently reviewed
+F6 duplicate supervisor pid=12476 still alive=False (expected False)
+F6-status exit=0 ms=447 [V2 status]
+F6-health exit=0 ms=420 [V2 health]
+F7-project-verify exit=0 ms=919 [V2 project:verify staging-rehearsal]
+F8-scratch-ok exit=0 ms=389 [V2 scratch:clean staging-rehearsal .tmp-staging]
+F8-scratch-refused-src exit=1 ms=396 [V2 scratch:clean staging-rehearsal src]
+F8 .tmp-staging removed=True src kept=True
+F9-stop exit=0 ms=677 [V2 stop --wait 30000]
+G1-start-gate-forced exit=0 ms=587 [V2 start --detach]
+G1-start-gate-forced supervisor pid=16508 (recorded, rehearsal-owned)
+G1-task-G exit=0 ms=580 [V2 task:add --project staging-rehearsal --title "Gate G" --instructions x --criteria "src/g.ts exists" --verify CHANGES_EXIST]
+G1 threshold 60000 MB: Gate G status=QUEUED executions=0 resource_deferred events=1
+G1-stop exit=0 ms=705 [V2 stop --wait 30000]
+G2-start-gate-off exit=0 ms=460 [V2 start --detach]
+G2-start-gate-off supervisor pid=7760 (recorded, rehearsal-owned)
+  reached in 2.1s: Gate G ran after the gate was lowered
+G2-stop exit=0 ms=703 [V2 stop --wait 30000]
+F10 rehearsal-owned processes still alive after stop: 
+F11 new tasks: Feature A=COMPLETED/att0/exec1[ok]/sessions1; Flaky B=COMPLETED/att1/exec2[PROCESS_CRASH>ok]/sessions1; Fatal C=FAILED/att2/exec2[TASK_FAILURE>TASK_FAILURE]/sessions1; Deploy E=BLOCKED/att0/exec1[PERMISSION_DENIED]/sessions1; Review: Feature A=COMPLETED/att0/exec1[ok]/sessions1; Review: Flaky B=COMPLETED/att0/exec1[ok]/sessions1; Fix: Flaky B (QA round 1)=COMPLETED/att0/exec1[ok]/sessions1; Review: Flaky B (round 2)=COMPLETED/att0/exec1[ok]/sessions1; Review: Flaky B (round 2) (repair 1)=COMPLETED/att0/exec1[ok]/sessions1; Review: Flaky B (round 2) (repair 2)=COMPLETED/att0/exec1[ok]/sessions1; Long D=COMPLETED/att0/exec2[INTERRUPTED>ok]/sessions1; Review: Long D=COMPLETED/att0/exec1[ok]/sessions1; Gate G=COMPLETED/att0/exec1[ok]/sessions1; Review: Gate G=COMPLETED/att0/exec1[ok]/sessions1
+F11 qa: Feature A#1=PASSED, Flaky B#1=FAILED, Flaky B#2=ESCALATED, Long D#1=PASSED, Gate G#1=PASSED approvals: publish_release:DENIED:owner-cli, qa_escalation:PENDING: overlaps=0
+F11 events: {"approval.decided":1,"approval.required":2,"assignment.registered":1,"assignment.verification_changed":1,"checkpoint.created":17,"owner.approval_decided":1,"project.created":1,"project.lifecycle":1,"qa.correction_created":1,"qa.escalated":1,"qa.failed":1,"qa.passed":3,"qa.review_queued":7,"recovery.completed":1,"recovery.task_reconciled":1,"retry.scheduled":2,"roadmap.status_reconciled":1,"supervisor.resource_deferred":1,"supervisor.started":4,"supervisor.stopped":3,"task.enqueue_duplicate":1,"task.enqueued":14,"task.transition":51,"task.verification_policy":6,"verification.evidence":27,"worker.launched":17,"worker.terminated":16}
+  F12 pilot history (rowid<=baseline) tasks                  91b5a52838569965 vs 91b5a52838569965 equal=True
+  F12 pilot history (rowid<=baseline) executions             b4f2daeb33828286 vs b4f2daeb33828286 equal=True
+  F12 pilot history (rowid<=baseline) checkpoints            458051e370fd181b vs 458051e370fd181b equal=True
+  F12 pilot history (rowid<=baseline) approvals              5fbbf5c428ece749 vs 5fbbf5c428ece749 equal=True
+  F12 pilot history (rowid<=baseline) qa_reviews             8b543f92f00b20cf vs 8b543f92f00b20cf equal=True
+  F12 pilot history (rowid<=baseline) task_transitions       f9da04f70c3498a2 vs f9da04f70c3498a2 equal=True
+  F12 pilot history (rowid<=baseline) verification_evidence  6034a7f5a1bcad11 vs 6034a7f5a1bcad11 equal=True
+  F12 pilot history (rowid<=baseline) assignments            28ae6620e9641dca vs 28ae6620e9641dca equal=True
+  F12 pilot history (rowid<=baseline) plan_tasks             1ed786c578b4eebd vs 1ed786c578b4eebd equal=True
+  F12 pilot history (rowid<=baseline) requirements           cd198dff90f55650 vs cd198dff90f55650 equal=True
+  F12 pilot history (rowid<=baseline) task_outputs           fea4c521625bbc01 vs fea4c521625bbc01 equal=True
+  F12 pilot history (rowid<=baseline) project_documents      710e8c2b1fd168b7 vs 710e8c2b1fd168b7 equal=True
+  F12 pilot history (rowid<=baseline) adrs                   329b0d822fdbe03e vs 329b0d822fdbe03e equal=True
+  F12 pilot history (rowid<=baseline) workflow_runs          3495b5986d257465 vs 3495b5986d257465 equal=True
+  F12 pilot history (rowid<=baseline) workflow_steps         74df102d361ce1a4 vs 74df102d361ce1a4 equal=True
+F12 pre-existing production history untouched by staging processing: True
+R1-v1-restore exit=0 ms=606 [V1 restore "E:\Agent\v2-staging\rr\stage\home\pre-v2-backup\agent-2026-11-09T13-29-13-225Z.db" --reason "release-readiness rollback rehearsal"]
+R1 versions after rollback=1:initial_schema 2:phase_1_5_fencing_lifecycle_assignments_verification 3:phase_2_planning_workflows 4:phase_1_5_cli_worker_supervision 5:worker_process_identity 6:phase_2_project_intelligence 7:phase_3_engineering 8:phase_4_integration_sync integrity=ok fk=0 schemaHash=3eee365ef9b54fd4 equals pre-upgrade schema=True
+  R1 rollback projects               7ca5da72bd16e14a vs 7ca5da72bd16e14a equal=True
+  R1 rollback tasks                  91b5a52838569965 vs 91b5a52838569965 equal=True
+  R1 rollback executions             b4f2daeb33828286 vs b4f2daeb33828286 equal=True
+  R1 rollback checkpoints            458051e370fd181b vs 458051e370fd181b equal=True
+  R1 rollback approvals              5fbbf5c428ece749 vs 5fbbf5c428ece749 equal=True
+  R1 rollback qa_reviews             8b543f92f00b20cf vs 8b543f92f00b20cf equal=True
+  R1 rollback task_transitions       f9da04f70c3498a2 vs f9da04f70c3498a2 equal=True
+  R1 rollback verification_evidence  6034a7f5a1bcad11 vs 6034a7f5a1bcad11 equal=True
+  R1 rollback assignments            28ae6620e9641dca vs 28ae6620e9641dca equal=True
+  R1 rollback plan_tasks             1ed786c578b4eebd vs 1ed786c578b4eebd equal=True
+  R1 rollback requirements           cd198dff90f55650 vs cd198dff90f55650 equal=True
+  R1 rollback task_outputs           fea4c521625bbc01 vs fea4c521625bbc01 equal=True
+  R1 rollback project_documents      710e8c2b1fd168b7 vs 710e8c2b1fd168b7 equal=True
+  R1 rollback adrs                   329b0d822fdbe03e vs 329b0d822fdbe03e equal=True
+  R1 rollback workflow_runs          3495b5986d257465 vs 3495b5986d257465 equal=True
+  R1 rollback workflow_steps         74df102d361ce1a4 vs 74df102d361ce1a4 equal=True
+R1 restored DB equals pre-upgrade baseline: True; tasks=141 statuses={"COMPLETED":141}
+R2-v1-doctor exit=0 ms=682 [V1 doctor]
+R2-v1-status exit=0 ms=393 [V1 status]
+R2-v1-tasks exit=0 ms=404 [V1 tasks]
+R3-v1-start exit=0 ms=424 [V1 start --detach]
+R3-v1-start supervisor pid=18468 (recorded, rehearsal-owned)
+R3-v1-health exit=0 ms=421 [V1 health]
+R3-v1-second-start exit=0 ms=520 [V1 start --detach]
+R4-v1-stop exit=0 ms=1,037 [V1 stop --wait 30000]
+  R4 projects               7ca5da72bd16e14a vs 7ca5da72bd16e14a equal=True
+  R4 tasks                  91b5a52838569965 vs 91b5a52838569965 equal=True
+  R4 executions             b4f2daeb33828286 vs b4f2daeb33828286 equal=True
+  R4 checkpoints            458051e370fd181b vs 458051e370fd181b equal=True
+  R4 approvals              5fbbf5c428ece749 vs 5fbbf5c428ece749 equal=True
+  R4 qa_reviews             8b543f92f00b20cf vs 8b543f92f00b20cf equal=True
+  R4 task_transitions       f9da04f70c3498a2 vs f9da04f70c3498a2 equal=True
+  R4 verification_evidence  6034a7f5a1bcad11 vs 6034a7f5a1bcad11 equal=True
+  R4 assignments            28ae6620e9641dca vs 28ae6620e9641dca equal=True
+  R4 plan_tasks             1ed786c578b4eebd vs 1ed786c578b4eebd equal=True
+  R4 requirements           cd198dff90f55650 vs cd198dff90f55650 equal=True
+  R4 task_outputs           fea4c521625bbc01 vs fea4c521625bbc01 equal=True
+  R4 project_documents      710e8c2b1fd168b7 vs 710e8c2b1fd168b7 equal=True
+  R4 adrs                   329b0d822fdbe03e vs 329b0d822fdbe03e equal=True
+  R4 workflow_runs          3495b5986d257465 vs 3495b5986d257465 equal=True
+  R4 workflow_steps         74df102d361ce1a4 vs 74df102d361ce1a4 equal=True
+R4 V1 startup on restored DB: versions=1:initial_schema 2:phase_1_5_fencing_lifecycle_assignments_verification 3:phase_2_planning_workflows 4:phase_1_5_cli_worker_supervision 5:worker_process_identity 6:phase_2_project_intelligence 7:phase_3_engineering 8:phase_4_integration_sync history still equal baseline=True
+R5-v1-on-v11-staging-doctor exit=0 ms=642 [V1 doctor]
+R5-v1-on-v11-staging-status exit=0 ms=423 [V1 status]
+R5-v1-on-v11-staging-start exit=0 ms=437 [V1 start --detach]
+R5-v1-on-v11-staging-start supervisor pid=18428 (recorded, rehearsal-owned)
+R5-v1-on-v11-staging-health exit=0 ms=463 [V1 health]
+R5-v1-on-v11-staging-stop exit=0 ms=713 [V1 stop --wait 30000]
+R5-v1-on-v11-staging: versions=1:initial_schema 2:phase_1_5_fencing_lifecycle_assignments_verification 3:phase_2_planning_workflows 4:phase_1_5_cli_worker_supervision 5:worker_process_identity 6:phase_2_project_intelligence 7:phase_3_engineering 8:phase_4_integration_sync 10:qa_requirement_ownership_and_review_links 11:phase_2_stage_5_progress_snapshots integrity=ok tasks={"BLOCKED":1,"COMPLETED":153,"FAILED":1}
+R5-v1-on-v11-liveSnapshot-doctor exit=0 ms=645 [V1 doctor]
+R5-v1-on-v11-liveSnapshot-status exit=0 ms=501 [V1 status]
+R5-v1-on-v11-liveSnapshot-start exit=0 ms=459 [V1 start --detach]
+R5-v1-on-v11-liveSnapshot-start supervisor pid=18756 (recorded, rehearsal-owned)
+R5-v1-on-v11-liveSnapshot-health exit=0 ms=564 [V1 health]
+R5-v1-on-v11-liveSnapshot-stop exit=0 ms=695 [V1 stop --wait 30000]
+R5-v1-on-v11-liveSnapshot: versions=1:initial_schema 2:phase_1_5_fencing_lifecycle_assignments_verification 3:phase_2_planning_workflows 4:phase_1_5_cli_worker_supervision 5:worker_process_identity 6:phase_2_project_intelligence 7:phase_3_engineering 8:phase_4_integration_sync 10:qa_requirement_ownership_and_review_links 11:phase_2_stage_5_progress_snapshots integrity=ok tasks={"COMPLETED":141}
+R6 projects               rows preupgrade=1 liveNow=1 (new=0) preexisting-rows-identical=True
+R6 tasks                  rows preupgrade=141 liveNow=141 (new=0) preexisting-rows-identical=True
+R6 executions             rows preupgrade=157 liveNow=157 (new=0) preexisting-rows-identical=True
+R6 checkpoints            rows preupgrade=157 liveNow=157 (new=0) preexisting-rows-identical=True
+R6 approvals              rows preupgrade=9 liveNow=9 (new=0) preexisting-rows-identical=True
+R6 qa_reviews             rows preupgrade=65 liveNow=65 (new=0) preexisting-rows-identical=True
+R6 task_transitions       rows preupgrade=617 liveNow=617 (new=0) preexisting-rows-identical=True
+R6 verification_evidence  rows preupgrade=410 liveNow=410 (new=0) preexisting-rows-identical=True
+R6 assignments            rows preupgrade=1 liveNow=1 (new=0) preexisting-rows-identical=True
+R6 plan_tasks             rows preupgrade=46 liveNow=46 (new=0) preexisting-rows-identical=True
+R6 requirements           rows preupgrade=41 liveNow=41 (new=0) preexisting-rows-identical=True
+R6 task_outputs           rows preupgrade=141 liveNow=141 (new=0) preexisting-rows-identical=True
+R6 project_documents      rows preupgrade=2 liveNow=2 (new=0) preexisting-rows-identical=True
+R6 adrs                   rows preupgrade=11 liveNow=11 (new=0) preexisting-rows-identical=True
+R6 workflow_runs          rows preupgrade=1 liveNow=1 (new=0) preexisting-rows-identical=True
+R6 workflow_steps         rows preupgrade=6 liveNow=6 (new=0) preexisting-rows-identical=True
+R6 activity_events        rows preupgrade=2276 liveNow=2281 (new=5) preexisting-rows-identical=False
+R6 milestones             rows preupgrade=7 liveNow=7 (new=0) preexisting-rows-identical=False
+end 2026-11-09T18:33:53.7351247+05:00 production supervisor pid 8992 alive=True sameStart=True; scheduled-task definition unchanged=True

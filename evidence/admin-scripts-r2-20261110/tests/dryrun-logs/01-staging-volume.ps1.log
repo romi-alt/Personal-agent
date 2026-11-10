@@ -1,0 +1,42 @@
+﻿== 01-staging-volume (DRY-RUN, revision r2-20261110) ==
+  [WARN] R7 trusted script location + SHA256SUMS broad write on 
+E:\Agent\v2-staging\worker-isolation\admin-scripts-r2-20261110; broad write on 
+E:\Agent\v2-staging\worker-isolation\admin-scripts-r2-20261110\00-isolation-group-deny.ps1; broad write on 
+E:\Agent\v2-staging\worker-isolation\admin-scripts-r2-20261110\00a-remove-test-residue.ps1; broad write on 
+E:\Agent\v2-staging\worker-isolation\admin-scripts-r2-20261110\01-staging-volume.ps1; broad write on 
+E:\Agent\v2-staging\worker-isolation\admin-scripts-r2-20261110\02-identities-and-rights.ps1; broad write on 
+E:\Agent\v2-staging\worker-isolation\admin-scripts-r2-20261110\03-staging-layout.ps1; broad write on 
+E:\Agent\v2-staging\worker-isolation\admin-scripts-r2-20261110\04-broker-install.ps1; broad write on 
+E:\Agent\v2-staging\worker-isolation\admin-scripts-r2-20261110\05-firewall-egress.ps1; broad write on 
+E:\Agent\v2-staging\worker-isolation\admin-scripts-r2-20261110\06-worker-enable.ps1; broad write on 
+E:\Agent\v2-staging\worker-isolation\admin-scripts-r2-20261110\07-verify-config.ps1; broad write on 
+E:\Agent\v2-staging\worker-isolation\admin-scripts-r2-20261110\09-rollback.ps1; broad write on 
+E:\Agent\v2-staging\worker-isolation\admin-scripts-r2-20261110\Freeze-AdminScripts.ps1; broad write on 
+E:\Agent\v2-staging\worker-isolation\admin-scripts-r2-20261110\_common.ps1; SHA256SUMS missing
+  [FAIL] PRE 00 applied (group + explicit DENY on E:\, F:\) 
+  [PASS] P0 production task present and running Running
+  [PASS] P1 production supervisor PID 8992 alive 
+  [PASS] P2 production HEAD = e60278f e60278f
+  [PASS] P3 production task action still points at the checkout script 
+  DRY-RUN icacls: C:\ElevariqStagingDisk -- protected: SYSTEM + Administrators only [icacls C:\ElevariqStagingDisk 
+/inheritance:r /grant:r *S-1-5-18:(OI)(CI)F *S-1-5-32-544:(OI)(CI)F]
+  DRY-RUN icacls: C:\ElevariqStaging -- mount-point folder protected before mounting [icacls C:\ElevariqStaging 
+/inheritance:r /grant:r *S-1-5-18:(OI)(CI)F *S-1-5-32-544:(OI)(CI)F 
+*S-1-5-21-3837883729-3478098758-1729361560-1001:(OI)(CI)F]
+  DRY-RUN diskpart: C:\ElevariqStagingDisk\elv-staging.vhdx -- create vdisk 
+file="C:\ElevariqStagingDisk\elv-staging.vhdx" maximum=40960 type=expandable ; attach vdisk ; create partition primary 
+; format fs=ntfs label=ELVSTG quick ; assign mount="C:\ElevariqStaging"
+  DRY-RUN icacls: C:\ElevariqStaging -- volume root: strip explicit broad ACEs [icacls C:\ElevariqStaging 
+/inheritance:r /remove:g *S-1-5-11 *S-1-5-32-545 *S-1-3-0 *S-1-1-0]
+  DRY-RUN icacls: C:\ElevariqStaging -- volume root: SYSTEM + Administrators + owner Full [icacls C:\ElevariqStaging 
+/grant:r *S-1-5-18:(OI)(CI)F *S-1-5-32-544:(OI)(CI)F *S-1-5-21-3837883729-3478098758-1729361560-1001:(OI)(CI)F]
+  DRY-RUN register-scheduledtask: ElevariqStagingDiskAttach -- SYSTEM, AtStartup: Mount-DiskImage -ImagePath 
+'C:\ElevariqStagingDisk\elv-staging.vhdx' -NoDriveLetter -ErrorAction Stop
+  [PASS] P0 production task present and running Running
+  [PASS] P1 production supervisor PID 8992 alive 
+  [PASS] P2 production HEAD = e60278f e60278f
+  [PASS] P3 production task action still points at the checkout script 
+
+Report: E:\Agent\v2-staging\worker-isolation\admin-scripts-r2-20261110\reports\01-staging-volume-20261110-140328.json
+Changes: 6  Refusals: 0  Checks: 10  Mode: DRY-RUN
+

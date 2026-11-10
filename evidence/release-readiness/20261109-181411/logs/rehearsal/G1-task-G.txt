@@ -1,0 +1,2 @@
+queued task tsk_mw9awt7ead100b09be: Gate G
+  verification: CHANGES_EXIST, REQUIREMENTS_SATISFIED (independent review)

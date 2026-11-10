@@ -1,0 +1,20 @@
+
+> elevariq-personal-agent@0.1.0 test:browser
+> playwright test
+
+
+Running 9 tests using 1 worker
+
+(node:19740) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ok 1 tests\browser\command-center.spec.ts:55:1 › login: a wrong token is refused and audited; the right token opens a hardened session (1.4s)
+  ok 2 tests\browser\command-center.spec.ts:73:1 › project creation and assignment in plain language starts planning (2.5s)
+  ok 3 tests\browser\command-center.spec.ts:88:1 › approval workflow: the plan approval appears in the inbox and is approved with an audit note (9.7s)
+  ok 4 tests\browser\command-center.spec.ts:133:1 › approval workflow: a production deploy request is denied through the UI (224ms)
+  ok 5 tests\browser\command-center.spec.ts:162:1 › task monitoring with pause and resume of a task and of the project (2.1s)
+  ok 6 tests\browser\command-center.spec.ts:190:1 › live execution status: a worker waiting for a usage reset is shown, then its completion (4.7s)
+  ok 7 tests\browser\command-center.spec.ts:205:1 › error states: stale approval action, unknown project, missing CSRF, sign-out (1.3s)
+  ok 8 tests\browser\command-center.spec.ts:251:1 › responsive: phone and tablet widths have no horizontal overflow and stay operable (10.6s)
+  ok 9 tests\browser\command-center.spec.ts:277:1 › no JavaScript errors in any of the above (5ms)
+
+  9 passed (39.7s)

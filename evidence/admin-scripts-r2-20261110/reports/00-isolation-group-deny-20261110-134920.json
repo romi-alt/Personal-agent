@@ -1,0 +1,71 @@
+﻿{
+    "script":  "00-isolation-group-deny",
+    "revision":  "r2-20261110",
+    "startedAt":  "2026-11-10T13:49:20.4356807+05:00",
+    "dryRun":  true,
+    "user":  "DESKTOP-QGGLG8D\\Roman",
+    "changes":  [
+                    {
+                        "action":  "targets",
+                        "target":  "E:\\, F:\\, C:\\Download, C:\\Intel, D:\\src, D:\\Intel",
+                        "detail":  "DENY targets (validated by Assert-DenyTarget)",
+                        "applied":  false,
+                        "at":  "2026-11-10T13:49:20.8187185+05:00"
+                    },
+                    {
+                        "action":  "sweep-chunk",
+                        "target":  "F:\\ChatGPT Installer.exe, F:\\FBR NTN.png, F:\\Google ADKcode, F:\\Microsoft.Services.Store.winmd, F:\\node-v26.7.0-x64.msi, F:\\tech-research-portal.zip",
+                        "detail":  "partial read-only sweep (chunk); not sufficient for -Apply",
+                        "applied":  false,
+                        "at":  "2026-11-10T13:49:21.7905108+05:00"
+                    }
+                ],
+    "refusals":  [
+
+                 ],
+    "checks":  [
+                   {
+                       "id":  "R7",
+                       "name":  "trusted script location + SHA256SUMS",
+                       "status":  "WARN",
+                       "detail":  "broad write on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r2-20261110; broad write on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r2-20261110\\00-isolation-group-deny.ps1; broad write on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r2-20261110\\00a-remove-test-residue.ps1; broad write on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r2-20261110\\01-staging-volume.ps1; broad write on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r2-20261110\\02-identities-and-rights.ps1; broad write on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r2-20261110\\03-staging-layout.ps1; broad write on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r2-20261110\\04-broker-install.ps1; broad write on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r2-20261110\\05-firewall-egress.ps1; broad write on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r2-20261110\\06-worker-enable.ps1; broad write on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r2-20261110\\07-verify-config.ps1; broad write on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r2-20261110\\09-rollback.ps1; broad write on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r2-20261110\\Freeze-AdminScripts.ps1; broad write on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r2-20261110\\_common.ps1; SHA256SUMS missing"
+                   },
+                   {
+                       "id":  "P0",
+                       "name":  "production task present and running",
+                       "status":  "PASS",
+                       "detail":  "Running"
+                   },
+                   {
+                       "id":  "P1",
+                       "name":  "production supervisor PID 8992 alive",
+                       "status":  "PASS",
+                       "detail":  ""
+                   },
+                   {
+                       "id":  "P2",
+                       "name":  "production HEAD = e60278f",
+                       "status":  "PASS",
+                       "detail":  "e60278f"
+                   },
+                   {
+                       "id":  "P3",
+                       "name":  "production task action still points at the checkout script",
+                       "status":  "PASS",
+                       "detail":  ""
+                   },
+                   {
+                       "id":  "S1",
+                       "name":  "sweep: no uncovered explicit-broad-allow / protected-with-broad-access / null-dacl / unreadable / unlistable items",
+                       "status":  "PASS",
+                       "detail":  "0 open; see E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r2-20261110\\reports\\sweep-20261110-134921-5244.csv"
+                   },
+                   {
+                       "id":  "S2",
+                       "name":  "sweep: reparse points reviewed (not followed; a target OUTSIDE the DENY targets is governed only by its own ACL, not by this DENY)",
+                       "status":  "PASS",
+                       "detail":  "0 reparse points; see E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r2-20261110\\reports\\sweep-20261110-134921-5244.csv"
+                   }
+               ],
+    "path":  "E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r2-20261110\\reports\\00-isolation-group-deny-20261110-134920.json"
+}

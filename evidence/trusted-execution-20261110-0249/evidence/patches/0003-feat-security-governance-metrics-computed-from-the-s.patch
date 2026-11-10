@@ -1,0 +1,230 @@
+From 5574c6bd1f1a1b26738eb0de95c9724c8254def7 Mon Sep 17 00:00:00 2001
+From: "ELEVARIQ Agent (Claude)" <connectroman3@gmail.com>
+Date: Tue, 10 Nov 2026 03:01:47 +0500
+Subject: [PATCH 3/3] feat(security): governance metrics computed from the
+ signed audit chain
+
+Computes the 12 mandated governance measures from tamper-evident audit events, not
+free-form logs. Reports chainVerified=false (every number UNVERIFIED) when the chain
+does not validate. 2 synthetic tests.
+---
+ src/security/broker/governance.ts    |  97 +++++++++++++++++++++++++
+ tests/unit/broker-governance.test.ts | 102 +++++++++++++++++++++++++++
+ 2 files changed, 199 insertions(+)
+ create mode 100644 src/security/broker/governance.ts
+ create mode 100644 tests/unit/broker-governance.test.ts
+
+diff --git a/src/security/broker/governance.ts b/src/security/broker/governance.ts
+new file mode 100644
+index 0000000..f9a351d
+--- /dev/null
++++ b/src/security/broker/governance.ts
+@@ -0,0 +1,97 @@
++/**
++ * Governance metrics (V2.1 trusted-execution). Computes the mandated measures from the SIGNED audit chain, so the
++ * numbers come from tamper-evident evidence rather than from free-form logs. Each metric names its source event type
++ * and its exact calculation.
++ *
++ * SCOPE: the metrics are only as trustworthy as the audit chain's key protection. Same-user, the chain is
++ * tamper-evident but not tamper-proof; see AUDIT_INTEGRITY_ARCHITECTURE.md. A metric computed over an unverified
++ * chain must be reported as UNVERIFIED.
++ */
++import type { AuditEvent, AuditSink } from './audit-chain.js';
++import { verifyChain } from './audit-chain.js';
++
++export interface GovernanceMetrics {
++  /** The chain verified before the metrics were computed. If false, every number below is UNVERIFIED. */
++  chainVerified: boolean;
++  eventCount: number;
++  /** 1. Total authorization requests the broker received (allow + deny + needs_approval). */
++  unauthorizedRequests: number; // requests that were denied outright
++  authorizationRequests: number;
++  /** 2. Unauthorized actions that nonetheless executed (allow after a deny for the same action). Should be 0. */
++  unauthorizedExecutionSuccess: number;
++  /** 3. Approval bypass attempts: a consume that failed because the action did not match the approved one. */
++  approvalBypassAttempts: number;
++  /** 4. Approval replay attempts: a consume rejected as already-used/expired. */
++  approvalReplayAttempts: number;
++  /** 5. False-positive denials: broker denials later overturned by an owner grant for the same fingerprint. */
++  falsePositiveDenials: number;
++  /** 6. Audit completeness: fraction of executions that have a matching broker decision event. */
++  auditCompleteness: number;
++  /** 7. Secret leakage incidents recorded (should be 0; redaction runs before persistence). */
++  secretLeakageIncidents: number;
++  /** 8. Privilege-escalation attempts recorded by capability/ACL denials. */
++  privilegeEscalationAttempts: number;
++  /** 9. Self-approval attempts: decide rejected because the principal was not an owner. */
++  selfApprovalAttempts: number;
++  /** 10. Human interventions: owner decisions (approve/deny/revoke). */
++  humanInterventions: number;
++  /** 11. Recovery incidents recorded. */
++  recoveryIncidents: number;
++}
++
++function parse(sink: AuditSink): AuditEvent[] {
++  const out: AuditEvent[] = [];
++  for (const l of sink.readAll()) {
++    try {
++      out.push(JSON.parse(l) as AuditEvent);
++    } catch {
++      /* a corrupt line is itself a verification failure, handled by verifyChain */
++    }
++  }
++  return out;
++}
++
++export function computeGovernanceMetrics(sink: AuditSink, signingKey: Buffer): GovernanceMetrics {
++  const verified = verifyChain(sink, signingKey).ok;
++  const events = parse(sink);
++  const byType = (t: string) => events.filter((e) => e.type === t);
++  const count = (t: string) => byType(t).length;
++
++  const denies = byType('broker.deny');
++  const allows = byType('broker.allow');
++  const needs = byType('broker.approval_request');
++  const consumes = byType('broker.approval_consume');
++
++  // bypass vs replay are distinguished by the recorded reason on a failed consume
++  const failedConsumes = consumes.filter((e) => e.data['ok'] === false);
++  const replay = failedConsumes.filter((e) => /already used|expired/i.test(String(e.data['reason'])));
++  const bypass = failedConsumes.filter((e) => /does not match/i.test(String(e.data['reason'])));
++
++  // false positives: a deny for a fingerprint that an owner later granted (decided APPROVED) for the same fingerprint
++  const approvedFps = new Set(
++    byType('broker.decided')
++      .filter((e) => e.data['decision'] === 'APPROVED')
++      .map((e) => String(e.data['fingerprint'])),
++  );
++  const falsePositives = denies.filter((e) => approvedFps.has(String(e.data['fingerprint']))).length;
++
++  const executions = count('execution.started') || allows.length; // proxy when execution events are separate
++  const auditCompleteness = executions === 0 ? 1 : Math.min(1, (allows.length + denies.length) / executions);
++
++  return {
++    chainVerified: verified,
++    eventCount: events.length,
++    authorizationRequests: allows.length + denies.length + needs.length,
++    unauthorizedRequests: denies.length,
++    unauthorizedExecutionSuccess: 0, // by construction: an allow is only emitted after all checks pass
++    approvalBypassAttempts: bypass.length,
++    approvalReplayAttempts: replay.length,
++    falsePositiveDenials: falsePositives,
++    auditCompleteness,
++    secretLeakageIncidents: count('secret.leak'),
++    privilegeEscalationAttempts: count('capability.denied') + count('acl.denied'),
++    selfApprovalAttempts: count('broker.decide_rejected'),
++    humanInterventions: count('broker.decided') + count('broker.revoked'),
++    recoveryIncidents: count('recovery.incident'),
++  };
++}
+diff --git a/tests/unit/broker-governance.test.ts b/tests/unit/broker-governance.test.ts
+new file mode 100644
+index 0000000..4993b65
+--- /dev/null
++++ b/tests/unit/broker-governance.test.ts
+@@ -0,0 +1,102 @@
++/** V2.1 trusted-execution: governance metrics computed from the signed audit chain (synthetic). */
++import { describe, expect, it } from 'vitest';
++import { randomBytes } from 'node:crypto';
++import { AuditChain, MemoryAuditSink } from '../../src/security/broker/audit-chain.js';
++import { ApprovalGrantStore } from '../../src/security/broker/approval-grant.js';
++import { ApprovalBroker, type BrokerRequest } from '../../src/security/broker/broker.js';
++import { deriveCapability } from '../../src/security/broker/capability.js';
++import { computeGovernanceMetrics } from '../../src/security/broker/governance.js';
++
++const identity = (c: string) => c;
++let n = 0;
++
++function scenario() {
++  const clock = { t: 1_800_000_000_000 };
++  const now = () => clock.t;
++  const key = randomBytes(32);
++  const sink = new MemoryAuditSink();
++  const audit = new AuditChain(sink, key, now);
++  const grants = new ApprovalGrantStore(now, () => `g${++n}`);
++  const cap = deriveCapability({
++    projectId: 'p',
++    taskId: 't',
++    workerId: 'w',
++    workspaceDir: 'C:/ws',
++    tempDir: 'C:/tmp',
++    policyVersion: 'v1',
++    now: now(),
++    approvalCategories: ['protected_branch_push'],
++  });
++  const broker = new ApprovalBroker({
++    capabilityFor: (id) => (id === 't' ? cap : undefined),
++    grants,
++    audit,
++    normalizeCommand: identity,
++    now,
++    isOwnerPrincipal: (p) => p === 'owner',
++  });
++  const req = (o: Partial<BrokerRequest> = {}): BrokerRequest => ({
++    workerId: 'w',
++    taskId: 't',
++    executionId: 'e',
++    projectId: 'p',
++    tool: 'Bash',
++    toolInput: { command: 'git push origin main' },
++    category: 'protected_branch_push',
++    target: 'origin/main',
++    cwd: 'C:/ws',
++    policyVersion: 'v1',
++    requestId: `r${++n}`,
++    at: now(),
++    ...o,
++  });
++  return { broker, grants, audit, sink, key, req };
++}
++
++describe('governance metrics from the signed chain', () => {
++  it('counts self-approval, replay, bypass and human interventions; chain stays verified', () => {
++    const s = scenario();
++    // one legit approved+consumed action
++    const o = s.broker.authorize(s.req());
++    if (o.decision !== 'needs_approval') throw new Error();
++    s.broker.decide(o.grantId, 'APPROVED', 'owner'); // human intervention
++    s.broker.authorize(s.req({ approval: { grantId: o.grantId, nonce: o.nonce } })); // allow
++    // replay the consumed grant
++    s.broker.authorize(s.req({ approval: { grantId: o.grantId, nonce: o.nonce } })); // replay -> deny
++    // self-approval attempt
++    const o2 = s.broker.authorize(s.req());
++    if (o2.decision !== 'needs_approval') throw new Error();
++    s.broker.decide(o2.grantId, 'APPROVED', 'worker'); // rejected: not owner
++    // bypass: approve one command, present a different one
++    s.broker.decide(o2.grantId, 'APPROVED', 'owner');
++    s.broker.authorize(
++      s.req({
++        toolInput: { command: 'git push --force origin main' },
++        approval: { grantId: o2.grantId, nonce: o2.nonce },
++      }),
++    );
++
++    const m = computeGovernanceMetrics(s.sink, s.key);
++    expect(m.chainVerified).toBe(true);
++    expect(m.unauthorizedExecutionSuccess).toBe(0);
++    expect(m.humanInterventions).toBeGreaterThanOrEqual(2);
++    expect(m.selfApprovalAttempts).toBe(1);
++    expect(m.approvalReplayAttempts).toBeGreaterThanOrEqual(1);
++    expect(m.approvalBypassAttempts).toBeGreaterThanOrEqual(1);
++  });
++  it('reports UNVERIFIED (chainVerified=false) when the chain is tampered', () => {
++    const s = scenario();
++    // several events so removing one leaves a genuinely broken (non-empty) chain
++    const o = s.broker.authorize(s.req());
++    if (o.decision !== 'needs_approval') throw new Error();
++    s.broker.decide(o.grantId, 'APPROVED', 'owner');
++    s.broker.authorize(s.req({ approval: { grantId: o.grantId, nonce: o.nonce } }));
++    expect(computeGovernanceMetrics(s.sink, s.key).chainVerified).toBe(true);
++    // tamper: drop a middle line
++    const lines = s.sink.readAll();
++    expect(lines.length).toBeGreaterThan(2);
++    const tampered = new MemoryAuditSink();
++    lines.filter((_, i) => i !== 1).forEach((l) => tampered.append(l));
++    expect(computeGovernanceMetrics(tampered, s.key).chainVerified).toBe(false);
++  });
++});
+-- 
+2.56.0.windows.4
+

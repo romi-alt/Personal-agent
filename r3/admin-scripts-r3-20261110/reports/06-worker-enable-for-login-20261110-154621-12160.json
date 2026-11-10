@@ -1,0 +1,115 @@
+﻿{
+    "script":  "06-worker-enable-for-login",
+    "revision":  "r3-20261110",
+    "startedAt":  "2026-11-10T15:46:21.6759063+05:00",
+    "finishedAt":  "2026-11-10T15:46:23.2398320+05:00",
+    "dryRun":  true,
+    "user":  "DESKTOP-QGGLG8D\\Roman",
+    "elevated":  false,
+    "changes":  [
+                    {
+                        "action":  "enable-localuser",
+                        "target":  "elv-stg-worker",
+                        "detail":  "owner sets password; enable; then runas + claude login (worker\u0027s own login)",
+                        "applied":  false,
+                        "at":  "2026-11-10T15:46:21.8076225+05:00"
+                    }
+                ],
+    "refusals":  [
+
+                 ],
+    "checks":  [
+                   {
+                       "id":  "R7",
+                       "name":  "trusted admin-only script location + canonical SHA256SUMS + out-of-band manifest hash",
+                       "status":  "WARN",
+                       "detail":  "owner S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110; inheritance not cut on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110; write 0x10116 for S-1-5-11 on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110; write 0x10116 for S-1-5-11(IO) on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110; owner S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110\\00-isolation-group-deny.ps1; write 0x10116 for S-1-5-11 on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110\\00-isolation-group-deny.ps1; owner S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110\\00a-remove-test-residue.ps1; write 0x10116 for S-1-5-11 on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110\\00a-remove-test-residue.ps1; owner S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110\\01-staging-volume.ps1; write 0x10116 for S-1-5-11 on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110\\01-staging-volume.ps1; owner S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110\\02-identities-and-rights.ps1; write 0x10116 for S-1-5-11 on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110\\02-identities-and-rights.ps1; owner S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110\\03-staging-layout.ps1; write 0x10116 for S-1-5-11 on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110\\03-staging-layout.ps1; owner S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110\\04-broker-install.ps1; write 0x10116 for S-1-5-11 on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110\\04-broker-install.ps1; owner S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110\\05-firewall-egress.ps1; write 0x10116 for S-1-5-11 on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110\\05-firewall-egress.ps1; owner S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110\\06-worker-enable.ps1; write 0x10116 for S-1-5-11 on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110\\06-worker-enable.ps1; owner S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110\\07-verify-config.ps1; write 0x10116 for S-1-5-11 on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110\\07-verify-config.ps1; owner S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110\\09-rollback.ps1; write 0x10116 for S-1-5-11 on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110\\09-rollback.ps1; owner S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110\\Freeze-AdminScripts.ps1; write 0x10116 for S-1-5-11 on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110\\Freeze-AdminScripts.ps1; owner S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110\\_common.ps1; write 0x10116 for S-1-5-11 on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110\\_common.ps1; SHA256SUMS missing"
+                   },
+                   {
+                       "id":  "G1",
+                       "name":  "worker exists",
+                       "status":  "FAIL",
+                       "detail":  "False"
+                   },
+                   {
+                       "id":  "G2",
+                       "name":  "worker in deny group (ADSI, fail closed)",
+                       "status":  "FAIL",
+                       "detail":  "no worker/group"
+                   },
+                   {
+                       "id":  "G3",
+                       "name":  "worker is NOT an administrator",
+                       "status":  "FAIL",
+                       "detail":  "no worker"
+                   },
+                   {
+                       "id":  "G4",
+                       "name":  "explicit inheritable DENY on every recorded DENY target",
+                       "status":  "FAIL",
+                       "detail":  "no group"
+                   },
+                   {
+                       "id":  "G5",
+                       "name":  "H1 per-object verification complete and newer than the apply",
+                       "status":  "FAIL",
+                       "detail":  "no deny-targets.json"
+                   },
+                   {
+                       "id":  "G6",
+                       "name":  "staging layout re-evaluated: 0 FAIL (Test-ElvLayout)",
+                       "status":  "FAIL",
+                       "detail":  "identities/group missing"
+                   },
+                   {
+                       "id":  "G7",
+                       "name":  "firewall: both worker rules bound to the CURRENT worker SID; profiles enforcing",
+                       "status":  "FAIL",
+                       "detail":  "no worker"
+                   },
+                   {
+                       "id":  "G8",
+                       "name":  "no shadow copy of a DENY-target volume predates the apply (H5; UNKNOWN = FAIL)",
+                       "status":  "FAIL",
+                       "detail":  "no deny-targets.json"
+                   },
+                   {
+                       "id":  "G9",
+                       "name":  "bin\\ and the launcher are admin-only writable",
+                       "status":  "FAIL",
+                       "detail":  "bin\\ missing"
+                   },
+                   {
+                       "id":  "GATE",
+                       "name":  "all gate items PASS",
+                       "status":  "FAIL",
+                       "detail":  ""
+                   },
+                   {
+                       "id":  "P0",
+                       "name":  "production task present and running",
+                       "status":  "PASS",
+                       "detail":  "Running"
+                   },
+                   {
+                       "id":  "P1",
+                       "name":  "production supervisor process alive (found by command line)",
+                       "status":  "PASS",
+                       "detail":  "pids=8992"
+                   },
+                   {
+                       "id":  "P2",
+                       "name":  "production HEAD = e60278f",
+                       "status":  "PASS",
+                       "detail":  "e60278f"
+                   },
+                   {
+                       "id":  "P3",
+                       "name":  "production task action still points at the checkout script",
+                       "status":  "PASS",
+                       "detail":  ""
+                   }
+               ],
+    "error":  null,
+    "path":  "E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110\\reports\\06-worker-enable-for-login-20261110-154621-12160.json"
+}

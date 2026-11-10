@@ -1,0 +1,436 @@
+{
+ "at": "2026-11-09T13:15:11.487Z",
+ "source": "C:\\Users\\Roman\\AppData\\Local\\ElevariqAgent\\agent.db",
+ "readonly": true,
+ "journal_mode": "wal",
+ "quick_check": [
+  "ok"
+ ],
+ "foreign_key_violations": 0,
+ "migrations": [
+  {
+   "version": 1,
+   "name": "initial_schema",
+   "applied_at": 1794048024599
+  },
+  {
+   "version": 2,
+   "name": "phase_1_5_fencing_lifecycle_assignments_verification",
+   "applied_at": 1794048024606
+  },
+  {
+   "version": 3,
+   "name": "phase_2_planning_workflows",
+   "applied_at": 1794048024609
+  },
+  {
+   "version": 4,
+   "name": "phase_1_5_cli_worker_supervision",
+   "applied_at": 1794048024613
+  },
+  {
+   "version": 5,
+   "name": "worker_process_identity",
+   "applied_at": 1794048024614
+  },
+  {
+   "version": 6,
+   "name": "phase_2_project_intelligence",
+   "applied_at": 1794048024619
+  },
+  {
+   "version": 7,
+   "name": "phase_3_engineering",
+   "applied_at": 1794048024621
+  },
+  {
+   "version": 8,
+   "name": "phase_4_integration_sync",
+   "applied_at": 1794048024622
+  },
+  {
+   "version": 10,
+   "name": "qa_requirement_ownership_and_review_links",
+   "applied_at": 1794229678308
+  },
+  {
+   "version": 11,
+   "name": "phase_2_stage_5_progress_snapshots",
+   "applied_at": 1794229678312
+  }
+ ],
+ "tables": [
+  "activity_events",
+  "adrs",
+  "approvals",
+  "architecture_specs",
+  "assignments",
+  "checkpoints",
+  "epics",
+  "executions",
+  "external_records",
+  "milestones",
+  "plan_reviews",
+  "plan_tasks",
+  "progress_snapshots",
+  "project_documents",
+  "project_memory",
+  "project_transitions",
+  "projects",
+  "provider_state",
+  "provider_verification",
+  "qa_review_tasks",
+  "qa_reviews",
+  "requirements",
+  "research_findings",
+  "schema_migrations",
+  "sqlite_sequence",
+  "supervisor_state",
+  "sync_cursors",
+  "sync_runs",
+  "task_outputs",
+  "task_transitions",
+  "tasks",
+  "verification_evidence",
+  "workflow_runs",
+  "workflow_steps",
+  "workspaces"
+ ],
+ "counts": {
+  "activity_events": 2281,
+  "adrs": 11,
+  "approvals": 9,
+  "architecture_specs": 1,
+  "assignments": 1,
+  "checkpoints": 157,
+  "epics": 8,
+  "executions": 157,
+  "external_records": 0,
+  "milestones": 7,
+  "plan_reviews": 2,
+  "plan_tasks": 46,
+  "progress_snapshots": 1,
+  "project_documents": 2,
+  "project_memory": 7,
+  "project_transitions": 10,
+  "projects": 1,
+  "provider_state": 1,
+  "provider_verification": 0,
+  "qa_review_tasks": 66,
+  "qa_reviews": 65,
+  "requirements": 41,
+  "research_findings": 14,
+  "schema_migrations": 10,
+  "supervisor_state": 1,
+  "sync_cursors": 0,
+  "sync_runs": 0,
+  "task_outputs": 141,
+  "task_transitions": 617,
+  "tasks": 141,
+  "verification_evidence": 410,
+  "workflow_runs": 1,
+  "workflow_steps": 6,
+  "workspaces": 0
+ },
+ "taskStatus": [
+  {
+   "status": "COMPLETED",
+   "n": 141
+  }
+ ],
+ "approvalStatus": [
+  {
+   "status": "APPROVED",
+   "action_type": "access_change",
+   "n": 3
+  },
+  {
+   "status": "APPROVED",
+   "action_type": "destructive_delete",
+   "n": 1
+  },
+  {
+   "status": "APPROVED",
+   "action_type": "live_database_migration",
+   "n": 1
+  },
+  {
+   "status": "APPROVED",
+   "action_type": "plan_approval",
+   "n": 1
+  },
+  {
+   "status": "APPROVED",
+   "action_type": "qa_escalation",
+   "n": 3
+  }
+ ],
+ "pendingApprovals": [],
+ "openExecutions": [],
+ "leasedTasks": [],
+ "qaStatus": [
+  {
+   "status": "FAILED",
+   "n": 19
+  },
+  {
+   "status": "OWNER_ACCEPTED",
+   "n": 3
+  },
+  {
+   "status": "PASSED",
+   "n": 43
+  }
+ ],
+ "projects": [
+  {
+   "id": "prj_mw6eh6rhb83bc6d83d",
+   "name": "ELEVARIQ Retail Operations Portal",
+   "lifecycle": "VERIFYING",
+   "status": "ACTIVE",
+   "current_milestone": "M1: Foundation",
+   "progress_summary": "0% verified (100% claimed); 0/69 tasks verified"
+  }
+ ],
+ "milestoneStatus": [
+  {
+   "status": "ACCEPTED",
+   "n": 2
+  },
+  {
+   "status": "REVIEWED",
+   "n": 5
+  }
+ ],
+ "requirementStatus": [
+  {
+   "status": "REVIEWED",
+   "n": 41
+  }
+ ],
+ "supervisor": {
+  "instance_id": "sup_63ce8e39",
+  "pid": 8992,
+  "host": "DESKTOP-QGGLG8D",
+  "started_at": 1794229678315,
+  "heartbeat_at": 1794230110574,
+  "status": "IDLE",
+  "stop_requested": 0,
+  "current_task_id": null,
+  "last_error": null
+ },
+ "providerState": [
+  {
+   "provider": "claude-cli",
+   "status": "OK",
+   "blocked_until": null,
+   "reason": null,
+   "error_class": null,
+   "consecutive_failures": 0,
+   "has_fingerprint": 1,
+   "updated_at": 1794180027898
+  }
+ ],
+ "lastCheckpoint": {
+  "id": "chk_mw8df2ugc015f6a248",
+  "task_id": "tsk_mw7277sxcb24a47449",
+  "repo_ref": "agent/elevariq-retail-operations-portal@1ae7d2fe0cb82c2afc9c7e66f9e344e0f5c3591d",
+  "created_at": 1794174912808
+ },
+ "workflowRuns": [
+  {
+   "id": "wfr_mw6eh6yqe01f6589c4",
+   "kind": "plan_project",
+   "status": "COMPLETED",
+   "current_step": "done"
+  }
+ ],
+ "recentWarnErrors": [
+  {
+   "type": "supervisor.resource_deferred",
+   "severity": "warn",
+   "at": 1794230068117
+  },
+  {
+   "type": "supervisor.resource_deferred",
+   "severity": "warn",
+   "at": 1794229680813
+  },
+  {
+   "type": "auth.not_ready",
+   "severity": "warn",
+   "at": 1794179954024
+  },
+  {
+   "type": "auth.not_ready",
+   "severity": "warn",
+   "at": 1794179723884
+  },
+  {
+   "type": "auth.not_ready",
+   "severity": "warn",
+   "at": 1794179287703
+  },
+  {
+   "type": "auth.not_ready",
+   "severity": "warn",
+   "at": 1794178597414
+  },
+  {
+   "type": "auth.not_ready",
+   "severity": "warn",
+   "at": 1794178549165
+  },
+  {
+   "type": "auth.not_ready",
+   "severity": "warn",
+   "at": 1794176628307
+  },
+  {
+   "type": "auth.not_ready",
+   "severity": "warn",
+   "at": 1794175826935
+  },
+  {
+   "type": "task.completed_with_denials",
+   "severity": "warn",
+   "at": 1794174912711
+  },
+  {
+   "type": "provider.rate_limit",
+   "severity": "warn",
+   "at": 1794174884102
+  },
+  {
+   "type": "provider.rate_limit",
+   "severity": "warn",
+   "at": 1794174717464
+  },
+  {
+   "type": "provider.rate_limit",
+   "severity": "warn",
+   "at": 1794174610816
+  },
+  {
+   "type": "provider.rate_limit",
+   "severity": "warn",
+   "at": 1794174518186
+  },
+  {
+   "type": "provider.rate_limit",
+   "severity": "warn",
+   "at": 1794174498359
+  }
+ ],
+ "recentEvents": [
+  {
+   "type": "supervisor.resource_deferred",
+   "severity": "warn",
+   "at": 1794230068117
+  },
+  {
+   "type": "supervisor.resource_resumed",
+   "severity": "info",
+   "at": 1794230043722
+  },
+  {
+   "type": "supervisor.resource_deferred",
+   "severity": "warn",
+   "at": 1794229680813
+  },
+  {
+   "type": "roadmap.status_reconciled",
+   "severity": "info",
+   "at": 1794229679714
+  },
+  {
+   "type": "supervisor.started",
+   "severity": "info",
+   "at": 1794229678368
+  },
+  {
+   "type": "supervisor.stopped",
+   "severity": "info",
+   "at": 1794229619034
+  },
+  {
+   "type": "backup.created",
+   "severity": "info",
+   "at": 1794228824526
+  },
+  {
+   "type": "auth.ready",
+   "severity": "info",
+   "at": 1794180027900
+  },
+  {
+   "type": "auth.not_ready",
+   "severity": "warn",
+   "at": 1794179954024
+  },
+  {
+   "type": "auth.not_ready",
+   "severity": "warn",
+   "at": 1794179723884
+  },
+  {
+   "type": "auth.ready",
+   "severity": "info",
+   "at": 1794179370136
+  },
+  {
+   "type": "auth.not_ready",
+   "severity": "warn",
+   "at": 1794179287703
+  },
+  {
+   "type": "auth.ready",
+   "severity": "info",
+   "at": 1794178615444
+  },
+  {
+   "type": "auth.not_ready",
+   "severity": "warn",
+   "at": 1794178597414
+  },
+  {
+   "type": "auth.not_ready",
+   "severity": "warn",
+   "at": 1794178549165
+  }
+ ],
+ "supervisorHeartbeatAgeS": 1,
+ "snapshot": {
+  "path": "E:\\Agent\\v2-staging\\release-readiness\\20261109-181411\\db\\live-snapshot-v11.db",
+  "ms": 58,
+  "bytes": 7720960,
+  "sha256": "75f00d6b34a31d49ff7b28164368cce5b38e2b6a9c8ebffd2a2b580c7b1ae290",
+  "integrity_check": [
+   "ok"
+  ],
+  "migrations": [
+   1,
+   2,
+   3,
+   4,
+   5,
+   6,
+   7,
+   8,
+   10,
+   11
+  ],
+  "tasks": 141
+ },
+ "sourceFileUnchangedByUs": {
+  "before": {
+   "mtime": 1794229679567.5647,
+   "size": 7716864
+  },
+  "after": {
+   "mtime": 1794229679567.5647,
+   "size": 7716864
+  },
+  "note": "main-file mtime may still change from the live supervisor checkpointing its WAL; we opened readonly"
+ }
+}

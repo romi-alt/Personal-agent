@@ -1,0 +1,5 @@
+﻿final check 2026-11-09T18:42:34.2740351+05:00
+same-form export (-TaskName) equals 18:14 evidence file (whitespace-normalised): True
+Note: Get-ScheduledTask | Export-ScheduledTask serialises defaults explicitly and the principal as a name instead of a SID, so it differs textually; it is not a task change.
+TaskScheduler/Operational events 106/140/141/142 for the task in the last 3 h: none
+production supervisor pid 8992 alive, start 2026-11-09 18:07:57; checkout e60278f clean

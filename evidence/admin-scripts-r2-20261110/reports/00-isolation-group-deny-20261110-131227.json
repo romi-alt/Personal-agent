@@ -1,0 +1,150 @@
+﻿{
+    "script":  "00-isolation-group-deny",
+    "revision":  "r2-20261110",
+    "startedAt":  "2026-11-10T13:12:27.2362519+05:00",
+    "dryRun":  true,
+    "user":  "DESKTOP-QGGLG8D\\Roman",
+    "changes":  [
+                    {
+                        "action":  "targets",
+                        "target":  "E:\\, F:\\, C:\\Download, C:\\Intel, D:\\src, D:\\Intel",
+                        "detail":  "DENY targets (validated by Assert-DenyTarget)",
+                        "applied":  false,
+                        "at":  "2026-11-10T13:12:27.3075585+05:00"
+                    },
+                    {
+                        "action":  "sweep",
+                        "target":  "E:\\, F:\\, C:\\Download, C:\\Intel, D:\\src, D:\\Intel",
+                        "detail":  "mandatory dirs+files sweep runs before any change in -Apply (use -Sweep to preview)",
+                        "applied":  false,
+                        "at":  "2026-11-10T13:12:27.9603506+05:00"
+                    },
+                    {
+                        "action":  "backup",
+                        "target":  "E:\\",
+                        "detail":  "icacls /save root -\u003e C:\\Users\\Roman\\ElevariqAdmin\\acl\\E_-root.acl and full tree -\u003e E_-full.acl",
+                        "applied":  false,
+                        "at":  "2026-11-10T13:12:27.9603506+05:00"
+                    },
+                    {
+                        "action":  "backup",
+                        "target":  "F:\\",
+                        "detail":  "icacls /save root -\u003e C:\\Users\\Roman\\ElevariqAdmin\\acl\\F_-root.acl and full tree -\u003e F_-full.acl",
+                        "applied":  false,
+                        "at":  "2026-11-10T13:12:27.9603506+05:00"
+                    },
+                    {
+                        "action":  "backup",
+                        "target":  "C:\\Download",
+                        "detail":  "icacls /save root -\u003e C:\\Users\\Roman\\ElevariqAdmin\\acl\\C__Download-root.acl and full tree -\u003e C__Download-full.acl",
+                        "applied":  false,
+                        "at":  "2026-11-10T13:12:27.9670785+05:00"
+                    },
+                    {
+                        "action":  "backup",
+                        "target":  "C:\\Intel",
+                        "detail":  "icacls /save root -\u003e C:\\Users\\Roman\\ElevariqAdmin\\acl\\C__Intel-root.acl and full tree -\u003e C__Intel-full.acl",
+                        "applied":  false,
+                        "at":  "2026-11-10T13:12:27.9670785+05:00"
+                    },
+                    {
+                        "action":  "backup",
+                        "target":  "D:\\src",
+                        "detail":  "icacls /save root -\u003e C:\\Users\\Roman\\ElevariqAdmin\\acl\\D__src-root.acl and full tree -\u003e D__src-full.acl",
+                        "applied":  false,
+                        "at":  "2026-11-10T13:12:27.9686425+05:00"
+                    },
+                    {
+                        "action":  "backup",
+                        "target":  "D:\\Intel",
+                        "detail":  "icacls /save root -\u003e C:\\Users\\Roman\\ElevariqAdmin\\acl\\D__Intel-root.acl and full tree -\u003e D__Intel-full.acl",
+                        "applied":  false,
+                        "at":  "2026-11-10T13:12:27.9686425+05:00"
+                    },
+                    {
+                        "action":  "new-localgroup",
+                        "target":  "ElevariqIsolatedIdentities",
+                        "detail":  "create EMPTY group (members added by 02)",
+                        "applied":  false,
+                        "at":  "2026-11-10T13:12:27.9696912+05:00"
+                    },
+                    {
+                        "action":  "icacls",
+                        "target":  "E:\\",
+                        "detail":  "DENY Full for isolation group (inherits to children) [icacls E:\\ /deny *\u003cgroup-SID\u003e:(OI)(CI)F]",
+                        "applied":  false,
+                        "at":  "2026-11-10T13:12:27.9744376+05:00"
+                    },
+                    {
+                        "action":  "icacls",
+                        "target":  "F:\\",
+                        "detail":  "DENY Full for isolation group (inherits to children) [icacls F:\\ /deny *\u003cgroup-SID\u003e:(OI)(CI)F]",
+                        "applied":  false,
+                        "at":  "2026-11-10T13:12:27.9744376+05:00"
+                    },
+                    {
+                        "action":  "icacls",
+                        "target":  "C:\\Download",
+                        "detail":  "DENY Full for isolation group (inherits to children) [icacls C:\\Download /deny *\u003cgroup-SID\u003e:(OI)(CI)F]",
+                        "applied":  false,
+                        "at":  "2026-11-10T13:12:27.9744376+05:00"
+                    },
+                    {
+                        "action":  "icacls",
+                        "target":  "C:\\Intel",
+                        "detail":  "DENY Full for isolation group (inherits to children) [icacls C:\\Intel /deny *\u003cgroup-SID\u003e:(OI)(CI)F]",
+                        "applied":  false,
+                        "at":  "2026-11-10T13:12:27.9797982+05:00"
+                    },
+                    {
+                        "action":  "icacls",
+                        "target":  "D:\\src",
+                        "detail":  "DENY Full for isolation group (inherits to children) [icacls D:\\src /deny *\u003cgroup-SID\u003e:(OI)(CI)F]",
+                        "applied":  false,
+                        "at":  "2026-11-10T13:12:27.9818972+05:00"
+                    },
+                    {
+                        "action":  "icacls",
+                        "target":  "D:\\Intel",
+                        "detail":  "DENY Full for isolation group (inherits to children) [icacls D:\\Intel /deny *\u003cgroup-SID\u003e:(OI)(CI)F]",
+                        "applied":  false,
+                        "at":  "2026-11-10T13:12:27.9818972+05:00"
+                    }
+                ],
+    "refusals":  [
+
+                 ],
+    "checks":  [
+                   {
+                       "id":  "R7",
+                       "name":  "trusted script location + SHA256SUMS",
+                       "status":  "WARN",
+                       "detail":  "broad write on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r2-20261110; broad write on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r2-20261110\\00-isolation-group-deny.ps1; broad write on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r2-20261110\\00a-remove-test-residue.ps1; broad write on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r2-20261110\\01-staging-volume.ps1; broad write on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r2-20261110\\02-identities-and-rights.ps1; broad write on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r2-20261110\\03-staging-layout.ps1; broad write on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r2-20261110\\04-broker-install.ps1; broad write on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r2-20261110\\05-firewall-egress.ps1; broad write on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r2-20261110\\06-worker-enable.ps1; broad write on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r2-20261110\\07-verify-config.ps1; broad write on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r2-20261110\\09-rollback.ps1; broad write on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r2-20261110\\Freeze-AdminScripts.ps1; broad write on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r2-20261110\\_common.ps1; SHA256SUMS missing"
+                   },
+                   {
+                       "id":  "P0",
+                       "name":  "production task present and running",
+                       "status":  "PASS",
+                       "detail":  "Running"
+                   },
+                   {
+                       "id":  "P1",
+                       "name":  "production supervisor PID 8992 alive",
+                       "status":  "PASS",
+                       "detail":  ""
+                   },
+                   {
+                       "id":  "P2",
+                       "name":  "production HEAD = e60278f",
+                       "status":  "PASS",
+                       "detail":  "e60278f"
+                   },
+                   {
+                       "id":  "P3",
+                       "name":  "production task action still points at the checkout script",
+                       "status":  "PASS",
+                       "detail":  ""
+                   }
+               ],
+    "path":  "E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r2-20261110\\reports\\00-isolation-group-deny-20261110-131227.json"
+}

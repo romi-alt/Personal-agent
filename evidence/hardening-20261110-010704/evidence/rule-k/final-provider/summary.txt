@@ -1,0 +1,17 @@
+label=final-provider protectedPaths=provider cases=120 expectBLOCK=74 expectALLOW=46
+current: OK=116 falsePositives=4 falseNegatives=0
+V2 e60278f: falsePositives=1 falseNegatives=74
+  benign: n=29 FP=0 FN=0
+  commit-message/quoted: n=13 FP=0 FN=0
+  windows-path: n=18 FP=0 FN=0
+  quoting: n=9 FP=0 FN=0
+  substitution/indirection: n=9 FP=0 FN=0
+  indirect-command: n=7 FP=0 FN=0
+  credential-access: n=29 FP=0 FN=0
+  fp-watch: n=6 FP=4 FN=0
+FALSE POSITIVES:
+  K115 [fp-watch] grep -rn ANTHROPIC_API_KEY src  -> reading credentials, credential stores or dumping the environment is not permitted (V2.1 class K)
+  K116 [fp-watch] cat tests/fixtures/.credentials.json  -> reading credentials, credential stores or dumping the environment is not permitted (V2.1 class K)
+  K117 [fp-watch] ls ~/.ssh  -> reading credentials, credential stores or dumping the environment is not permitted (V2.1 class K)
+  K119 [fp-watch] git push --dry-run origin feature/x  -> Pushing to a remote / protected branch requires owner approval
+FALSE NEGATIVES:

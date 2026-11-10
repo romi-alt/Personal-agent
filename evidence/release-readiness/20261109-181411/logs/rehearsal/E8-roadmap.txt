@@ -1,0 +1,75 @@
+Verified progress: 0/46 tasks delivered (0% by size)
+Critical path (remaining): T1 -> T3 -> T5 -> T8 -> T10 -> T11 -> T15 -> T16 -> T17 -> T27 -> T28 -> T32 -> T33 -> T34 -> T36 -> T38 -> T41 -> T46  weight 32
+
+Milestones:
+KEY  TITLE                             DELIVERED  PROGRESS
+---  --------------------------------  ---------  --------
+M1   Foundation                        0/7        0%
+M2   Identity, Access and Audit        0/7        0%
+M3   Catalog and Inventory             0/8        0%
+M4   Suppliers and Purchasing          0/4        0%
+M5   Sales                             0/4        0%
+M6   Dashboard, Reports and Integrity  0/7        0%
+M7   Quality, Security and Evidence    0/9        0%
+
+Epics:
+KEY  TITLE                        DELIVERED
+---  ---------------------------  ---------
+E1   Platform and Tooling         0/6
+E2   Design System and App Shell  0/2
+E3   Identity and Access          0/7
+E4   Catalog and Inventory        0/7
+E5   Purchasing                   0/4
+E6   Sales                        0/4
+E7   Reporting and Integrity      0/7
+E8   Quality and Evidence         0/9
+
+Tasks:
+KEY  MILESTONE  EPIC  SIZE  STATUS     VERIFIED  DEPENDS                      CRITICAL  TITLE
+---  ---------  ----  ----  ---------  --------  ---------------------------  --------  --------------------------------------------------
+T1   M1         E1    M     COMPLETED  3/4       -                            *         Scaffold npm workspaces monorepo
+T2   M1         E1    S     COMPLETED  3/4       T1                                     Shared money library (integer paisa)
+T3   M1         E1    M     COMPLETED  3/4       T1                           *         Migration runner and core schema
+T6   M1         E2    M     COMPLETED  3/4       T1                                     Design system: tokens, themes and core components
+T4   M1         E1    M     COMPLETED  3/4       T3                                     Inventory, purchasing and sales schema migrations
+T5   M1         E1    M     COMPLETED  2/4       T3                           *         Fastify API skeleton with zod validation and error
+T7   M1         E2    M     COMPLETED  3/4       T6,T5                                  SPA shell, routing and API client
+T8   M2         E3    M     COMPLETED  3/4       T5,T3                        *         Authentication: sessions, login/logout, throttling
+T9   M2         E3    S     COMPLETED  3/4       T8                                     Password management and policy
+T10  M2         E3    M     COMPLETED  3/4       T8                           *         Permission matrix, default-deny enforcement and br
+T11  M2         E3    S     COMPLETED  3/4       T10                          *         Audit module and viewer API
+T12  M2         E3    M     COMPLETED  3/4       T11,T9                                 User and branch administration API
+T14  M2         E3    S     COMPLETED  3/4       T7,T11                                 Audit log viewer UI
+T15  M3         E4    M     COMPLETED  3/4       T11,T4                       *         Catalog API: categories and products
+T13  M2         E3    M     COMPLETED  3/4       T7,T12                                 Auth and administration UI
+T16  M3         E4    M     COMPLETED  3/4       T15,T10                      *         Inventory service: stock ledger choke point, recei
+T20  M3         E4    M     COMPLETED  3/4       T15,T7                                 Products UI
+T17  M3         E4    S     COMPLETED  3/4       T16                          *         Stock queries: ledger, low-stock and valuation
+T18  M3         E4    M     COMPLETED  3/4       T16                                    Stock transfers with approval
+T19  M3         E1    M     COMPLETED  3/4       T16,T12                                Deterministic fictional seed data
+T23  M4         E5    S     COMPLETED  3/4       T16                                    Suppliers API with payments and computed balances
+T21  M3         E4    M     COMPLETED  3/4       T17,T7                                 Inventory UI: stock levels, receive, adjust, ledge
+T27  M5         E6    M     COMPLETED  3/4       T17,T10,T2                   *         Sales creation: customers, discounts and invoices
+T22  M3         E4    S     COMPLETED  3/4       T18,T7                                 Transfers UI
+T31  M6         E7    S     COMPLETED  3/4       T19,T10                                Operating expenses API and UI
+T24  M4         E5    M     COMPLETED  3/4       T23,T17                                Purchase orders and receiving
+T28  M5         E6    M     COMPLETED  3/4       T27                          *         Sales history, returns and cancellation
+T29  M5         E6    M     COMPLETED  3/4       T27,T7                                 Sales creation UI
+T25  M4         E5    S     COMPLETED  3/4       T24                                    Purchase returns to suppliers
+T30  M5         E6    M     COMPLETED  3/4       T28,T7                                 Sales history, invoice print, returns and cancella
+T32  M6         E7    M     COMPLETED  3/4       T28,T24                      *         Reporting engine, dashboard API and operational re
+T26  M4         E5    M     COMPLETED  3/4       T25,T7                                 Suppliers and purchasing UI
+T37  M6         E7    S     COMPLETED  3/4       T28,T25                                Integrity and reconciliation tool
+T33  M6         E7    S     COMPLETED  3/4       T32,T31                      *         Profitability report
+T35  M6         E7    M     COMPLETED  3/4       T32,T7                                 Executive dashboard UI
+T34  M6         E7    S     COMPLETED  3/4       T33                          *         CSV export with formula-injection protection
+T36  M6         E7    M     COMPLETED  3/4       T34,T7                       *         Reports UI with date filters and export
+T39  M7         E8    M     COMPLETED  3/3       T37,T34                                Authorization test matrix
+T40  M7         E8    M     COMPLETED  3/3       T37,T34                                Cross-module integration and database integrity te
+T42  M7         E8    S     COMPLETED  3/3       T37,T34                                Performance dataset and measurement
+T38  M7         E8    M     COMPLETED  3/4       T36,T35,T30,T26,T22,T21,T13  *         Accessibility pass and confirmation dialog coverag
+T44  M7         E8    S     COMPLETED  2/4       T39                                    API documentation (OpenAPI)
+T43  M7         E8    M     COMPLETED  3/3       T39,T40                                Security checks and dependency analysis
+T41  M7         E8    M     COMPLETED  3/3       T38,T40                      *         Playwright msedge desktop and mobile journeys
+T45  M7         E8    M     COMPLETED  2/3       T44,T42                                User, deployment and architecture documentation
+T46  M7         E8    M     COMPLETED  3/3       T41,T43,T45                  *         Traceability, verified-vs-assumed register and del

@@ -1,0 +1,8 @@
+﻿== 03 Firewall rules (DRY-RUN) ==
+  DRY-RUN new-netfirewallrule: ELEVARIQ-Worker-Allow-Anthropic -- Outbound Allow; LocalUser=worker-SID; Remote=api.anthropic.com; worker -> Anthropic API
+  DRY-RUN new-netfirewallrule: ELEVARIQ-Worker-Allow-Proxy -- Outbound Allow; LocalUser=worker-SID; Remote=127.0.0.1; worker -> owner egress proxy
+  DRY-RUN new-netfirewallrule: ELEVARIQ-Worker-Block-Other -- Outbound Block; LocalUser=worker-SID; Remote=Any; worker -> everything else (deny)
+  DRY-RUN residual-gap: egress -- Image-based rules do not cover arbitrary child images. Force worker traffic through the authenticated proxy for complete control.
+
+Report written: E:\Agent\v2-staging\trusted-execution-20261110-0249\admin-scripts\reports\03-firewall-rules-20261110-031319.json
+Changes: 4  Refusals: 0  Mode: DRY-RUN

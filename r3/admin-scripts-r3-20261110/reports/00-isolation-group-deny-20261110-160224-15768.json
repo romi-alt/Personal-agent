@@ -1,0 +1,187 @@
+﻿{
+    "script":  "00-isolation-group-deny",
+    "revision":  "r3-20261110",
+    "startedAt":  "2026-11-10T16:02:24.4880193+05:00",
+    "finishedAt":  "2026-11-10T16:02:26.3770690+05:00",
+    "dryRun":  true,
+    "user":  "DESKTOP-QGGLG8D\\Roman",
+    "elevated":  false,
+    "changes":  [
+                    {
+                        "action":  "targets",
+                        "target":  "E:\\, F:\\, C:\\Download, C:\\Intel, D:\\src, D:\\Intel, E:\\$RECYCLE.BIN, F:\\$RECYCLE.BIN",
+                        "detail":  "DENY targets (validated by Assert-DenyTarget)",
+                        "applied":  false,
+                        "at":  "2026-11-10T16:02:24.8184049+05:00"
+                    },
+                    {
+                        "action":  "sweep",
+                        "target":  "E:\\, F:\\, C:\\Download, C:\\Intel, D:\\src, D:\\Intel, E:\\$RECYCLE.BIN, F:\\$RECYCLE.BIN",
+                        "detail":  "mandatory dirs+files sweep (B1-fixed) runs before any change in -Apply (use -Sweep to preview)",
+                        "applied":  false,
+                        "at":  "2026-11-10T16:02:26.3089015+05:00"
+                    },
+                    {
+                        "action":  "backup",
+                        "target":  "E:\\",
+                        "detail":  "icacls /save root -\u003e C:\\Users\\Roman\\ElevariqAdmin\\acl\\E_\\20261110-160226-root.acl; baseline-root.sddl kept if present; full tree -\u003e 20261110-160226-full.acl (exit checked)",
+                        "applied":  false,
+                        "at":  "2026-11-10T16:02:26.3125914+05:00"
+                    },
+                    {
+                        "action":  "backup",
+                        "target":  "F:\\",
+                        "detail":  "icacls /save root -\u003e C:\\Users\\Roman\\ElevariqAdmin\\acl\\F_\\20261110-160226-root.acl; baseline-root.sddl kept if present; full tree -\u003e 20261110-160226-full.acl (exit checked)",
+                        "applied":  false,
+                        "at":  "2026-11-10T16:02:26.3125914+05:00"
+                    },
+                    {
+                        "action":  "backup",
+                        "target":  "C:\\Download",
+                        "detail":  "icacls /save root -\u003e C:\\Users\\Roman\\ElevariqAdmin\\acl\\C__Download\\20261110-160226-root.acl; baseline-root.sddl kept if present; full tree -\u003e 20261110-160226-full.acl (exit checked)",
+                        "applied":  false,
+                        "at":  "2026-11-10T16:02:26.3125914+05:00"
+                    },
+                    {
+                        "action":  "backup",
+                        "target":  "C:\\Intel",
+                        "detail":  "icacls /save root -\u003e C:\\Users\\Roman\\ElevariqAdmin\\acl\\C__Intel\\20261110-160226-root.acl; baseline-root.sddl kept if present; full tree -\u003e 20261110-160226-full.acl (exit checked)",
+                        "applied":  false,
+                        "at":  "2026-11-10T16:02:26.3242069+05:00"
+                    },
+                    {
+                        "action":  "backup",
+                        "target":  "D:\\src",
+                        "detail":  "icacls /save root -\u003e C:\\Users\\Roman\\ElevariqAdmin\\acl\\D__src\\20261110-160226-root.acl; baseline-root.sddl kept if present; full tree -\u003e 20261110-160226-full.acl (exit checked)",
+                        "applied":  false,
+                        "at":  "2026-11-10T16:02:26.3258353+05:00"
+                    },
+                    {
+                        "action":  "backup",
+                        "target":  "D:\\Intel",
+                        "detail":  "icacls /save root -\u003e C:\\Users\\Roman\\ElevariqAdmin\\acl\\D__Intel\\20261110-160226-root.acl; baseline-root.sddl kept if present; full tree -\u003e 20261110-160226-full.acl (exit checked)",
+                        "applied":  false,
+                        "at":  "2026-11-10T16:02:26.3303482+05:00"
+                    },
+                    {
+                        "action":  "backup",
+                        "target":  "E:\\$RECYCLE.BIN",
+                        "detail":  "icacls /save root -\u003e C:\\Users\\Roman\\ElevariqAdmin\\acl\\E___RECYCLE.BIN\\20261110-160226-root.acl; baseline-root.sddl kept if present; full tree -\u003e 20261110-160226-full.acl (exit checked)",
+                        "applied":  false,
+                        "at":  "2026-11-10T16:02:26.3303482+05:00"
+                    },
+                    {
+                        "action":  "backup",
+                        "target":  "F:\\$RECYCLE.BIN",
+                        "detail":  "icacls /save root -\u003e C:\\Users\\Roman\\ElevariqAdmin\\acl\\F___RECYCLE.BIN\\20261110-160226-root.acl; baseline-root.sddl kept if present; full tree -\u003e 20261110-160226-full.acl (exit checked)",
+                        "applied":  false,
+                        "at":  "2026-11-10T16:02:26.3342933+05:00"
+                    },
+                    {
+                        "action":  "new-localgroup",
+                        "target":  "ElevariqIsolatedIdentities",
+                        "detail":  "create EMPTY group (members added by 02)",
+                        "applied":  false,
+                        "at":  "2026-11-10T16:02:26.3359296+05:00"
+                    },
+                    {
+                        "action":  "icacls",
+                        "target":  "E:\\",
+                        "detail":  "DENY Full for isolation group (inherits to children) [icacls E:\\ /deny *\u003cgroup-SID\u003e:(OI)(CI)F]",
+                        "applied":  false,
+                        "at":  "2026-11-10T16:02:26.3410930+05:00"
+                    },
+                    {
+                        "action":  "icacls",
+                        "target":  "F:\\",
+                        "detail":  "DENY Full for isolation group (inherits to children) [icacls F:\\ /deny *\u003cgroup-SID\u003e:(OI)(CI)F]",
+                        "applied":  false,
+                        "at":  "2026-11-10T16:02:26.3439211+05:00"
+                    },
+                    {
+                        "action":  "icacls",
+                        "target":  "C:\\Download",
+                        "detail":  "DENY Full for isolation group (inherits to children) [icacls C:\\Download /deny *\u003cgroup-SID\u003e:(OI)(CI)F]",
+                        "applied":  false,
+                        "at":  "2026-11-10T16:02:26.3439211+05:00"
+                    },
+                    {
+                        "action":  "icacls",
+                        "target":  "C:\\Intel",
+                        "detail":  "DENY Full for isolation group (inherits to children) [icacls C:\\Intel /deny *\u003cgroup-SID\u003e:(OI)(CI)F]",
+                        "applied":  false,
+                        "at":  "2026-11-10T16:02:26.3439211+05:00"
+                    },
+                    {
+                        "action":  "icacls",
+                        "target":  "D:\\src",
+                        "detail":  "DENY Full for isolation group (inherits to children) [icacls D:\\src /deny *\u003cgroup-SID\u003e:(OI)(CI)F]",
+                        "applied":  false,
+                        "at":  "2026-11-10T16:02:26.3599254+05:00"
+                    },
+                    {
+                        "action":  "icacls",
+                        "target":  "D:\\Intel",
+                        "detail":  "DENY Full for isolation group (inherits to children) [icacls D:\\Intel /deny *\u003cgroup-SID\u003e:(OI)(CI)F]",
+                        "applied":  false,
+                        "at":  "2026-11-10T16:02:26.3599254+05:00"
+                    },
+                    {
+                        "action":  "icacls",
+                        "target":  "E:\\$RECYCLE.BIN",
+                        "detail":  "DENY Full for isolation group (inherits to children) [icacls E:\\$RECYCLE.BIN /deny *\u003cgroup-SID\u003e:(OI)(CI)F]",
+                        "applied":  false,
+                        "at":  "2026-11-10T16:02:26.3599254+05:00"
+                    },
+                    {
+                        "action":  "icacls",
+                        "target":  "F:\\$RECYCLE.BIN",
+                        "detail":  "DENY Full for isolation group (inherits to children) [icacls F:\\$RECYCLE.BIN /deny *\u003cgroup-SID\u003e:(OI)(CI)F]",
+                        "applied":  false,
+                        "at":  "2026-11-10T16:02:26.3599254+05:00"
+                    }
+                ],
+    "refusals":  [
+
+                 ],
+    "checks":  [
+                   {
+                       "id":  "R7",
+                       "name":  "trusted admin-only script location + canonical SHA256SUMS + out-of-band manifest hash",
+                       "status":  "WARN",
+                       "detail":  "owner S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110; inheritance not cut on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110; write 0x10116 for S-1-5-11 on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110; write 0x10116 for S-1-5-11(IO) on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110; owner S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110\\00-isolation-group-deny.ps1; write 0x10116 for S-1-5-11 on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110\\00-isolation-group-deny.ps1; owner S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110\\00a-remove-test-residue.ps1; write 0x10116 for S-1-5-11 on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110\\00a-remove-test-residue.ps1; owner S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110\\01-staging-volume.ps1; write 0x10116 for S-1-5-11 on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110\\01-staging-volume.ps1; owner S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110\\02-identities-and-rights.ps1; write 0x10116 for S-1-5-11 on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110\\02-identities-and-rights.ps1; owner S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110\\03-staging-layout.ps1; write 0x10116 for S-1-5-11 on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110\\03-staging-layout.ps1; owner S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110\\04-broker-install.ps1; write 0x10116 for S-1-5-11 on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110\\04-broker-install.ps1; owner S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110\\05-firewall-egress.ps1; write 0x10116 for S-1-5-11 on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110\\05-firewall-egress.ps1; owner S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110\\06-worker-enable.ps1; write 0x10116 for S-1-5-11 on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110\\06-worker-enable.ps1; owner S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110\\07-verify-config.ps1; write 0x10116 for S-1-5-11 on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110\\07-verify-config.ps1; owner S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110\\09-rollback.ps1; write 0x10116 for S-1-5-11 on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110\\09-rollback.ps1; owner S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110\\Freeze-AdminScripts.ps1; write 0x10116 for S-1-5-11 on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110\\Freeze-AdminScripts.ps1; owner S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110\\_common.ps1; write 0x10116 for S-1-5-11 on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110\\_common.ps1; SHA256SUMS missing"
+                   },
+                   {
+                       "id":  "P0",
+                       "name":  "production task present and running",
+                       "status":  "PASS",
+                       "detail":  "Running"
+                   },
+                   {
+                       "id":  "P1",
+                       "name":  "production supervisor process alive (found by command line)",
+                       "status":  "PASS",
+                       "detail":  "pids=8992"
+                   },
+                   {
+                       "id":  "P2",
+                       "name":  "production HEAD = e60278f",
+                       "status":  "PASS",
+                       "detail":  "e60278f"
+                   },
+                   {
+                       "id":  "P3",
+                       "name":  "production task action still points at the checkout script",
+                       "status":  "PASS",
+                       "detail":  ""
+                   },
+                   {
+                       "id":  "H5",
+                       "name":  "shadow copies of DENY-target volumes",
+                       "status":  "UNKNOWN",
+                       "detail":  "not enumerated (not elevated)"
+                   }
+               ],
+    "error":  null,
+    "path":  "E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110\\reports\\00-isolation-group-deny-20261110-160224-15768.json"
+}

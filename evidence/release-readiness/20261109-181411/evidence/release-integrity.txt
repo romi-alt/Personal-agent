@@ -1,0 +1,30 @@
+﻿git : From https://github.com/romi-alt/Personal-agent
+At line:1 char:482
++ ... n E:\Agent\pa-v2-integrate; & { git fetch origin --prune 2>&1 | Out-S ...
++                                     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (From https://gi.../Personal-agent:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+ - [deleted]         (none)     -> origin/pr-4-merge
+
+origin/main=e60278fcf6d609c28fbd4c247cee4b6a9571e22d
+e60278f full=e60278fcf6d609c28fbd4c247cee4b6a9571e22d
+parents:
+e60278fcf6d609c28fbd4c247cee4b6a9571e22d f59d4ca86e6e941af47a3b8454a9044fe7dc94ad fca3cd3f46ce0aa2a7fe5fb098df14e5e58eabd9
+Muhammad Roman <connectroman3@gmail.com> Mon Nov 9 17:48:29 2026 +0500
+Merge pull request #4 from romi-alt/integrate/v2-main
+tree e60278f=b408a00a422f4324bc615bf588208174fbeb779d
+tree fca3cd3=b408a00a422f4324bc615bf588208174fbeb779d
+diff e60278f..fca3cd3 files:
+integrate status:
+V1 1b07468 -> e60278f:
+ 84 files changed, 6979 insertions(+), 170 deletions(-)
+ 36 files changed, 2969 insertions(+), 137 deletions(-)
+M	.env.example
+M	package.json
+M	src/database/migrations.ts
+merge-base 1b07468 e60278f: 1b0746862fc19e55a76799e48d0048ead1ea2a59
+is 1b07468 ancestor of e60278f:
+0
+commits 1b07468..e60278f: 37
+tags:

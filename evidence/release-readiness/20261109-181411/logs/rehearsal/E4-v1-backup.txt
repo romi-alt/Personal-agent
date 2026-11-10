@@ -1,0 +1,2 @@
+backup agent-2026-11-09T13-29-13-225Z.db (7684096 bytes, schema v8) verified
+counts: projects=1 tasks=141 executions=157 checkpoints=157 approvals=9 activity_events=2276 verification_evidence=410 workflow_runs=1

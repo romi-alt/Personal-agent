@@ -1,0 +1,26 @@
+ELEVARIQ Retail Operations Portal [prj_mw6eh6rhb83bc6d83d]  lifecycle=VERIFYING  operational-status=ACTIVE
+tasks: 141 total  COMPLETED=141   estimated spend: $61.8055
+delivery ready: NO
+LEVEL                   STATUS
+----------------------  --------------
+CLAIMED_COMPLETE        PASSED
+CHANGES_EXIST           PASSED
+BUILD_PASSES            NOT_CONFIGURED
+TESTS_PASS              NOT_CONFIGURED
+REQUIREMENTS_SATISFIED  PASSED
+SECURITY_CHECKS_PASS    PASSED
+OWNER_APPROVAL          MISSING
+
+Lifecycle history:
+AT                        FROM                     TO                       REASON
+------------------------  -----------------------  -----------------------  --------------------------------------------------------------------------------------------------------------------------
+2026-11-07T12:49:18.724Z  REGISTERED               ANALYZING                planning workflow wfr_mw6eh6yqe01f6589c4 started
+2026-11-07T12:53:23.973Z  ANALYZING                PLANNING                 analysis and architecture accepted
+2026-11-07T13:01:17.316Z  PLANNING                 IN_DEVELOPMENT           task added: Scaffold npm workspaces monorepo
+2026-11-07T20:05:57.034Z  IN_DEVELOPMENT           VERIFYING                all tasks terminal; independent verification and owner approval required
+2026-11-07T20:20:28.590Z  VERIFYING                AWAITING_OWNER_APPROVAL  verification run complete; unresolved: BUILD_PASSES: NOT_CONFIGURED, TESTS_PASS: NOT_CONFIGURED, OWNER_APPROVAL: MISSING
+2026-11-07T20:23:12.489Z  AWAITING_OWNER_APPROVAL  IN_DEVELOPMENT           task added: Fix: npm test fails on a fresh Windows clone (CRLF checkout of generated docs)
+2026-11-07T20:44:51.735Z  IN_DEVELOPMENT           VERIFYING                all tasks terminal; independent verification and owner approval required
+2026-11-07T21:15:59.269Z  VERIFYING                AWAITING_OWNER_APPROVAL  verification run complete; unresolved: BUILD_PASSES: NOT_CONFIGURED, TESTS_PASS: NOT_CONFIGURED, OWNER_APPROVAL: MISSING
+2026-11-07T23:53:23.254Z  AWAITING_OWNER_APPROVAL  IN_DEVELOPMENT           task added: Fix S1-F1: flag legacy seeded demo accounts in databases created before 022d286 (safe, idempotent remediation)
+2026-11-08T21:55:12.854Z  IN_DEVELOPMENT           VERIFYING                all tasks terminal; independent verification and owner approval required

@@ -1,0 +1,52 @@
+﻿{
+    "script":  "00a-remove-test-residue",
+    "revision":  "r3-20261110",
+    "startedAt":  "2026-11-10T16:20:33.1172072+05:00",
+    "finishedAt":  "2026-11-10T16:20:33.2433102+05:00",
+    "dryRun":  true,
+    "user":  "DESKTOP-QGGLG8D\\Roman",
+    "elevated":  false,
+    "changes":  [
+                    {
+                        "action":  "icacls",
+                        "target":  "E:\\Agent\\v2-staging\\hardening\\isotest\\outside",
+                        "detail":  "remove explicit allow for S-1-1-0 [icacls E:\\Agent\\v2-staging\\hardening\\isotest\\outside /remove:g *S-1-1-0]",
+                        "applied":  false,
+                        "at":  "2026-11-10T16:20:33.1867371+05:00"
+                    },
+                    {
+                        "action":  "icacls",
+                        "target":  "E:\\Agent\\v2-staging\\hardening\\repo",
+                        "detail":  "remove explicit allow for S-1-15-2-2956649102-4223940443-41726279-2319145132-3979920432-1607303059-3113665130 [icacls E:\\Agent\\v2-staging\\hardening\\repo /remove:g *S-1-15-2-2956649102-4223940443-41726279-2319145132-3979920432-1607303059-3113665130]",
+                        "applied":  false,
+                        "at":  "2026-11-10T16:20:33.2152544+05:00"
+                    },
+                    {
+                        "action":  "icacls",
+                        "target":  "E:\\Agent\\v2-staging\\hardening\\isotest\\tools",
+                        "detail":  "remove explicit allow for S-1-15-2-2956649102-4223940443-41726279-2319145132-3979920432-1607303059-3113665130 [icacls E:\\Agent\\v2-staging\\hardening\\isotest\\tools /remove:g *S-1-15-2-2956649102-4223940443-41726279-2319145132-3979920432-1607303059-3113665130]",
+                        "applied":  false,
+                        "at":  "2026-11-10T16:20:33.2303238+05:00"
+                    },
+                    {
+                        "action":  "manual",
+                        "target":  "HKCU AppContainer mappings",
+                        "detail":  "owner, non-elevated: Remove-Item HKCU:\\Software\\Classes\\Local Settings\\Software\\Microsoft\\Windows\\CurrentVersion\\AppContainer\\Mappings\\\u003cprofile-SID\u003e for elevariq-iso-smoke / elevariq-worker-isotest (identify by Moniker value first)",
+                        "applied":  false,
+                        "at":  "2026-11-10T16:20:33.2433102+05:00"
+                    }
+                ],
+    "refusals":  [
+
+                 ],
+    "checks":  [
+                   {
+                       "id":  "R7",
+                       "name":  "trusted admin-only script location + canonical SHA256SUMS + out-of-band manifest hash",
+                       "status":  "WARN",
+                       "detail":  "owner S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110; inheritance not cut on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110; write 0x10116 for S-1-5-11 on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110; write 0x10116 for S-1-5-11(IO) on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110; owner S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110\\00-isolation-group-deny.ps1; write 0x10116 for S-1-5-11 on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110\\00-isolation-group-deny.ps1; owner S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110\\00a-remove-test-residue.ps1; write 0x10116 for S-1-5-11 on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110\\00a-remove-test-residue.ps1; owner S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110\\01-staging-volume.ps1; write 0x10116 for S-1-5-11 on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110\\01-staging-volume.ps1; owner S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110\\02-identities-and-rights.ps1; write 0x10116 for S-1-5-11 on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110\\02-identities-and-rights.ps1; owner S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110\\03-staging-layout.ps1; write 0x10116 for S-1-5-11 on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110\\03-staging-layout.ps1; owner S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110\\04-broker-install.ps1; write 0x10116 for S-1-5-11 on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110\\04-broker-install.ps1; owner S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110\\05-firewall-egress.ps1; write 0x10116 for S-1-5-11 on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110\\05-firewall-egress.ps1; owner S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110\\06-worker-enable.ps1; write 0x10116 for S-1-5-11 on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110\\06-worker-enable.ps1; owner S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110\\07-verify-config.ps1; write 0x10116 for S-1-5-11 on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110\\07-verify-config.ps1; owner S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110\\09-rollback.ps1; write 0x10116 for S-1-5-11 on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110\\09-rollback.ps1; owner S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110\\Freeze-AdminScripts.ps1; write 0x10116 for S-1-5-11 on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110\\Freeze-AdminScripts.ps1; owner S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110\\_common.ps1; write 0x10116 for S-1-5-11 on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110\\_common.ps1; SHA256SUMS missing"
+                   }
+               ],
+    "error":  null,
+    "path":  "E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110\\reports\\00a-remove-test-residue-20261110-162033-17456.json"
+}

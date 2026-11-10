@@ -1,0 +1,15 @@
+﻿
+ RUN  v5.1.0 E:/Agent/v2-staging/hardening/repo
+
+ ✓ tests/integration/audit-redaction-v21.test.ts (20 tests) 5418ms
+   ✓ V2.1 Phase C: persisted bytes contain no synthetic secret (2)
+     ✓ store write paths (transitions, errors, executions, checkpoints, provider/supervisor state, approvals, evidence, events, outputs) 1542ms
+     ✓ a hostile provider run (tool_use, web evidence, denials, error, summary) leaves no secret on disk 2412ms
+   ✓ V2.1 Phase D: QA does not follow links planted by the worker (confused deputy) (1)
+     ✓ junction and hard link to an owner-only file are not read; a regular new file is 1380ms
+
+ Test Files  1 passed (1)
+      Tests  20 passed (20)
+   Start at  01:08:50
+   Duration  6.34s (tests 90%, import 7%, transform 3%)
+

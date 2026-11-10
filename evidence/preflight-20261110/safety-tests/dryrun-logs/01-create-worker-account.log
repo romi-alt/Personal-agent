@@ -1,0 +1,16 @@
+﻿== 01 Create staging worker account (DRY-RUN / STAGING-ONLY) ==
+  DRY-RUN create-localuser: elv-stg-worker -- standard user, random password, PasswordNeverExpires, Users group only
+  DRY-RUN mkdir: C:\ElevariqStaging -- create staging root
+  DRY-RUN secure-broker-root: C:\ElevariqStaging\broker -- owner USER SID + SYSTEM Full, inheritance reset, BEFORE writing credential
+  DRY-RUN record-password: C:\ElevariqStaging\broker\worker-cred.xml -- DPAPI credential (owner identity); not written in dry-run
+  DRY-RUN expect-absent-privilege: elv-stg-worker -- SeDebugPrivilege
+  DRY-RUN expect-absent-privilege: elv-stg-worker -- SeImpersonatePrivilege
+  DRY-RUN expect-absent-privilege: elv-stg-worker -- SeAssignPrimaryTokenPrivilege
+  DRY-RUN expect-absent-privilege: elv-stg-worker -- SeBackupPrivilege
+  DRY-RUN expect-absent-privilege: elv-stg-worker -- SeRestorePrivilege
+  DRY-RUN expect-absent-privilege: elv-stg-worker -- SeTakeOwnershipPrivilege
+  DRY-RUN expect-absent-privilege: elv-stg-worker -- SeLoadDriverPrivilege
+  DRY-RUN expect-absent-privilege: elv-stg-worker -- SeCreateServicePrivilege
+
+Report written: E:\Agent\v2-staging\trusted-execution-20261110-0249\admin-scripts\reports\01-create-worker-account-20261110-032738.json
+Changes: 12  Refusals: 0  Mode: DRY-RUN / STAGING-ONLY

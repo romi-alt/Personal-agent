@@ -1,0 +1,7 @@
+Provider state: OK  consecutive failures: 0  
+
+Tasks needing attention or recovery:
+(none)
+
+Recent recovery actions:
+(none)

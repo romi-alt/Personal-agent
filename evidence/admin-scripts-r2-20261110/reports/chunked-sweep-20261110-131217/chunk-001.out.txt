@@ -1,0 +1,13 @@
+== 00-isolation-group-deny (DRY-RUN, revision r2-20261110) ==
+  [WARN] R7 trusted script location + SHA256SUMS broad write on E:\Agent\v2-staging\worker-isolation\admin-scripts-r2-20261110; broad write on E:\Agent\v2-staging\worker-isolation\admin-scripts-r2-20261110\00-isolation-group-deny.ps1; broad write on E:\Agent\v2-staging\worker-isolation\admin-scripts-r2-20261110\00a-remove-test-residue.ps1; broad write on E:\Agent\v2-staging\worker-isolation\admin-scripts-r2-20261110\01-staging-volume.ps1; broad write on E:\Agent\v2-staging\worker-isolation\admin-scripts-r2-20261110\02-identities-and-rights.ps1; broad write on E:\Agent\v2-staging\worker-isolation\admin-scripts-r2-20261110\03-staging-layout.ps1; broad write on E:\Agent\v2-staging\worker-isolation\admin-scripts-r2-20261110\04-broker-install.ps1; broad write on E:\Agent\v2-staging\worker-isolation\admin-scripts-r2-20261110\05-firewall-egress.ps1; broad write on E:\Agent\v2-staging\worker-isolation\admin-scripts-r2-20261110\06-worker-enable.ps1; broad write on E:\Agent\v2-staging\worker-isolation\admin-scripts-r2-20261110\07-verify-config.ps1; broad write on E:\Agent\v2-staging\worker-isolation\admin-scripts-r2-20261110\09-rollback.ps1; broad write on E:\Agent\v2-staging\worker-isolation\admin-scripts-r2-20261110\Freeze-AdminScripts.ps1; broad write on E:\Agent\v2-staging\worker-isolation\admin-scripts-r2-20261110\_common.ps1; SHA256SUMS missing
+  DRY-RUN targets: E:\, F:\, C:\Download, C:\Intel, D:\src, D:\Intel -- DENY targets (validated by Assert-DenyTarget)
+  [PASS] P0 production task present and running Running
+  [PASS] P1 production supervisor PID 8992 alive 
+  [PASS] P2 production HEAD = e60278f e60278f
+  [PASS] P3 production task action still points at the checkout script 
+  DRY-RUN sweep-chunk: C:\Intel -- partial read-only sweep (chunk); not sufficient for -Apply
+    swept 3 items; findings 2 -> E:\Agent\v2-staging\worker-isolation\admin-scripts-r2-20261110\reports\sweep-20261110-131222-20328.csv
+  [FAIL] S1 sweep: no uncovered explicit-broad-allow / protected-with-broad-access / unreadable items 2 open; see E:\Agent\v2-staging\worker-isolation\admin-scripts-r2-20261110\reports\sweep-20261110-131222-20328.csv
+
+Report: E:\Agent\v2-staging\worker-isolation\admin-scripts-r2-20261110\reports\00-isolation-group-deny-20261110-131219.json
+Changes: 2  Refusals: 0  Checks: 6  Mode: DRY-RUN

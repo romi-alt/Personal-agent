@@ -1,0 +1,82 @@
+﻿{
+    "script":  "04-broker-install",
+    "revision":  "r3-20261110",
+    "startedAt":  "2026-11-10T16:07:30.3659960+05:00",
+    "finishedAt":  "2026-11-10T16:07:31.8933498+05:00",
+    "dryRun":  true,
+    "user":  "DESKTOP-QGGLG8D\\Roman",
+    "elevated":  false,
+    "changes":  [
+                    {
+                        "action":  "verify-release",
+                        "target":  "",
+                        "detail":  "SHA256SUMS complete + matching; release dir ADMIN-ONLY writable; no reparse points",
+                        "applied":  false,
+                        "at":  "2026-11-10T16:07:30.4802924+05:00"
+                    },
+                    {
+                        "action":  "copy",
+                        "target":  "C:\\ElevariqStaging\\broker\\bin",
+                        "detail":  "replace broker\\bin contents with the verified release; re-verify at destination",
+                        "applied":  false,
+                        "at":  "2026-11-10T16:07:30.4802924+05:00"
+                    },
+                    {
+                        "action":  "set-password+enable",
+                        "target":  "elv-stg-broker",
+                        "detail":  "owner types the broker password (not stored)",
+                        "applied":  false,
+                        "at":  "2026-11-10T16:07:30.4802924+05:00"
+                    },
+                    {
+                        "action":  "register-scheduledtask",
+                        "target":  "ElevariqStagingBroker",
+                        "detail":  "principal=elv-stg-broker Password logon, Limited; action=powershell -File C:\\ElevariqStaging\\broker\\bin\\run-broker.ps1; not started",
+                        "applied":  false,
+                        "at":  "2026-11-10T16:07:30.4925481+05:00"
+                    }
+                ],
+    "refusals":  [
+
+                 ],
+    "checks":  [
+                   {
+                       "id":  "R7",
+                       "name":  "trusted admin-only script location + canonical SHA256SUMS + out-of-band manifest hash",
+                       "status":  "WARN",
+                       "detail":  "owner S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110; inheritance not cut on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110; write 0x10116 for S-1-5-11 on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110; write 0x10116 for S-1-5-11(IO) on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110; owner S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110\\00-isolation-group-deny.ps1; write 0x10116 for S-1-5-11 on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110\\00-isolation-group-deny.ps1; owner S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110\\00a-remove-test-residue.ps1; write 0x10116 for S-1-5-11 on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110\\00a-remove-test-residue.ps1; owner S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110\\01-staging-volume.ps1; write 0x10116 for S-1-5-11 on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110\\01-staging-volume.ps1; owner S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110\\02-identities-and-rights.ps1; write 0x10116 for S-1-5-11 on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110\\02-identities-and-rights.ps1; owner S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110\\03-staging-layout.ps1; write 0x10116 for S-1-5-11 on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110\\03-staging-layout.ps1; owner S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110\\04-broker-install.ps1; write 0x10116 for S-1-5-11 on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110\\04-broker-install.ps1; owner S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110\\05-firewall-egress.ps1; write 0x10116 for S-1-5-11 on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110\\05-firewall-egress.ps1; owner S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110\\06-worker-enable.ps1; write 0x10116 for S-1-5-11 on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110\\06-worker-enable.ps1; owner S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110\\07-verify-config.ps1; write 0x10116 for S-1-5-11 on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110\\07-verify-config.ps1; owner S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110\\09-rollback.ps1; write 0x10116 for S-1-5-11 on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110\\09-rollback.ps1; owner S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110\\Freeze-AdminScripts.ps1; write 0x10116 for S-1-5-11 on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110\\Freeze-AdminScripts.ps1; owner S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110\\_common.ps1; write 0x10116 for S-1-5-11 on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110\\_common.ps1; SHA256SUMS missing"
+                   },
+                   {
+                       "id":  "PRE",
+                       "name":  "03 applied (broker\\bin exists, worker DENY present)",
+                       "status":  "FAIL",
+                       "detail":  ""
+                   },
+                   {
+                       "id":  "P0",
+                       "name":  "production task present and running",
+                       "status":  "PASS",
+                       "detail":  "Running"
+                   },
+                   {
+                       "id":  "P1",
+                       "name":  "production supervisor process alive (found by command line)",
+                       "status":  "PASS",
+                       "detail":  "pids=8992"
+                   },
+                   {
+                       "id":  "P2",
+                       "name":  "production HEAD = e60278f",
+                       "status":  "PASS",
+                       "detail":  "e60278f"
+                   },
+                   {
+                       "id":  "P3",
+                       "name":  "production task action still points at the checkout script",
+                       "status":  "PASS",
+                       "detail":  ""
+                   }
+               ],
+    "error":  null,
+    "path":  "E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110\\reports\\04-broker-install-20261110-160730-1308.json"
+}

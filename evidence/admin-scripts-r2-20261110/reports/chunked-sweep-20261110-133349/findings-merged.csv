@@ -1,0 +1,7 @@
+﻿"path","issue","detail","chunk"
+"C:\Intel\GfxCPLBatchFiles","explicit-broad-allow","S-1-5-11:0x1200E9","C:\Intel"
+"C:\Intel\IntelOptaneData","unreadable","Attempted to perform an unauthorized operation.","C:\Intel"
+"C:\Intel\IntelOptaneData","unlistable","Access to the path 'C:\Intel\IntelOptaneData' is denied.","C:\Intel"
+"D:\Intel\GfxCPLBatchFiles","explicit-broad-allow","S-1-5-11:0x1200E9","D:\Intel"
+"D:\Intel\IntelOptaneData","unreadable","Attempted to perform an unauthorized operation.","D:\Intel"
+"D:\Intel\IntelOptaneData","unlistable","Access to the path 'D:\Intel\IntelOptaneData' is denied.","D:\Intel"

@@ -1,0 +1,35 @@
+﻿{
+    "mode":  "baseline",
+    "wallMs":  22574,
+    "detachedGrandchildSurvived":  true,
+    "db":  {
+               "approvals":  [
+                                 {
+                                     "id":  "apr_isotestcli0001",
+                                     "status":  "APPROVED",
+                                     "decided_by":  "owner-cli"
+                                 },
+                                 {
+                                     "id":  "apr_isotestsql0001",
+                                     "status":  "APPROVED",
+                                     "decided_by":  "attacker"
+                                 }
+                             ],
+               "attackerTable":  1
+           },
+    "policyFileWidened":  true,
+    "fakeProdEnvTampered":  true,
+    "stopHoldCreated":  true,
+    "auditForged":  true,
+    "audit2Deleted":  true,
+    "outsideVictimDeleted":  true,
+    "outsideVictim2Deleted":  true,
+    "escapeFiles":  [
+                        "E:\\Agent\\v2-staging\\hardening\\isotest\\outside\\escape.txt",
+                        "C:\\Users\\Roman\\AppData\\Local\\ElevariqAgent-isotest\\escape.txt",
+                        "C:\\Users\\Roman\\.elevariq-isotest\\escape.txt"
+                    ],
+    "hkcuTestKey":  true,
+    "isoTask":  false,
+    "outsideAcl":  true
+}

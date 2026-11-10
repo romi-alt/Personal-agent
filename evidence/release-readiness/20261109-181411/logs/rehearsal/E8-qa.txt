@@ -1,0 +1,67 @@
+TASK                    TITLE                                     ROUND  STATUS          REVIEW                  CORRECTION              APPROVAL
+----------------------  ----------------------------------------  -----  --------------  ----------------------  ----------------------  ----------------------
+tsk_mw6ewlfncbf97edf23  Scaffold npm workspaces monorepo          1      FAILED          tsk_mw6f6t4j59955ad71c  tsk_mw6f79bv409911f69d  -
+tsk_mw6ewlfncbf97edf23  Scaffold npm workspaces monorepo          2      PASSED          tsk_mw6fcmqhaad8cfc225  -                       -
+tsk_mw6ewlfvabcf6960e5  Design system: tokens, themes and core c  1      PASSED          tsk_mw6fpcqm4e1199f8e1  -                       -
+tsk_mw6ewlft8cc6d4a29d  Migration runner and core schema          1      FAILED          tsk_mw6fssj51f320a0379  tsk_mw6ft8v4e77c883372  -
+tsk_mw6ewlft8cc6d4a29d  Migration runner and core schema          2      FAILED          tsk_mw6fuiu84d5477b3b7  tsk_mw6fv1mt2c7a4345fb  -
+tsk_mw6ewlft8cc6d4a29d  Migration runner and core schema          3      PASSED          tsk_mw6fzksj79178aa068  -                       -
+tsk_mw6ewlfxe20267607c  Inventory, purchasing and sales schema m  1      PASSED          tsk_mw6g83ocbd2384ff48  -                       -
+tsk_mw6ewlg0ee2337a276  Fastify API skeleton with zod validation  1      FAILED          tsk_mw6g8w189264aecf5c  tsk_mw6g9ba43b399f1327  -
+tsk_mw6ewlg0ee2337a276  Fastify API skeleton with zod validation  2      FAILED          tsk_mw6gae4zf4bad3f3b1  tsk_mw6gat072c614ffc30  -
+tsk_mw6ewlg0ee2337a276  Fastify API skeleton with zod validation  3      OWNER_ACCEPTED  tsk_mw6gbth07100f69595  -                       apr_mw6gciyz7ececc9fb3
+tsk_mw6ewlfr84adb198d3  Shared money library (integer paisa)      1      PASSED          tsk_mw6geoo3cca1f66cf7  -                       -
+tsk_mw6ewlg2ce83383554  SPA shell, routing and API client         1      FAILED          tsk_mw6gm7sb7d2d74ab4f  tsk_mw6gmotcf4349ba3aa  -
+tsk_mw6ewlg2ce83383554  SPA shell, routing and API client         2      PASSED          tsk_mw6goxn62c803f0077  -                       -
+tsk_mw6ewlg3456892b1e8  Authentication: sessions, login/logout,   1      FAILED          tsk_mw6gwzp79c255c4f34  tsk_mw6gxq4qca4d904910  -
+tsk_mw6ewlg3456892b1e8  Authentication: sessions, login/logout,   2      PASSED          tsk_mw6gzri71b235373ff  -                       -
+tsk_mw6ewlg758e9a42609  Permission matrix, default-deny enforcem  1      PASSED          tsk_mw6h85mu37a73de0ea  -                       -
+tsk_mw6ewlg5e3f346ddf2  Password management and policy            1      PASSED          tsk_mw6hjw9k575bb1f917  -                       -
+tsk_mw6ewlg9ef0bb3f8b5  Audit module and viewer API               1      FAILED          tsk_mw6htx2yc138f2df75  tsk_mw6hukwv7da04e2e86  -
+tsk_mw6ewlg9ef0bb3f8b5  Audit module and viewer API               2      PASSED          tsk_mw6hy942e94532302f  -                       -
+tsk_mw6ewlgf27cb5d4069  Audit log viewer UI                       1      PASSED          tsk_mw6i5f83a88447e2ce  -                       -
+tsk_mw6ewlgb3e7a9764cf  User and branch administration API        1      PASSED          tsk_mw6idmra176396cc2b  -                       -
+tsk_mw6ewlgh0407ad19bb  Catalog API: categories and products      1      PASSED          tsk_mw6ikqakcb3e9071bc  -                       -
+tsk_mw6ewlgj4e255e1028  Auth and administration UI                1      PASSED          tsk_mw6j4wdi1771d36238  -                       -
+tsk_mw6ewlgn269b7d6820  Products UI                               1      PASSED          tsk_mw6jdp8m8506becaf4  -                       -
+tsk_mw6ewlgl8a0fd2306c  Inventory service: stock ledger choke po  1      PASSED          tsk_mw6jjrgb762377c2b1  -                       -
+tsk_mw6ewlgs75f4644ddc  Deterministic fictional seed data         1      FAILED          tsk_mw6jqlra6cf03c6f83  tsk_mw6jr1df1967d06f2d  -
+tsk_mw6ewlgs75f4644ddc  Deterministic fictional seed data         2      PASSED          tsk_mw6jujfj275c6cddbb  -                       -
+tsk_mw6ewlgq0086ceef09  Stock transfers with approval             1      PASSED          tsk_mw6k14d1479936c570  -                       -
+tsk_mw6ewlgz172ca6db36  Transfers UI                              1      PASSED          tsk_mw6k6lww23d1580913  -                       -
+tsk_mw6ewlgo818a176aa9  Stock queries: ledger, low-stock and val  1      PASSED          tsk_mw6kgkbf640d400f8b  -                       -
+tsk_mw6ewlgv347483eed5  Inventory UI: stock levels, receive, adj  1      PASSED          tsk_mw6kop5id552ff9df1  -                       -
+tsk_mw6ewlgt5d909275a9  Suppliers API with payments and computed  1      PASSED          tsk_mw6kvnbl83cff992c5  -                       -
+tsk_mw6ewlh4cd150bc144  Purchase orders and receiving             1      PASSED          tsk_mw6l7vd77e4303f3db  -                       -
+tsk_mw6ewlh969b427fa3d  Purchase returns to suppliers             1      PASSED          tsk_mw6lfn3gc703e76433  -                       -
+tsk_mw6ewlhefa8ba4e8d2  Suppliers and purchasing UI               1      FAILED          tsk_mw6lqmki64a510b89b  tsk_mw6lrfcwd7a75cec37  -
+tsk_mw6ewlhefa8ba4e8d2  Suppliers and purchasing UI               2      PASSED          tsk_mw6lsqai6b55c389e0  -                       -
+tsk_mw6ewlgx46a7b121d6  Sales creation: customers, discounts and  1      PASSED          tsk_mw6lzu7z0062e11465  -                       -
+tsk_mw6ewlh7f79a80beb8  Sales creation UI                         1      PASSED          tsk_mw6m647ofae3534daa  -                       -
+tsk_mw6ewlh5f40bdbd091  Sales history, returns and cancellation   1      PASSED          tsk_mw6mevlud5b7cd35b9  -                       -
+tsk_mw6ewlhb1f4e0d7e41  Sales history, invoice print, returns an  1      PASSED          tsk_mw6mlna7dffc7f0ee0  -                       -
+tsk_mw6ewlhga645dd28f9  Integrity and reconciliation tool         1      PASSED          tsk_mw6mva831dd77995f7  -                       -
+tsk_mw6ewlhc65e2ac6be3  Reporting engine, dashboard API and oper  1      FAILED          tsk_mw6n50mu9fe705c0c0  tsk_mw6n5h9aec055a2e2d  -
+tsk_mw6ewlh02250a23045  Operating expenses API and UI             1      PASSED          tsk_mw6nkyri15483db746  -                       -
+tsk_mw6ewlhc65e2ac6be3  Reporting engine, dashboard API and oper  2      PASSED          tsk_mw6nm11taaa0338fb9  -                       -
+tsk_mw6ewlhj6a9f16ebd6  Executive dashboard UI                    1      PASSED          tsk_mw6nrso022683d5b8e  -                       -
+tsk_mw6ewlhh588963b2b1  Profitability report                      1      PASSED          tsk_mw6nxthu3e2d13aa4f  -                       -
+tsk_mw6ewlhlc027b0c340  CSV export with formula-injection protec  1      PASSED          tsk_mw6o8ucd5b8de4d854  -                       -
+tsk_mw6ewlhmf8d1750d40  Reports UI with date filters and export   1      PASSED          tsk_mw6ogcega679c04c62  -                       -
+tsk_mw6ewlhu84616bc089  Performance dataset and measurement       1      PASSED          tsk_mw6p14v64a8bae810a  -                       -
+tsk_mw6ewlhq59c0c75955  Cross-module integration and database in  1      FAILED          tsk_mw6pcb776e0bb80265  tsk_mw6pcuby822af47da7  -
+tsk_mw6ewlhq59c0c75955  Cross-module integration and database in  2      FAILED          tsk_mw6phli1c33aaabcaa  tsk_mw6pi7u5727762e645  -
+tsk_mw6ewlhq59c0c75955  Cross-module integration and database in  3      PASSED          tsk_mw6pn9h614546a63c8  -                       -
+tsk_mw6ewlhoacf71ad021  Authorization test matrix                 1      FAILED          tsk_mw6ptltz6ec592026d  tsk_mw6ptzsw234616dd07  -
+tsk_mw6ewlhoacf71ad021  Authorization test matrix                 2      FAILED          tsk_mw6pyu32e1f1c0d6ae  tsk_mw6pza0z137b925560  -
+tsk_mw6ewlhoacf71ad021  Authorization test matrix                 3      PASSED          tsk_mw6q36dwde7dfeed48  -                       -
+tsk_mw6ewlhy060bc4949b  API documentation (OpenAPI)               1      FAILED          tsk_mw6qfden193f4c95a8  tsk_mw6qfs7w1f9e7a7b8f  -
+tsk_mw6ewlhy060bc4949b  API documentation (OpenAPI)               2      FAILED          tsk_mw6qm36ja9ff026d8c  tsk_mw6qml8vb15a16e7fa  -
+tsk_mw6ewlhy060bc4949b  API documentation (OpenAPI)               3      OWNER_ACCEPTED  tsk_mw6qvbyg0217c74e10  -                       apr_mw6qvse6b4d6aa09ed
+tsk_mw6ewli5188932593a  User, deployment and architecture docume  1      FAILED          tsk_mw6rryb372f1e2fbd5  tsk_mw6rshx74dc6617543  -
+tsk_mw6ewli1a52a7f90f5  Security checks and dependency analysis   1      PASSED          tsk_mw6rt3cg88ed0fdde3  -                       -
+tsk_mw6ewli5188932593a  User, deployment and architecture docume  2      FAILED          tsk_mw6sj5wyb0786bf9fd  tsk_mw6sjt0r26b8c03396  -
+tsk_mw6ewli5188932593a  User, deployment and architecture docume  3      OWNER_ACCEPTED  tsk_mw6t0zap8e938cf1c1  -                       apr_mw6t1kin1e9bfa182b
+tsk_mw6ewlhw48197b1d81  Accessibility pass and confirmation dial  1      PASSED          tsk_mw6t5mwo2aa98a6c61  -                       -
+tsk_mw6ewli37f97d81932  Playwright msedge desktop and mobile jou  1      PASSED          tsk_mw6tl83r4178335afd  -                       -
+tsk_mw6ewli71844f49b97  Traceability, verified-vs-assumed regist  1      PASSED          tsk_mw6u27t773e0392dd6  -                       -

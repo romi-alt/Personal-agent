@@ -1,0 +1,91 @@
+
+ RUN  v5.1.0 E:/Agent/v2-staging/hardening/repo
+
+ ✓ tests/unit/process-tree.test.ts (5 tests) 13405ms
+   ✓ process identity (real processes) (1)
+     ✓ reads image name and OS creation time of a live process 2865ms
+   ✓ identity-verified orphan stop (real processes) (4)
+     ✓ never kills a process whose identity differs from the recorded worker 8912ms
+     ✓ accepts the fallback window when the identity was never recorded 1620ms
+ ✓ tests/unit/store.test.ts (12 tests) 17313ms
+   ✓ projects and tasks (6)
+     ✓ creates an isolated, git-initialised project workspace 1604ms
+     ✓ adds a task in QUEUED with a persisted initial transition 1598ms
+     ✓ orders the queue by project priority, task priority, then insertion order 1715ms
+     ✓ rejects duplicate tasks (idempotent enqueue) and supports explicit dedupe keys 1580ms
+     ✓ does not claim a task until its dependencies are COMPLETED 1560ms
+     ✓ respects scheduled start and next-eligible time 1484ms
+   ✓ state machine (3)
+     ✓ rejects invalid transitions centrally and keeps history 1491ms
+     ✓ persists timestamp, reason and execution id for each transition 1618ms
+   ✓ worker leasing (3)
+     ✓ lets only one claimer win when two supervisors race for the same task 1521ms
+     ✓ enforces max concurrency and extends the lease on heartbeat only for the holder 1603ms
+     ✓ allows only one live supervisor instance 1531ms
+ ✓ tests/unit/capacity-sleep.test.ts (13 tests) 4164ms
+   ✓ A11: host sleep is not charged to the execution budget or the stall window (3)
+     ✓ 11 min of work, 3 h asleep, then finishes: completed (v1: TIMEOUT 15 s after wake, retry consumed) 644ms
+     ✓ a genuine active-time overrun still times out after a sleep, and the message says the sleep was not charged 660ms
+   ✓ A10: the in-process wait ends once the reported reset has passed (sleep-safe resume) (2)
+     ✓ without sleep, a reset that has not yet passed keeps the same process waiting (no premature kill) 646ms
+   ✓ v2 review: stale or unrelated reset times do not steer the wait (2)
+     ✓ a 429 after a non-rejected (warning) event with a far reset is NOT handed off for hours 443ms
+     ✓ a rejected event whose reset is already in the past cannot trigger a capacity_resume loop 538ms
+   ✓ A12: bounded in-process capacity waits and escalation (6)
+     ✓ a wait with no reported reset ends at the ceiling (CLAUDE_CLI_MAX_CAPACITY_WAIT_MS) 334ms
+     ✓ CLAUDE_CLI_MAX_CAPACITY_WAIT_MS=0 restores the v1 unbounded in-process wait (owner opt-out) 538ms
+ ✓ tests/unit/readiness-and-hooks.test.ts (16 tests) 11552ms
+   ✓ provider readiness report (5)
+     ✓ importing the SDK is NOT enough: everything else is NO / NOT_VERIFIED by default 1628ms
+     ✓ credentials + budget configured still does not make the provider operational without live evidence 1522ms
+     ✓ becomes operational only after API access AND a live execution were verified; recovery is a separate level 1489ms
+     ✓ evidence goes STALE when the SDK version or the credential changes 1322ms
+     ✓ a subscription OAuth token is never accepted as configured credentials 1333ms
+   ✓ verifyApiAccess (non-billable, explicit, never automatic) (3)
+     ✓ records evidence only on HTTP 200 1473ms
+     ✓ sends only a models-list request (no inference) and reports network errors without leaking the key 1375ms
+     ✓ refuses with no key or a subscription token before any request 1336ms
+ ✓ tests/unit/cli-provider.test.ts (18 tests) 4264ms
+   ✓ ClaudeCliProvider: capacity waits are not stalls and not completion (5)
+     ✓ a usage-limit wait suspends the execution timeout; the same process continues when capacity returns 936ms
+     ✓ a confirmed usage-limit wait is exempt from the inactivity (stall) timeout; plain silence is not 1346ms
+     ✓ outside a capacity wait the execution timeout applies (TIMEOUT), not success 332ms
+   ✓ policy hook command (2)
+     ✓ fails closed: a broken invocation exits 2 (blocking), never 0 or 1 1036ms
+ ✓ tests/unit/phase-bde-v21.test.ts (44 tests) 2034ms
+   ✓ Phase E: the real hook process fails closed (2)
+     ✓ a policy rewritten after launch (approval widened) blocks every call with exit 2 1342ms
+     ✓ unknown tools are denied; MCP tools need approval; a payload without a tool name is denied 335ms
+ ✓ tests/unit/scratch-cleanup.test.ts (18 tests) 582ms
+ ✓ tests/unit/text-and-git.test.ts (4 tests) 1647ms
+   ✓ gitState (single git call) (1)
+     ✓ reports head, branch and changes for a real repository; non-repos are not repos 1635ms
+ ✓ tests/unit/policy-normalize.test.ts (159 tests) 187ms
+ ✓ tests/unit/policy-v21-hardening.test.ts (81 tests) 177ms
+ ✓ tests/unit/verifier-env-v21.test.ts (1 test) 288ms
+ ✓ tests/unit/requirement-coverage.test.ts (3 tests) 242ms
+ ✓ tests/unit/redact-and-paths.test.ts (14 tests) 133ms
+ ✓ tests/unit/status-reconcile.test.ts (2 tests) 206ms
+ ✓ tests/unit/planning.test.ts (24 tests) 165ms
+ ✓ tests/unit/pr5-review-fixes.test.ts (24 tests) 83ms
+ ✓ tests/unit/database.test.ts (3 tests) 148ms
+ ✓ tests/unit/qa-ownership.test.ts (8 tests) 108ms
+ ✓ tests/unit/claude-provider.test.ts (15 tests) 118ms
+ ✓ tests/unit/policy-v2-review.test.ts (18 tests) 88ms
+ ✓ tests/unit/agent-control-policy.test.ts (14 tests) 74ms
+ ✓ tests/unit/project-intelligence.test.ts (12 tests) 58ms
+ ✓ tests/unit/config.test.ts (5 tests) 38ms
+ ✓ tests/unit/integrations.test.ts (6 tests) 51ms
+ ✓ tests/unit/security-verifier.test.ts (2 tests) 48ms
+ ✓ tests/unit/windows-scripts.test.ts (12 tests) 29ms
+ ✓ tests/unit/decide.test.ts (12 tests) 17ms
+
+ Test Files  27 passed (27)
+      Tests  545 passed (545)
+   Start at  01:46:44
+   Duration  36.73s (tests 91%, import 8%, transform 1%, worker 1%)
+
+    Isolate  27 workers spawned · ~346ms startup each (spawn + environment, per file)
+             at least ~4.33s faster with isolate: false — reuses workers across files instead of one per file
+
+JSON report written to E:/Agent/v2-staging/hardening/20261110-010704/logs/regression/07-unit.json

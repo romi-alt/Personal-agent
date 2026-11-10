@@ -1,0 +1,12 @@
+﻿13:13:33 plan: 39 chunks; run dir E:\Agent\v2-staging\worker-isolation\admin-scripts-r2-20261110\reports\chunked-sweep-20261110-131331; task=Running pid8992=True; free=1505 MB
+13:24:39 [1/39] ok items=220204 findings=1 666s free=871MB task=Running pid8992=True :: E:\Agent
+13:25:21 [2/39] ok items=10833 findings=0 41s free=1045MB task=Running pid8992=True :: E:\Claude code
+13:25:32 [3/39] ok items=1154 findings=0 10s free=1028MB task=Running pid8992=True :: E:\Disk C
+13:25:38 [4/39] ok items=84 findings=0 5s free=1074MB task=Running pid8992=True :: E:\Documents data
+13:25:44 [5/39] ok items=24 findings=0 5s free=1095MB task=Running pid8992=True :: E:\Dr Nisar Data
+13:25:50 [6/39] ok items=93 findings=0 5s free=1139MB task=Running pid8992=True :: E:\Elevariq Internship Program
+13:26:01 [7/39] ok items=2171 findings=0 10s free=1276MB task=Running pid8992=True :: E:\elevariq-ui-tmp
+13:26:07 [8/39] ok items=214 findings=0 5s free=1270MB task=Running pid8992=True :: E:\Elevariq.io
+13:29:06 [9/39] ok items=56378 findings=0 178s free=930MB task=Running pid8992=True :: E:\Latest Desktop
+13:29:12 [10/39] ok items=15 findings=0 5s free=930MB task=Running pid8992=True :: E:\New folder
+13:29:18 [11/39] ok items=397 findings=0 5s free=921MB task=Running pid8992=True :: E:\Office 365 ProPlus - Online Installer v3.1.1

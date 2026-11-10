@@ -1,0 +1,10 @@
+﻿== 02 Configure staging ACLs (DRY-RUN / STAGING-ONLY) ==
+  DRY-RUN identity: elv-stg-worker -- worker SID=; owner SID=S-1-5-21-3837883729-3478098758-1729361560-1001
+  DRY-RUN icacls: C:\ElevariqStaging\work -- worker M; owner+SYSTEM Full; inheritance reset [args: C:\ElevariqStaging\work /inheritance:r /grant:r *S-1-5-18:(OI)(CI)F /grant:r *S-1-5-21-3837883729-3478098758-1729361560-1001:(OI)(CI)F /grant:r <worker-SID>:(OI)(CI)M]
+  DRY-RUN icacls: C:\ElevariqStaging\broker -- worker DENY all; owner+SYSTEM Full; inheritance reset [args: C:\ElevariqStaging\broker /inheritance:r /grant:r *S-1-5-18:(OI)(CI)F /grant:r *S-1-5-21-3837883729-3478098758-1729361560-1001:(OI)(CI)F /deny <worker-SID>:(OI)(CI)F]
+  DRY-RUN icacls: C:\ElevariqStaging\home -- worker M; owner+SYSTEM Full; inheritance reset [args: C:\ElevariqStaging\home /inheritance:r /grant:r *S-1-5-18:(OI)(CI)F /grant:r *S-1-5-21-3837883729-3478098758-1729361560-1001:(OI)(CI)F /grant:r <worker-SID>:(OI)(CI)M]
+  DRY-RUN icacls: C:\ElevariqStaging\decoys -- SYNTHETIC decoys: worker DENY (stand-ins for prod/owner; nothing real touched) [args: C:\ElevariqStaging\decoys /inheritance:r /grant:r *S-1-5-18:(OI)(CI)F /grant:r *S-1-5-21-3837883729-3478098758-1729361560-1001:(OI)(CI)F /deny <worker-SID>:(OI)(CI)F]
+  DRY-RUN report-only: E:\ -- Authenticated Users:Modify on E:\ is inherited by production. A new worker is an Authenticated User, so it could reach production via that grant. The PILOT does NOT change this (owner constraint). Closing it is the separate PRODUCTION_ISOLATION_STAGE.
+
+Report written: E:\Agent\v2-staging\trusted-execution-20261110-0249\admin-scripts\reports\02-configure-acls-20261110-032739.json
+Changes: 6  Refusals: 0  Mode: DRY-RUN / STAGING-ONLY

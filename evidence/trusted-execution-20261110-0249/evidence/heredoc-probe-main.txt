@@ -1,0 +1,7 @@
+﻿OK   H1 baseline: direct traversal: expected DENY, got DENY (useRaw=false)
+FAIL H2 quoted <<EOF in echo, then traversal on next line: expected DENY, got ALLOW (useRaw=false)
+FAIL H3 single-quoted <<EOF then traversal: expected DENY, got ALLOW (useRaw=false)
+FAIL H4 <<EOF inside a comment, then traversal: expected DENY, got ALLOW (useRaw=false)
+OK   H5 arithmetic shift, then traversal: expected DENY, got DENY (useRaw=true)
+OK   H6 real data heredoc with ../src import (legit): expected ALLOW, got ALLOW (useRaw=false)
+OK   H7 heredoc never terminated, traversal inside: expected DENY, got DENY (useRaw=true)

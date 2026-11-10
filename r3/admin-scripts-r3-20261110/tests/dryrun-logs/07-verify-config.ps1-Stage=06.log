@@ -1,0 +1,27 @@
+﻿== 07 configuration verification up to stage 06 (READ-ONLY; NOT access tests) ==
+  [FAIL] C00.1 group ElevariqIsolatedIdentities exists 
+  [FAIL] C00.5 test residue Everyone:F removed (00a) 
+  [FAIL] C01.1 staging VHDX mounted at C:\ElevariqStaging 
+  [FAIL] C01.4 disk attach task runs as SYSTEM 
+  [FAIL] C02.1 elv-stg-worker exists 
+  [FAIL] C02.1 elv-stg-broker exists 
+  [FAIL] C04.1 broker task runs as elv-stg-broker, Limited 
+  [PASS] C05.0 firewall profiles enabled and honouring local rules 
+  [FAIL] C05.1 ELEVARIQ-STG-Worker-Block-IPv6 present, enabled, outbound block, bound to the CURRENT worker SID 
+  [FAIL] C05.1 ELEVARIQ-STG-Worker-Block-IPv4 present, enabled, outbound block, bound to the CURRENT worker SID 
+  [PASS] C05.2 no staging ALLOW rules (r1 leftovers) 
+  [INFO] C05.3 host-level SMB/WebDAV delegation rules present (H3; optional, separately authorized) 0 host rules
+  [INFO] C05.4 service WebClient state (H3 delegation vector) Stopped/Manual
+  [INFO] C05.4 service BITS state (H3 delegation vector) Running/Automatic
+  [FAIL] C06.1 worker task runs as elv-stg-worker, Limited 
+  [PASS] P0 production task present and running Running
+  [PASS] P1 production supervisor process alive (found by command line) pids=8992
+  [PASS] P2 production HEAD = e60278f e60278f
+  [PASS] P3 production task action still points at the checkout script 
+
+CONFIGURATION: 10 FAIL. Reminder: configuration checks are NOT evidence that Windows denies the worker.
+
+Report: 
+E:\Agent\v2-staging\worker-isolation\admin-scripts-r3-20261110\reports\07-verify-config-20261110-162055-17456.json
+Changes: 0  Refusals: 0  Checks: 19 (10 FAIL)  Mode: DRY-RUN
+

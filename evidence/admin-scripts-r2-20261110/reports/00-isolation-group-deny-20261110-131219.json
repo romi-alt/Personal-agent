@@ -1,0 +1,65 @@
+﻿{
+    "script":  "00-isolation-group-deny",
+    "revision":  "r2-20261110",
+    "startedAt":  "2026-11-10T13:12:19.8233519+05:00",
+    "dryRun":  true,
+    "user":  "DESKTOP-QGGLG8D\\Roman",
+    "changes":  [
+                    {
+                        "action":  "targets",
+                        "target":  "E:\\, F:\\, C:\\Download, C:\\Intel, D:\\src, D:\\Intel",
+                        "detail":  "DENY targets (validated by Assert-DenyTarget)",
+                        "applied":  false,
+                        "at":  "2026-11-10T13:12:20.2651803+05:00"
+                    },
+                    {
+                        "action":  "sweep-chunk",
+                        "target":  "C:\\Intel",
+                        "detail":  "partial read-only sweep (chunk); not sufficient for -Apply",
+                        "applied":  false,
+                        "at":  "2026-11-10T13:12:22.0466331+05:00"
+                    }
+                ],
+    "refusals":  [
+
+                 ],
+    "checks":  [
+                   {
+                       "id":  "R7",
+                       "name":  "trusted script location + SHA256SUMS",
+                       "status":  "WARN",
+                       "detail":  "broad write on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r2-20261110; broad write on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r2-20261110\\00-isolation-group-deny.ps1; broad write on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r2-20261110\\00a-remove-test-residue.ps1; broad write on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r2-20261110\\01-staging-volume.ps1; broad write on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r2-20261110\\02-identities-and-rights.ps1; broad write on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r2-20261110\\03-staging-layout.ps1; broad write on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r2-20261110\\04-broker-install.ps1; broad write on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r2-20261110\\05-firewall-egress.ps1; broad write on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r2-20261110\\06-worker-enable.ps1; broad write on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r2-20261110\\07-verify-config.ps1; broad write on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r2-20261110\\09-rollback.ps1; broad write on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r2-20261110\\Freeze-AdminScripts.ps1; broad write on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r2-20261110\\_common.ps1; SHA256SUMS missing"
+                   },
+                   {
+                       "id":  "P0",
+                       "name":  "production task present and running",
+                       "status":  "PASS",
+                       "detail":  "Running"
+                   },
+                   {
+                       "id":  "P1",
+                       "name":  "production supervisor PID 8992 alive",
+                       "status":  "PASS",
+                       "detail":  ""
+                   },
+                   {
+                       "id":  "P2",
+                       "name":  "production HEAD = e60278f",
+                       "status":  "PASS",
+                       "detail":  "e60278f"
+                   },
+                   {
+                       "id":  "P3",
+                       "name":  "production task action still points at the checkout script",
+                       "status":  "PASS",
+                       "detail":  ""
+                   },
+                   {
+                       "id":  "S1",
+                       "name":  "sweep: no uncovered explicit-broad-allow / protected-with-broad-access / unreadable items",
+                       "status":  "FAIL",
+                       "detail":  "2 open; see E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r2-20261110\\reports\\sweep-20261110-131222-20328.csv"
+                   }
+               ],
+    "path":  "E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r2-20261110\\reports\\00-isolation-group-deny-20261110-131219.json"
+}

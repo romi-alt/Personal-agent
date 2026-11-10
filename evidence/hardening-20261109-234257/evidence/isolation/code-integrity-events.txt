@@ -1,0 +1,124 @@
+﻿
+
+TimeCreated : 11/10/2026 12:06:08 AM
+Id          : 3118
+Message     : Smart App Control Block Deteails
+
+TimeCreated : 11/10/2026 12:06:08 AM
+Id          : 3089
+Message     : Signature information for another event. Match using the Correlation Id.
+
+TimeCreated : 11/10/2026 12:06:08 AM
+Id          : 3077
+Message     : Code Integrity determined that a process (\Device\HarddiskVolume6\Windows\System32\WindowsPowerShell\v1.0\powershell.exe) attempted to load \Device\HarddiskVolume8\Agent\v2-staging\hardening\20261109-234257\bin\sandbox-run.exe that did not meet the Enterprise signing level requirements or violated code integrity policy (Policy ID:{0283ac0f-fff1-49ae-ada1-8a933130cad6}).
+
+TimeCreated : 11/10/2026 12:06:08 AM
+Id          : 3089
+Message     : Signature information for another event. Match using the Correlation Id.
+
+TimeCreated : 11/10/2026 12:06:08 AM
+Id          : 3033
+Message     : Code Integrity determined that a process (\Device\HarddiskVolume6\Windows\System32\WindowsPowerShell\v1.0\powershell.exe) attempted to load \Device\HarddiskVolume8\Agent\v2-staging\hardening\20261109-234257\bin\sandbox-run.exe that did not meet the Enterprise signing level requirements.
+
+TimeCreated : 11/10/2026 12:06:08 AM
+Id          : 3118
+Message     : Smart App Control Block Deteails
+
+TimeCreated : 11/10/2026 12:06:08 AM
+Id          : 3089
+Message     : Signature information for another event. Match using the Correlation Id.
+
+TimeCreated : 11/10/2026 12:06:08 AM
+Id          : 3077
+Message     : Code Integrity determined that a process (\Device\HarddiskVolume6\Windows\System32\WindowsPowerShell\v1.0\powershell.exe) attempted to load \Device\HarddiskVolume8\Agent\v2-staging\hardening\20261109-234257\bin\sandbox-run.exe that did not meet the Enterprise signing level requirements or violated code integrity policy (Policy ID:{0283ac0f-fff1-49ae-ada1-8a933130cad6}).
+
+TimeCreated : 11/10/2026 12:06:08 AM
+Id          : 3089
+Message     : Signature information for another event. Match using the Correlation Id.
+
+TimeCreated : 11/10/2026 12:06:08 AM
+Id          : 3033
+Message     : Code Integrity determined that a process (\Device\HarddiskVolume6\Windows\System32\WindowsPowerShell\v1.0\powershell.exe) attempted to load \Device\HarddiskVolume8\Agent\v2-staging\hardening\20261109-234257\bin\sandbox-run.exe that did not meet the Enterprise signing level requirements.
+
+TimeCreated : 11/10/2026 12:06:08 AM
+Id          : 3118
+Message     : Smart App Control Block Deteails
+
+TimeCreated : 11/10/2026 12:06:08 AM
+Id          : 3089
+Message     : Signature information for another event. Match using the Correlation Id.
+
+TimeCreated : 11/10/2026 12:06:08 AM
+Id          : 3077
+Message     : Code Integrity determined that a process (\Device\HarddiskVolume6\Windows\System32\WindowsPowerShell\v1.0\powershell.exe) attempted to load \Device\HarddiskVolume8\Agent\v2-staging\hardening\20261109-234257\bin\sandbox-run.exe that did not meet the Enterprise signing level requirements or violated code integrity policy (Policy ID:{0283ac0f-fff1-49ae-ada1-8a933130cad6}).
+
+TimeCreated : 11/10/2026 12:06:08 AM
+Id          : 3089
+Message     : Signature information for another event. Match using the Correlation Id.
+
+TimeCreated : 11/10/2026 12:06:08 AM
+Id          : 3033
+Message     : Code Integrity determined that a process (\Device\HarddiskVolume6\Windows\System32\WindowsPowerShell\v1.0\powershell.exe) attempted to load \Device\HarddiskVolume8\Agent\v2-staging\hardening\20261109-234257\bin\sandbox-run.exe that did not meet the Enterprise signing level requirements.
+
+TimeCreated : 11/10/2026 12:06:08 AM
+Id          : 3118
+Message     : Smart App Control Block Deteails
+
+TimeCreated : 11/10/2026 12:06:08 AM
+Id          : 3089
+Message     : Signature information for another event. Match using the Correlation Id.
+
+TimeCreated : 11/10/2026 12:06:08 AM
+Id          : 3077
+Message     : Code Integrity determined that a process (\Device\HarddiskVolume6\Windows\System32\WindowsPowerShell\v1.0\powershell.exe) attempted to load \Device\HarddiskVolume8\Agent\v2-staging\hardening\20261109-234257\bin\sandbox-run.exe that did not meet the Enterprise signing level requirements or violated code integrity policy (Policy ID:{0283ac0f-fff1-49ae-ada1-8a933130cad6}).
+
+TimeCreated : 11/10/2026 12:06:08 AM
+Id          : 3089
+Message     : Signature information for another event. Match using the Correlation Id.
+
+TimeCreated : 11/10/2026 12:06:08 AM
+Id          : 3033
+Message     : Code Integrity determined that a process (\Device\HarddiskVolume6\Windows\System32\WindowsPowerShell\v1.0\powershell.exe) attempted to load \Device\HarddiskVolume8\Agent\v2-staging\hardening\20261109-234257\bin\sandbox-run.exe that did not meet the Enterprise signing level requirements.
+
+TimeCreated : 11/10/2026 12:06:07 AM
+Id          : 3118
+Message     : Smart App Control Block Deteails
+
+TimeCreated : 11/10/2026 12:06:07 AM
+Id          : 3089
+Message     : Signature information for another event. Match using the Correlation Id.
+
+TimeCreated : 11/10/2026 12:06:07 AM
+Id          : 3077
+Message     : Code Integrity determined that a process (\Device\HarddiskVolume6\Windows\System32\WindowsPowerShell\v1.0\powershell.exe) attempted to load \Device\HarddiskVolume8\Agent\v2-staging\hardening\20261109-234257\bin\sandbox-run.exe that did not meet the Enterprise signing level requirements or violated code integrity policy (Policy ID:{0283ac0f-fff1-49ae-ada1-8a933130cad6}).
+
+TimeCreated : 11/10/2026 12:06:07 AM
+Id          : 3089
+Message     : Signature information for another event. Match using the Correlation Id.
+
+TimeCreated : 11/10/2026 12:06:07 AM
+Id          : 3033
+Message     : Code Integrity determined that a process (\Device\HarddiskVolume6\Windows\System32\WindowsPowerShell\v1.0\powershell.exe) attempted to load \Device\HarddiskVolume8\Agent\v2-staging\hardening\20261109-234257\bin\sandbox-run.exe that did not meet the Enterprise signing level requirements.
+
+TimeCreated : 11/10/2026 12:06:07 AM
+Id          : 3118
+Message     : Smart App Control Block Deteails
+
+TimeCreated : 11/10/2026 12:06:07 AM
+Id          : 3089
+Message     : Signature information for another event. Match using the Correlation Id.
+
+TimeCreated : 11/10/2026 12:06:07 AM
+Id          : 3077
+Message     : Code Integrity determined that a process (\Device\HarddiskVolume6\Windows\System32\WindowsPowerShell\v1.0\powershell.exe) attempted to load \Device\HarddiskVolume8\Agent\v2-staging\hardening\20261109-234257\bin\sandbox-run.exe that did not meet the Enterprise signing level requirements or violated code integrity policy (Policy ID:{0283ac0f-fff1-49ae-ada1-8a933130cad6}).
+
+TimeCreated : 11/10/2026 12:06:07 AM
+Id          : 3089
+Message     : Signature information for another event. Match using the Correlation Id.
+
+TimeCreated : 11/10/2026 12:06:07 AM
+Id          : 3033
+Message     : Code Integrity determined that a process (\Device\HarddiskVolume6\Windows\System32\WindowsPowerShell\v1.0\powershell.exe) attempted to load \Device\HarddiskVolume8\Agent\v2-staging\hardening\20261109-234257\bin\sandbox-run.exe that did not meet the Enterprise signing level requirements.
+
+
+

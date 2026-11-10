@@ -1,0 +1,63 @@
+﻿== 02-identities-and-rights (DRY-RUN, revision r3-20261110) ==
+  [WARN] R7 trusted admin-only script location + canonical SHA256SUMS + out-of-band manifest hash owner 
+S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on 
+E:\Agent\v2-staging\worker-isolation\admin-scripts-r3-20261110; inheritance not cut on 
+E:\Agent\v2-staging\worker-isolation\admin-scripts-r3-20261110; write 0x10116 for S-1-5-11 on 
+E:\Agent\v2-staging\worker-isolation\admin-scripts-r3-20261110; write 0x10116 for S-1-5-11(IO) on 
+E:\Agent\v2-staging\worker-isolation\admin-scripts-r3-20261110; owner S-1-5-21-3837883729-3478098758-1729361560-1001 
+is not SYSTEM/Administrators on 
+E:\Agent\v2-staging\worker-isolation\admin-scripts-r3-20261110\00-isolation-group-deny.ps1; write 0x10116 for S-1-5-11 
+on E:\Agent\v2-staging\worker-isolation\admin-scripts-r3-20261110\00-isolation-group-deny.ps1; owner 
+S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on 
+E:\Agent\v2-staging\worker-isolation\admin-scripts-r3-20261110\00a-remove-test-residue.ps1; write 0x10116 for S-1-5-11 
+on E:\Agent\v2-staging\worker-isolation\admin-scripts-r3-20261110\00a-remove-test-residue.ps1; owner 
+S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on 
+E:\Agent\v2-staging\worker-isolation\admin-scripts-r3-20261110\01-staging-volume.ps1; write 0x10116 for S-1-5-11 on 
+E:\Agent\v2-staging\worker-isolation\admin-scripts-r3-20261110\01-staging-volume.ps1; owner 
+S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on 
+E:\Agent\v2-staging\worker-isolation\admin-scripts-r3-20261110\02-identities-and-rights.ps1; write 0x10116 for 
+S-1-5-11 on E:\Agent\v2-staging\worker-isolation\admin-scripts-r3-20261110\02-identities-and-rights.ps1; owner 
+S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on 
+E:\Agent\v2-staging\worker-isolation\admin-scripts-r3-20261110\03-staging-layout.ps1; write 0x10116 for S-1-5-11 on 
+E:\Agent\v2-staging\worker-isolation\admin-scripts-r3-20261110\03-staging-layout.ps1; owner 
+S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on 
+E:\Agent\v2-staging\worker-isolation\admin-scripts-r3-20261110\04-broker-install.ps1; write 0x10116 for S-1-5-11 on 
+E:\Agent\v2-staging\worker-isolation\admin-scripts-r3-20261110\04-broker-install.ps1; owner 
+S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on 
+E:\Agent\v2-staging\worker-isolation\admin-scripts-r3-20261110\05-firewall-egress.ps1; write 0x10116 for S-1-5-11 on 
+E:\Agent\v2-staging\worker-isolation\admin-scripts-r3-20261110\05-firewall-egress.ps1; owner 
+S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on 
+E:\Agent\v2-staging\worker-isolation\admin-scripts-r3-20261110\06-worker-enable.ps1; write 0x10116 for S-1-5-11 on 
+E:\Agent\v2-staging\worker-isolation\admin-scripts-r3-20261110\06-worker-enable.ps1; owner 
+S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on 
+E:\Agent\v2-staging\worker-isolation\admin-scripts-r3-20261110\07-verify-config.ps1; write 0x10116 for S-1-5-11 on 
+E:\Agent\v2-staging\worker-isolation\admin-scripts-r3-20261110\07-verify-config.ps1; owner 
+S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on 
+E:\Agent\v2-staging\worker-isolation\admin-scripts-r3-20261110\09-rollback.ps1; write 0x10116 for S-1-5-11 on 
+E:\Agent\v2-staging\worker-isolation\admin-scripts-r3-20261110\09-rollback.ps1; owner 
+S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on 
+E:\Agent\v2-staging\worker-isolation\admin-scripts-r3-20261110\Freeze-AdminScripts.ps1; write 0x10116 for S-1-5-11 on 
+E:\Agent\v2-staging\worker-isolation\admin-scripts-r3-20261110\Freeze-AdminScripts.ps1; owner 
+S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on 
+E:\Agent\v2-staging\worker-isolation\admin-scripts-r3-20261110\_common.ps1; write 0x10116 for S-1-5-11 on 
+E:\Agent\v2-staging\worker-isolation\admin-scripts-r3-20261110\_common.ps1; SHA256SUMS missing
+  [FAIL] PRE00 deny group + DENY on E:\, F:\ 
+  [FAIL] PRE01 staging volume mounted 
+  DRY-RUN new-localuser: elv-stg-worker -- standard user, DISABLED, random unstored password
+  DRY-RUN add-localgroupmember: Users/elv-stg-worker -- add
+  DRY-RUN add-localgroupmember: ElevariqIsolatedIdentities/elv-stg-worker -- add
+  DRY-RUN new-localuser: elv-stg-broker -- standard user, DISABLED, random unstored password
+  DRY-RUN add-localgroupmember: Users/elv-stg-broker -- add
+  DRY-RUN add-localgroupmember: ElevariqIsolatedIdentities/elv-stg-broker -- add
+  DRY-RUN secedit: USER_RIGHTS -- 02 add=SeDenyRemoteInteractiveLogonRight:*<worker-SID>+*<broker-SID>;SeDenyNetworkLog
+onRight:*<worker-SID>+*<broker-SID>;SeBatchLogonRight:*<worker-SID>+*<broker-SID>;SeDenyInteractiveLogonRight:*<broker-
+SID> remove= (backup export to C:\Users\Roman\ElevariqAdmin\rights; re-export + verify after configure)
+  [PASS] P0 production task present and running Running
+  [PASS] P1 production supervisor process alive (found by command line) pids=8992
+  [PASS] P2 production HEAD = e60278f e60278f
+  [PASS] P3 production task action still points at the checkout script 
+
+Report: E:\Agent\v2-staging\worker-isolation\admin-scripts-r3-20261110\reports\02-identities-and-rights-20261110-162040
+-17456.json
+Changes: 7  Refusals: 0  Checks: 7 (2 FAIL)  Mode: DRY-RUN
+

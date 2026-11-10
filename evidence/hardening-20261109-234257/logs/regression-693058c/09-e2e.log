@@ -1,0 +1,51 @@
+
+ RUN  v5.1.0 E:/Agent/v2-staging/hardening/repo
+
+ ✓ tests/e2e/cli-commands.test.ts (16 tests) 98087ms
+   ✓ CLI commands (9)
+     ✓ help, doctor, integrations 6012ms
+     ✓ project:add, projects, workspaces, workspace:approve 8841ms
+     ✓ task:add (flags, .json file, .md file) and duplicate protection 14076ms
+     ✓ task:pause / resume / cancel / show 8854ms
+     ✓ task:retry / task:unblock operate on FAILED / BLOCKED tasks 3225ms
+     ✓ approvals / approve / deny move the task accordingly 6021ms
+     ✓ memory:set / memory:get, logs, status, health, recovery 13471ms
+     ✓ recovery --run reconciles an orphaned task when no supervisor is alive 1617ms
+     ✓ unknown command and bad config fail with clear exit codes 2630ms
+   ✓ CLI: Phase 1.5 commands (assignments, project lifecycle, verification, provider readiness) (5)
+     ✓ assignment:add validates, registers and creates no tasks; invalid input exits 2 with every problem listed 5627ms
+     ✓ project:status shows lifecycle and a strict delivery-readiness table 3980ms
+     ✓ project:accept and project:deliver are refused before verification 4100ms
+     ✓ project:verify records per-level evidence (unknowns stay unknown) 4137ms
+     ✓ provider:status reports each readiness level without claiming operational; provider:verify demands an explicit flag 4308ms
+   ✓ CLI: Phase 2 stage 5 commands (inbox, progress) (2)
+     ✓ status reports the owner inbox, and inbox/progress print actionable, honest output 5682ms
+     ✓ progress shows verified vs claimed and never an ETA; --history and --json work 5416ms
+ ✓ tests/e2e/restart-recovery.test.ts (3 tests) 43362ms
+   ✓ E2E: three tasks, capacity exhaustion, supervisor killed and restarted (3)
+     ✓ resumes the partially-completed task after restart and completes all three exactly once 24646ms
+     ✓ recovers a task whose supervisor was SIGKILLed mid-execution and resumes its session 11497ms
+     ✓ refuses to start a second live supervisor 7215ms
+ ✓ tests/e2e/orphan-worker.test.ts (3 tests) 88782ms
+   ✓ E2E: orphaned worker process after supervisor SIGKILL (3)
+     ✓ stops exactly the recorded worker, then resumes the task from its checkpoint 33549ms
+     ✓ leaves a process alone when the pid no longer has the recorded identity (pid reuse) 26714ms
+     ✓ Windows: a non-detached worker tree dies with its supervisor (libuv kill-on-close job object) 28509ms
+ ✓ tests/e2e/planning-e2e.test.ts (1 test) 35618ms
+   ✓ E2E: assignment -> planned tasks -> executed -> VERIFYING, across a SIGKILL during planning (1)
+     ✓ resumes the interrupted planning step, waits for plan approval, then builds and executes the plan exactly once 35614ms
+ ✓ tests/e2e/cli-verification-v2.test.ts (3 tests) 23363ms
+   ✓ CLI v2: verification after intake and task:add QA parity (3)
+     ✓ assignment:set-verification is authorised (--by/--reason), validated, audited and visible 9908ms
+     ✓ defense in depth: owner-only commands refuse to run inside a coding worker environment 6512ms
+     ✓ task:add requires criteria, enables independent review and the configured commands, audits waivers 6905ms
+ ✓ tests/e2e/concurrency.test.ts (1 test) 5071ms
+   ✓ multi-process database concurrency (1)
+     ✓ 4 processes x 60 tasks: no SQLITE_BUSY errors, every task claimed and completed exactly once 5059ms
+
+ Test Files  6 passed (6)
+      Tests  27 passed (27)
+   Start at  00:20:37
+   Duration  298.65s (tests 99%, import 1%)
+
+JSON report written to E:/Agent/v2-staging/hardening/20261109-234257/logs/regression-693058c/09-e2e.json

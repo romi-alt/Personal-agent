@@ -1,0 +1,2 @@
+restored E:\Agent\v2-staging\rr\stage\home\pre-v2-backup\agent-2026-11-09T13-29-13-225Z.db -> E:\Agent\v2-staging\rr\stage\home\agent.db
+previous database kept at E:\Agent\v2-staging\rr\stage\home\agent.db.pre-restore-2026-11-09T13-33-09-785Z

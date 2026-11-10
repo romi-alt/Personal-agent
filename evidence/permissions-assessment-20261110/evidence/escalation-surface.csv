@@ -1,0 +1,3 @@
+﻿"kind","name","runsAs","runLevel","state","writablePath","workerRights"
+"scheduled-task","\ElevariqPersonalAgent","Roman","Limited","Running","E:\Agent\Personal-agent\scripts\windows\run-supervisor.ps1","Read,Write,Append,Execute,WriteAttr,Delete"
+"scheduled-task","\ElevariqPersonalAgent","Roman","Limited","Running","E:\Agent\Personal-agent\scripts\windows","List,CreateFile,CreateDir,Traverse,WriteAttr,Delete"

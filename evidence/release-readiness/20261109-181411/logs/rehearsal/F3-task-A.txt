@@ -1,0 +1,2 @@
+queued task tsk_mw9asfn8e7d933e9cd: Feature A
+  verification: CHANGES_EXIST, REQUIREMENTS_SATISFIED (independent review)

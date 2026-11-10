@@ -1,0 +1,123 @@
+﻿{
+    "script":  "02-configure-acls",
+    "startedAt":  "2026-11-10T03:13:18.6261159+05:00",
+    "dryRun":  true,
+    "changes":  [
+                    {
+                        "action":  "note",
+                        "target":  "elevariq-worker",
+                        "detail":  "worker account not present yet; icacls would use its SID in Apply",
+                        "applied":  false,
+                        "at":  "2026-11-10T03:13:18.7296715+05:00"
+                    },
+                    {
+                        "action":  "owner-context",
+                        "target":  "Roman",
+                        "detail":  "sid=S-1-5-21-3837883729-3478098758-1729361560-1001; profile=C:\\Users\\Roman",
+                        "applied":  false,
+                        "at":  "2026-11-10T03:13:18.7615472+05:00"
+                    },
+                    {
+                        "action":  "icacls",
+                        "target":  "C:\\ElevariqWork",
+                        "detail":  "worker tree: worker Modify; owner+SYSTEM Full; inheritance reset [args: C:\\ElevariqWork /inheritance:r /grant *S-1-5-18:(OI)(CI)F /grant *S-1-5-21-3837883729-3478098758-1729361560-1001:(OI)(CI)F /grant \u003celevariq-worker-SID\u003e:(OI)(CI)M]",
+                        "applied":  false,
+                        "at":  "2026-11-10T03:13:18.7649416+05:00"
+                    },
+                    {
+                        "action":  "icacls",
+                        "target":  "C:\\ElevariqBroker",
+                        "detail":  "broker root: worker DENY all; owner+SYSTEM Full (signing key + audit + approvals) [args: C:\\ElevariqBroker /inheritance:r /grant *S-1-5-18:(OI)(CI)F /grant *S-1-5-21-3837883729-3478098758-1729361560-1001:(OI)(CI)F /deny \u003celevariq-worker-SID\u003e:(OI)(CI)F]",
+                        "applied":  false,
+                        "at":  "2026-11-10T03:13:18.7649416+05:00"
+                    },
+                    {
+                        "action":  "skip-absent",
+                        "target":  "C:\\Users\\Roman\\.ssh",
+                        "detail":  "path not present",
+                        "applied":  false,
+                        "at":  "2026-11-10T03:13:18.7778438+05:00"
+                    },
+                    {
+                        "action":  "skip-absent",
+                        "target":  "C:\\Users\\Roman\\.aws",
+                        "detail":  "path not present",
+                        "applied":  false,
+                        "at":  "2026-11-10T03:13:18.7817984+05:00"
+                    },
+                    {
+                        "action":  "acl-backup",
+                        "target":  "C:\\Users\\Roman\\.claude",
+                        "detail":  "would save ACL to E:\\Agent\\v2-staging\\trusted-execution-20261110-0249\\admin-scripts\\acl-backups\\C__Users_Roman_.claude.acl.txt",
+                        "applied":  false,
+                        "at":  "2026-11-10T03:13:18.7833995+05:00"
+                    },
+                    {
+                        "action":  "icacls",
+                        "target":  "C:\\Users\\Roman\\.claude",
+                        "detail":  "worker DENY on owner/production path [args: C:\\Users\\Roman\\.claude /deny \u003celevariq-worker-SID\u003e:(OI)(CI)F]",
+                        "applied":  false,
+                        "at":  "2026-11-10T03:13:18.7920252+05:00"
+                    },
+                    {
+                        "action":  "skip-absent",
+                        "target":  "C:\\Users\\Roman\\.config",
+                        "detail":  "path not present",
+                        "applied":  false,
+                        "at":  "2026-11-10T03:13:18.7936987+05:00"
+                    },
+                    {
+                        "action":  "skip-absent",
+                        "target":  "C:\\Users\\Roman\\.git-credentials",
+                        "detail":  "path not present",
+                        "applied":  false,
+                        "at":  "2026-11-10T03:13:18.7953773+05:00"
+                    },
+                    {
+                        "action":  "skip-absent",
+                        "target":  "C:\\Users\\Roman\\AppData\\Roaming\\GitHub CLI",
+                        "detail":  "path not present",
+                        "applied":  false,
+                        "at":  "2026-11-10T03:13:18.7969114+05:00"
+                    },
+                    {
+                        "action":  "acl-backup",
+                        "target":  "E:\\Agent\\Personal-agent",
+                        "detail":  "would save ACL to E:\\Agent\\v2-staging\\trusted-execution-20261110-0249\\admin-scripts\\acl-backups\\E__Agent_Personal-agent.acl.txt",
+                        "applied":  false,
+                        "at":  "2026-11-10T03:13:18.7983768+05:00"
+                    },
+                    {
+                        "action":  "icacls",
+                        "target":  "E:\\Agent\\Personal-agent",
+                        "detail":  "worker DENY on owner/production path [args: E:\\Agent\\Personal-agent /deny \u003celevariq-worker-SID\u003e:(OI)(CI)F]",
+                        "applied":  false,
+                        "at":  "2026-11-10T03:13:18.7983768+05:00"
+                    },
+                    {
+                        "action":  "acl-backup",
+                        "target":  "C:\\Users\\Roman\\AppData\\Local\\ElevariqAgent",
+                        "detail":  "would save ACL to E:\\Agent\\v2-staging\\trusted-execution-20261110-0249\\admin-scripts\\acl-backups\\C__Users_Roman_AppData_Local_ElevariqAgent.acl.txt",
+                        "applied":  false,
+                        "at":  "2026-11-10T03:13:18.8015632+05:00"
+                    },
+                    {
+                        "action":  "icacls",
+                        "target":  "C:\\Users\\Roman\\AppData\\Local\\ElevariqAgent",
+                        "detail":  "worker DENY on owner/production path [args: C:\\Users\\Roman\\AppData\\Local\\ElevariqAgent /deny \u003celevariq-worker-SID\u003e:(OI)(CI)F]",
+                        "applied":  false,
+                        "at":  "2026-11-10T03:13:18.8015632+05:00"
+                    },
+                    {
+                        "action":  "report-only",
+                        "target":  "E:\\",
+                        "detail":  "Authenticated Users has Modify on E:\\ (inherited by production). Recommend targeted removal via 02b; NOT changed here.",
+                        "applied":  false,
+                        "at":  "2026-11-10T03:13:18.8441853+05:00"
+                    }
+                ],
+    "refusals":  [
+
+                 ],
+    "path":  "E:\\Agent\\v2-staging\\trusted-execution-20261110-0249\\admin-scripts\\reports\\02-configure-acls-20261110-031318.json"
+}

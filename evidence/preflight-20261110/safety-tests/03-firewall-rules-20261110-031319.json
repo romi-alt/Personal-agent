@@ -1,0 +1,39 @@
+﻿{
+    "script":  "03-firewall-rules",
+    "startedAt":  "2026-11-10T03:13:19.2693798+05:00",
+    "dryRun":  true,
+    "changes":  [
+                    {
+                        "action":  "new-netfirewallrule",
+                        "target":  "ELEVARIQ-Worker-Allow-Anthropic",
+                        "detail":  "Outbound Allow; LocalUser=worker-SID; Remote=api.anthropic.com; worker -\u003e Anthropic API",
+                        "applied":  false,
+                        "at":  "2026-11-10T03:13:19.3897039+05:00"
+                    },
+                    {
+                        "action":  "new-netfirewallrule",
+                        "target":  "ELEVARIQ-Worker-Allow-Proxy",
+                        "detail":  "Outbound Allow; LocalUser=worker-SID; Remote=127.0.0.1; worker -\u003e owner egress proxy",
+                        "applied":  false,
+                        "at":  "2026-11-10T03:13:19.3954108+05:00"
+                    },
+                    {
+                        "action":  "new-netfirewallrule",
+                        "target":  "ELEVARIQ-Worker-Block-Other",
+                        "detail":  "Outbound Block; LocalUser=worker-SID; Remote=Any; worker -\u003e everything else (deny)",
+                        "applied":  false,
+                        "at":  "2026-11-10T03:13:19.3954108+05:00"
+                    },
+                    {
+                        "action":  "residual-gap",
+                        "target":  "egress",
+                        "detail":  "Image-based rules do not cover arbitrary child images. Force worker traffic through the authenticated proxy for complete control.",
+                        "applied":  false,
+                        "at":  "2026-11-10T03:13:19.3954108+05:00"
+                    }
+                ],
+    "refusals":  [
+
+                 ],
+    "path":  "E:\\Agent\\v2-staging\\trusted-execution-20261110-0249\\admin-scripts\\reports\\03-firewall-rules-20261110-031319.json"
+}

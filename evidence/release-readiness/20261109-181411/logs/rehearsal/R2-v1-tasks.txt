@@ -1,0 +1,143 @@
+ID                      TITLE                                                                                                           STATUS     PRIO  ATTEMPTS  ELIGIBLE  ERROR
+----------------------  --------------------------------------------------------------------------------------------------------------  ---------  ----  --------  --------  -----
+tsk_mw6eh7mof8eabd6481  Plan: intake                                                                                                    COMPLETED  1000  0/3       -         -
+tsk_mw6eht9s165c08608a  Plan: analyze                                                                                                   COMPLETED  1000  0/3       -         -
+tsk_mw6eiykjcc7fc967cc  Plan: research                                                                                                  COMPLETED  1000  0/3       -         -
+tsk_mw6ek1xy827c77811c  Plan: architect                                                                                                 COMPLETED  1000  0/3       -         -
+tsk_mw6emhrgd3bf3814bd  Plan: decompose                                                                                                 COMPLETED  1000  0/3       -         -
+tsk_mw6ep5xt47ed48c71d  Plan: review                                                                                                    COMPLETED  1000  0/3       -         -
+tsk_mw6ewlfncbf97edf23  Scaffold npm workspaces monorepo                                                                                COMPLETED  71    0/3       -         -
+tsk_mw6ewlfr84adb198d3  Shared money library (integer paisa)                                                                            COMPLETED  72    0/3       -         -
+tsk_mw6ewlft8cc6d4a29d  Migration runner and core schema                                                                                COMPLETED  73    0/3       -         -
+tsk_mw6ewlfvabcf6960e5  Design system: tokens, themes and core components                                                               COMPLETED  76    0/3       -         -
+tsk_mw6ewlfxe20267607c  Inventory, purchasing and sales schema migrations                                                               COMPLETED  74    0/3       -         -
+tsk_mw6ewlg0ee2337a276  Fastify API skeleton with zod validation and error model                                                        COMPLETED  75    0/3       -         -
+tsk_mw6ewlg2ce83383554  SPA shell, routing and API client                                                                               COMPLETED  77    0/3       -         -
+tsk_mw6ewlg3456892b1e8  Authentication: sessions, login/logout, throttling, CSRF                                                        COMPLETED  68    0/3       -         -
+tsk_mw6ewlg5e3f346ddf2  Password management and policy                                                                                  COMPLETED  69    0/3       -         -
+tsk_mw6ewlg758e9a42609  Permission matrix, default-deny enforcement and branch scope                                                    COMPLETED  70    0/3       -         -
+tsk_mw6ewlg9ef0bb3f8b5  Audit module and viewer API                                                                                     COMPLETED  71    0/3       -         -
+tsk_mw6ewlgb3e7a9764cf  User and branch administration API                                                                              COMPLETED  72    0/3       -         -
+tsk_mw6ewlgf27cb5d4069  Audit log viewer UI                                                                                             COMPLETED  74    0/3       -         -
+tsk_mw6ewlgh0407ad19bb  Catalog API: categories and products                                                                            COMPLETED  65    0/3       -         -
+tsk_mw6ewlgj4e255e1028  Auth and administration UI                                                                                      COMPLETED  73    0/3       -         -
+tsk_mw6ewlgl8a0fd2306c  Inventory service: stock ledger choke point, receiving and adjustments                                          COMPLETED  66    0/3       -         -
+tsk_mw6ewlgn269b7d6820  Products UI                                                                                                     COMPLETED  70    0/3       -         -
+tsk_mw6ewlgo818a176aa9  Stock queries: ledger, low-stock and valuation                                                                  COMPLETED  67    0/3       -         -
+tsk_mw6ewlgq0086ceef09  Stock transfers with approval                                                                                   COMPLETED  68    0/3       -         -
+tsk_mw6ewlgs75f4644ddc  Deterministic fictional seed data                                                                               COMPLETED  69    0/3       -         -
+tsk_mw6ewlgt5d909275a9  Suppliers API with payments and computed balances                                                               COMPLETED  63    0/3       -         -
+tsk_mw6ewlgv347483eed5  Inventory UI: stock levels, receive, adjust, ledger, low stock                                                  COMPLETED  71    0/3       -         -
+tsk_mw6ewlgx46a7b121d6  Sales creation: customers, discounts and invoices                                                               COMPLETED  57    0/3       -         -
+tsk_mw6ewlgz172ca6db36  Transfers UI                                                                                                    COMPLETED  72    0/3       -         -
+tsk_mw6ewlh02250a23045  Operating expenses API and UI                                                                                   COMPLETED  51    0/3       -         -
+tsk_mw6ewlh4cd150bc144  Purchase orders and receiving                                                                                   COMPLETED  64    0/3       -         -
+tsk_mw6ewlh5f40bdbd091  Sales history, returns and cancellation                                                                         COMPLETED  58    0/3       -         -
+tsk_mw6ewlh7f79a80beb8  Sales creation UI                                                                                               COMPLETED  59    0/3       -         -
+tsk_mw6ewlh969b427fa3d  Purchase returns to suppliers                                                                                   COMPLETED  65    0/3       -         -
+tsk_mw6ewlhb1f4e0d7e41  Sales history, invoice print, returns and cancellation UI                                                       COMPLETED  60    0/3       -         -
+tsk_mw6ewlhc65e2ac6be3  Reporting engine, dashboard API and operational reports                                                         COMPLETED  52    0/3       -         -
+tsk_mw6ewlhefa8ba4e8d2  Suppliers and purchasing UI                                                                                     COMPLETED  66    0/3       -         -
+tsk_mw6ewlhga645dd28f9  Integrity and reconciliation tool                                                                               COMPLETED  57    0/3       -         -
+tsk_mw6ewlhh588963b2b1  Profitability report                                                                                            COMPLETED  53    1/3       -         -
+tsk_mw6ewlhj6a9f16ebd6  Executive dashboard UI                                                                                          COMPLETED  55    0/3       -         -
+tsk_mw6ewlhlc027b0c340  CSV export with formula-injection protection                                                                    COMPLETED  54    0/3       -         -
+tsk_mw6ewlhmf8d1750d40  Reports UI with date filters and export                                                                         COMPLETED  56    0/3       -         -
+tsk_mw6ewlhoacf71ad021  Authorization test matrix                                                                                       COMPLETED  49    0/3       -         -
+tsk_mw6ewlhq59c0c75955  Cross-module integration and database integrity tests                                                           COMPLETED  50    0/3       -         -
+tsk_mw6ewlhu84616bc089  Performance dataset and measurement                                                                             COMPLETED  52    0/3       -         -
+tsk_mw6ewlhw48197b1d81  Accessibility pass and confirmation dialog coverage                                                             COMPLETED  48    0/3       -         -
+tsk_mw6ewlhy060bc4949b  API documentation (OpenAPI)                                                                                     COMPLETED  54    0/3       -         -
+tsk_mw6ewli1a52a7f90f5  Security checks and dependency analysis                                                                         COMPLETED  53    0/3       -         -
+tsk_mw6ewli37f97d81932  Playwright msedge desktop and mobile journeys                                                                   COMPLETED  51    0/3       -         -
+tsk_mw6ewli5188932593a  User, deployment and architecture documentation                                                                 COMPLETED  55    0/3       -         -
+tsk_mw6ewli71844f49b97  Traceability, verified-vs-assumed register and delivery report                                                  COMPLETED  56    0/3       -         -
+tsk_mw6f6t4j59955ad71c  Review: Scaffold npm workspaces monorepo                                                                        COMPLETED  2000  0/3       -         -
+tsk_mw6f79bv409911f69d  Fix: Scaffold npm workspaces monorepo (QA round 1)                                                              COMPLETED  1500  0/3       -         -
+tsk_mw6fcmqhaad8cfc225  Review: Scaffold npm workspaces monorepo (round 2)                                                              COMPLETED  2000  0/3       -         -
+tsk_mw6fpcqm4e1199f8e1  Review: Design system: tokens, themes and core components                                                       COMPLETED  2000  0/3       -         -
+tsk_mw6fssj51f320a0379  Review: Migration runner and core schema                                                                        COMPLETED  2000  0/3       -         -
+tsk_mw6ft8v4e77c883372  Fix: Migration runner and core schema (QA round 1)                                                              COMPLETED  1500  0/3       -         -
+tsk_mw6fuiu84d5477b3b7  Review: Migration runner and core schema (round 2)                                                              COMPLETED  2000  0/3       -         -
+tsk_mw6fv1mt2c7a4345fb  Fix: Migration runner and core schema (QA round 2)                                                              COMPLETED  1500  0/3       -         -
+tsk_mw6fzksj79178aa068  Review: Migration runner and core schema (round 3)                                                              COMPLETED  2000  0/3       -         -
+tsk_mw6g83ocbd2384ff48  Review: Inventory, purchasing and sales schema migrations                                                       COMPLETED  2000  0/3       -         -
+tsk_mw6g8w189264aecf5c  Review: Fastify API skeleton with zod validation and error model                                                COMPLETED  2000  0/3       -         -
+tsk_mw6g9ba43b399f1327  Fix: Fastify API skeleton with zod validation and error model (QA round 1)                                      COMPLETED  1500  0/3       -         -
+tsk_mw6gae4zf4bad3f3b1  Review: Fastify API skeleton with zod validation and error model (round 2)                                      COMPLETED  2000  0/3       -         -
+tsk_mw6gat072c614ffc30  Fix: Fastify API skeleton with zod validation and error model (QA round 2)                                      COMPLETED  1500  0/3       -         -
+tsk_mw6gbth07100f69595  Review: Fastify API skeleton with zod validation and error model (round 3)                                      COMPLETED  2000  0/3       -         -
+tsk_mw6geoo3cca1f66cf7  Review: Shared money library (integer paisa)                                                                    COMPLETED  2000  0/3       -         -
+tsk_mw6gm7sb7d2d74ab4f  Review: SPA shell, routing and API client                                                                       COMPLETED  2000  0/3       -         -
+tsk_mw6gmotcf4349ba3aa  Fix: SPA shell, routing and API client (QA round 1)                                                             COMPLETED  1500  0/3       -         -
+tsk_mw6goxn62c803f0077  Review: SPA shell, routing and API client (round 2)                                                             COMPLETED  2000  0/3       -         -
+tsk_mw6gwzp79c255c4f34  Review: Authentication: sessions, login/logout, throttling, CSRF                                                COMPLETED  2000  0/3       -         -
+tsk_mw6gxq4qca4d904910  Fix: Authentication: sessions, login/logout, throttling, CSRF (QA round 1)                                      COMPLETED  1500  0/3       -         -
+tsk_mw6gzri71b235373ff  Review: Authentication: sessions, login/logout, throttling, CSRF (round 2)                                      COMPLETED  2000  0/3       -         -
+tsk_mw6h85mu37a73de0ea  Review: Permission matrix, default-deny enforcement and branch scope                                            COMPLETED  2000  0/3       -         -
+tsk_mw6hjw9k575bb1f917  Review: Password management and policy                                                                          COMPLETED  2000  0/3       -         -
+tsk_mw6htx2yc138f2df75  Review: Audit module and viewer API                                                                             COMPLETED  2000  0/3       -         -
+tsk_mw6hukwv7da04e2e86  Fix: Audit module and viewer API (QA round 1)                                                                   COMPLETED  1500  0/3       -         -
+tsk_mw6hy942e94532302f  Review: Audit module and viewer API (round 2)                                                                   COMPLETED  2000  0/3       -         -
+tsk_mw6i5f83a88447e2ce  Review: Audit log viewer UI                                                                                     COMPLETED  2000  0/3       -         -
+tsk_mw6idmra176396cc2b  Review: User and branch administration API                                                                      COMPLETED  2000  0/3       -         -
+tsk_mw6ikqakcb3e9071bc  Review: Catalog API: categories and products                                                                    COMPLETED  2000  0/3       -         -
+tsk_mw6j4wdi1771d36238  Review: Auth and administration UI                                                                              COMPLETED  2000  0/3       -         -
+tsk_mw6jdp8m8506becaf4  Review: Products UI                                                                                             COMPLETED  2000  0/3       -         -
+tsk_mw6jjrgb762377c2b1  Review: Inventory service: stock ledger choke point, receiving and adjustments                                  COMPLETED  2000  0/3       -         -
+tsk_mw6jqlra6cf03c6f83  Review: Deterministic fictional seed data                                                                       COMPLETED  2000  0/3       -         -
+tsk_mw6jr1df1967d06f2d  Fix: Deterministic fictional seed data (QA round 1)                                                             COMPLETED  1500  0/3       -         -
+tsk_mw6jujfj275c6cddbb  Review: Deterministic fictional seed data (round 2)                                                             COMPLETED  2000  0/3       -         -
+tsk_mw6k14d1479936c570  Review: Stock transfers with approval                                                                           COMPLETED  2000  0/3       -         -
+tsk_mw6k6lww23d1580913  Review: Transfers UI                                                                                            COMPLETED  2000  0/3       -         -
+tsk_mw6kgkbf640d400f8b  Review: Stock queries: ledger, low-stock and valuation                                                          COMPLETED  2000  0/3       -         -
+tsk_mw6kop5id552ff9df1  Review: Inventory UI: stock levels, receive, adjust, ledger, low stock                                          COMPLETED  2000  0/3       -         -
+tsk_mw6kvnbl83cff992c5  Review: Suppliers API with payments and computed balances                                                       COMPLETED  2000  0/3       -         -
+tsk_mw6l7vd77e4303f3db  Review: Purchase orders and receiving                                                                           COMPLETED  2000  0/3       -         -
+tsk_mw6lfn3gc703e76433  Review: Purchase returns to suppliers                                                                           COMPLETED  2000  0/3       -         -
+tsk_mw6lqmki64a510b89b  Review: Suppliers and purchasing UI                                                                             COMPLETED  2000  0/3       -         -
+tsk_mw6lrfcwd7a75cec37  Fix: Suppliers and purchasing UI (QA round 1)                                                                   COMPLETED  1500  0/3       -         -
+tsk_mw6lsqai6b55c389e0  Review: Suppliers and purchasing UI (round 2)                                                                   COMPLETED  2000  0/3       -         -
+tsk_mw6lzu7z0062e11465  Review: Sales creation: customers, discounts and invoices                                                       COMPLETED  2000  0/3       -         -
+tsk_mw6m647ofae3534daa  Review: Sales creation UI                                                                                       COMPLETED  2000  0/3       -         -
+tsk_mw6mevlud5b7cd35b9  Review: Sales history, returns and cancellation                                                                 COMPLETED  2000  0/3       -         -
+tsk_mw6mlna7dffc7f0ee0  Review: Sales history, invoice print, returns and cancellation UI                                               COMPLETED  2000  0/3       -         -
+tsk_mw6mva831dd77995f7  Review: Integrity and reconciliation tool                                                                       COMPLETED  2000  0/3       -         -
+tsk_mw6n50mu9fe705c0c0  Review: Reporting engine, dashboard API and operational reports                                                 COMPLETED  2000  0/3       -         -
+tsk_mw6n5h9aec055a2e2d  Fix: Reporting engine, dashboard API and operational reports (QA round 1)                                       COMPLETED  1500  0/3       -         -
+tsk_mw6nkyri15483db746  Review: Operating expenses API and UI                                                                           COMPLETED  2000  0/3       -         -
+tsk_mw6nm11taaa0338fb9  Review: Reporting engine, dashboard API and operational reports (round 2)                                       COMPLETED  2000  0/3       -         -
+tsk_mw6nrso022683d5b8e  Review: Executive dashboard UI                                                                                  COMPLETED  2000  0/3       -         -
+tsk_mw6nxthu3e2d13aa4f  Review: Profitability report                                                                                    COMPLETED  2000  0/3       -         -
+tsk_mw6o8ucd5b8de4d854  Review: CSV export with formula-injection protection                                                            COMPLETED  2000  0/3       -         -
+tsk_mw6ogcega679c04c62  Review: Reports UI with date filters and export                                                                 COMPLETED  2000  0/3       -         -
+tsk_mw6p14v64a8bae810a  Review: Performance dataset and measurement                                                                     COMPLETED  2000  0/3       -         -
+tsk_mw6pcb776e0bb80265  Review: Cross-module integration and database integrity tests                                                   COMPLETED  2000  0/3       -         -
+tsk_mw6pcuby822af47da7  Fix: Cross-module integration and database integrity tests (QA round 1)                                         COMPLETED  1500  0/3       -         -
+tsk_mw6phli1c33aaabcaa  Review: Cross-module integration and database integrity tests (round 2)                                         COMPLETED  2000  0/3       -         -
+tsk_mw6pi7u5727762e645  Fix: Cross-module integration and database integrity tests (QA round 2)                                         COMPLETED  1500  0/3       -         -
+tsk_mw6pn9h614546a63c8  Review: Cross-module integration and database integrity tests (round 3)                                         COMPLETED  2000  0/3       -         -
+tsk_mw6ptltz6ec592026d  Review: Authorization test matrix                                                                               COMPLETED  2000  0/3       -         -
+tsk_mw6ptzsw234616dd07  Fix: Authorization test matrix (QA round 1)                                                                     COMPLETED  1500  0/3       -         -
+tsk_mw6pyu32e1f1c0d6ae  Review: Authorization test matrix (round 2)                                                                     COMPLETED  2000  0/3       -         -
+tsk_mw6pza0z137b925560  Fix: Authorization test matrix (QA round 2)                                                                     COMPLETED  1500  0/3       -         -
+tsk_mw6q36dwde7dfeed48  Review: Authorization test matrix (round 3)                                                                     COMPLETED  2000  0/3       -         -
+tsk_mw6qev54ed00819a0c  Review: API documentation (OpenAPI)                                                                             COMPLETED  2000  0/3       -         -
+tsk_mw6qfden193f4c95a8  Review: API documentation (OpenAPI) (repair 1)                                                                  COMPLETED  2000  0/3       -         -
+tsk_mw6qfs7w1f9e7a7b8f  Fix: API documentation (OpenAPI) (QA round 1)                                                                   COMPLETED  1500  0/3       -         -
+tsk_mw6qm36ja9ff026d8c  Review: API documentation (OpenAPI) (round 2)                                                                   COMPLETED  2000  0/3       -         -
+tsk_mw6qml8vb15a16e7fa  Fix: API documentation (OpenAPI) (QA round 2)                                                                   COMPLETED  1500  0/3       -         -
+tsk_mw6qvbyg0217c74e10  Review: API documentation (OpenAPI) (round 3)                                                                   COMPLETED  2000  0/3       -         -
+tsk_mw6rryb372f1e2fbd5  Review: User, deployment and architecture documentation                                                         COMPLETED  2000  0/3       -         -
+tsk_mw6rshx74dc6617543  Fix: User, deployment and architecture documentation (QA round 1)                                               COMPLETED  1500  1/3       -         -
+tsk_mw6rt3cg88ed0fdde3  Review: Security checks and dependency analysis                                                                 COMPLETED  2000  0/3       -         -
+tsk_mw6sj5wyb0786bf9fd  Review: User, deployment and architecture documentation (round 2)                                               COMPLETED  2000  0/3       -         -
+tsk_mw6sjt0r26b8c03396  Fix: User, deployment and architecture documentation (QA round 2)                                               COMPLETED  1500  0/3       -         -
+tsk_mw6t0zap8e938cf1c1  Review: User, deployment and architecture documentation (round 3)                                               COMPLETED  2000  0/3       -         -
+tsk_mw6t5mwo2aa98a6c61  Review: Accessibility pass and confirmation dialog coverage                                                     COMPLETED  2000  0/3       -         -
+tsk_mw6tl83r4178335afd  Review: Playwright msedge desktop and mobile journeys                                                           COMPLETED  2000  0/3       -         -
+tsk_mw6u27t773e0392dd6  Review: Traceability, verified-vs-assumed register and delivery report                                          COMPLETED  2000  0/3       -         -
+tsk_mw6uowo58b6602c4f0  Fix: npm test fails on a fresh Windows clone (CRLF checkout of generated docs)                                  COMPLETED  100   0/3       -         -
+tsk_mw6uox2lec204f5f93  Fix: seeded demo users must be flagged must_change_password (owner plan condition 3)                            COMPLETED  99    0/3       -         -
+tsk_mw7277731e588e25eb  Fix S1-F1: flag legacy seeded demo accounts in databases created before 022d286 (safe, idempotent remediation)  COMPLETED  10    0/3       -         -
+tsk_mw7277sxcb24a47449  Fix D4: investigate and correct the intermittent expenses web test failure (root cause, no timeout masking)     COMPLETED  9     2/3       -         -

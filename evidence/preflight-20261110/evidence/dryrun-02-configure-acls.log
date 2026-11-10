@@ -1,0 +1,20 @@
+﻿== 02 Configure ACLs (DRY-RUN) ==
+  DRY-RUN note: elevariq-worker -- worker account not present yet; icacls would use its SID in Apply
+  DRY-RUN owner-context: Roman -- sid=S-1-5-21-3837883729-3478098758-1729361560-1001; profile=C:\Users\Roman
+  DRY-RUN icacls: C:\ElevariqWork -- worker tree: worker Modify; owner+SYSTEM Full; inheritance reset [args: C:\ElevariqWork /inheritance:r /grant *S-1-5-18:(OI)(CI)F /grant *S-1-5-21-3837883729-3478098758-1729361560-1001:(OI)(CI)F /grant <elevariq-worker-SID>:(OI)(CI)M]
+  DRY-RUN icacls: C:\ElevariqBroker -- broker root: worker DENY all; owner+SYSTEM Full (signing key + audit + approvals) [args: C:\ElevariqBroker /inheritance:r /grant *S-1-5-18:(OI)(CI)F /grant *S-1-5-21-3837883729-3478098758-1729361560-1001:(OI)(CI)F /deny <elevariq-worker-SID>:(OI)(CI)F]
+  DRY-RUN skip-absent: C:\Users\Roman\.ssh -- path not present
+  DRY-RUN skip-absent: C:\Users\Roman\.aws -- path not present
+  DRY-RUN acl-backup: C:\Users\Roman\.claude -- would save ACL to E:\Agent\v2-staging\trusted-execution-20261110-0249\admin-scripts\acl-backups\C__Users_Roman_.claude.acl.txt
+  DRY-RUN icacls: C:\Users\Roman\.claude -- worker DENY on owner/production path [args: C:\Users\Roman\.claude /deny <elevariq-worker-SID>:(OI)(CI)F]
+  DRY-RUN skip-absent: C:\Users\Roman\.config -- path not present
+  DRY-RUN skip-absent: C:\Users\Roman\.git-credentials -- path not present
+  DRY-RUN skip-absent: C:\Users\Roman\AppData\Roaming\GitHub CLI -- path not present
+  DRY-RUN acl-backup: E:\Agent\Personal-agent -- would save ACL to E:\Agent\v2-staging\trusted-execution-20261110-0249\admin-scripts\acl-backups\E__Agent_Personal-agent.acl.txt
+  DRY-RUN icacls: E:\Agent\Personal-agent -- worker DENY on owner/production path [args: E:\Agent\Personal-agent /deny <elevariq-worker-SID>:(OI)(CI)F]
+  DRY-RUN acl-backup: C:\Users\Roman\AppData\Local\ElevariqAgent -- would save ACL to E:\Agent\v2-staging\trusted-execution-20261110-0249\admin-scripts\acl-backups\C__Users_Roman_AppData_Local_ElevariqAgent.acl.txt
+  DRY-RUN icacls: C:\Users\Roman\AppData\Local\ElevariqAgent -- worker DENY on owner/production path [args: C:\Users\Roman\AppData\Local\ElevariqAgent /deny <elevariq-worker-SID>:(OI)(CI)F]
+  DRY-RUN report-only: E:\ -- Authenticated Users has Modify on E:\ (inherited by production). Recommend targeted removal via 02b; NOT changed here.
+
+Report written: E:\Agent\v2-staging\trusted-execution-20261110-0249\admin-scripts\reports\02-configure-acls-20261110-031318.json
+Changes: 16  Refusals: 0  Mode: DRY-RUN

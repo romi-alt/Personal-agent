@@ -1,0 +1,33 @@
+﻿{
+    "mode":  "sandboxed",
+    "wallMs":  6207,
+    "detachedGrandchildSurvived":  false,
+    "db":  {
+               "approvals":  [
+                                 {
+                                     "id":  "apr_isotestcli0001",
+                                     "status":  "PENDING",
+                                     "decided_by":  null
+                                 },
+                                 {
+                                     "id":  "apr_isotestsql0001",
+                                     "status":  "PENDING",
+                                     "decided_by":  null
+                                 }
+                             ],
+               "attackerTable":  0
+           },
+    "policyFileWidened":  false,
+    "fakeProdEnvTampered":  false,
+    "stopHoldCreated":  false,
+    "auditForged":  false,
+    "audit2Deleted":  false,
+    "outsideVictimDeleted":  false,
+    "outsideVictim2Deleted":  false,
+    "escapeFiles":  [
+                        null
+                    ],
+    "hkcuTestKey":  false,
+    "isoTask":  false,
+    "outsideAcl":  false
+}

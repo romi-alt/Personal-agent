@@ -1,0 +1,6 @@
+﻿== 04 Staging worker task [register] (DRY-RUN) ==
+  DRY-RUN register-scheduledtask: ElevariqStagingWorker -- principal=elv-stg-worker (standard); action=powershell -File C:\ElevariqStaging\work\run-worker.ps1; env USERPROFILE/APPDATA/TEMP under C:\ElevariqStaging\work
+  DRY-RUN note: ElevariqStagingWorker -- does NOT alter production task ElevariqPersonalAgent
+
+Report written: E:\Agent\v2-staging\trusted-execution-20261110-0249\admin-scripts\reports\04-worker-task-register-20261110-032744.json
+Changes: 2  Refusals: 0  Mode: DRY-RUN / STAGING-ONLY

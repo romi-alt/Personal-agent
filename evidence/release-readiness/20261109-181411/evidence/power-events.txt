@@ -1,0 +1,21 @@
+﻿
+TimeCreated           Id ProviderName                          
+-----------           -- ------------                          
+11/9/2026 5:49:51 PM   1 Microsoft-Windows-IsolatedUserMode    
+11/9/2026 2:23:59 PM   1 Microsoft-Windows-IsolatedUserMode    
+11/9/2026 12:48:21 PM  1 Microsoft-Windows-IsolatedUserMode    
+11/9/2026 7:29:13 AM   1 Microsoft-Windows-Kernel-General      
+11/9/2026 3:46:47 AM   1 Microsoft-Windows-IsolatedUserMode    
+11/9/2026 2:46:08 AM   1 Microsoft-Windows-Kernel-General      
+11/9/2026 2:46:08 AM   1 Microsoft-Windows-Kernel-General      
+11/9/2026 2:46:08 AM   1 Microsoft-Windows-Kernel-General      
+11/9/2026 2:45:06 AM   1 Microsoft-Windows-Power-Troubleshooter
+11/9/2026 2:45:03 AM   1 Microsoft-Windows-Kernel-General      
+11/8/2026 11:30:43 PM 42 Microsoft-Windows-Kernel-Power        
+11/8/2026 10:45:44 PM  1 Microsoft-Windows-Power-Troubleshooter
+11/8/2026 10:45:41 PM  1 Microsoft-Windows-Kernel-General      
+11/8/2026 6:57:55 PM  42 Microsoft-Windows-Kernel-Power        
+11/8/2026 5:52:57 PM   1 Microsoft-Windows-Power-Troubleshooter
+
+
+

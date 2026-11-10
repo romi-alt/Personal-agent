@@ -1,0 +1,133 @@
+﻿{
+    "script":  "07-verify-config",
+    "revision":  "r3-20261110",
+    "startedAt":  "2026-11-10T16:00:14.4283097+05:00",
+    "finishedAt":  "2026-11-10T16:00:25.3028823+05:00",
+    "dryRun":  true,
+    "user":  "DESKTOP-QGGLG8D\\Roman",
+    "elevated":  false,
+    "changes":  [
+
+                ],
+    "refusals":  [
+
+                 ],
+    "checks":  [
+                   {
+                       "id":  "C00.1",
+                       "name":  "group ElevariqIsolatedIdentities exists",
+                       "status":  "FAIL",
+                       "detail":  ""
+                   },
+                   {
+                       "id":  "C00.5",
+                       "name":  "test residue Everyone:F removed (00a)",
+                       "status":  "FAIL",
+                       "detail":  ""
+                   },
+                   {
+                       "id":  "C01.1",
+                       "name":  "staging VHDX mounted at C:\\ElevariqStaging",
+                       "status":  "FAIL",
+                       "detail":  ""
+                   },
+                   {
+                       "id":  "C01.4",
+                       "name":  "disk attach task runs as SYSTEM",
+                       "status":  "FAIL",
+                       "detail":  ""
+                   },
+                   {
+                       "id":  "C02.1",
+                       "name":  "elv-stg-worker exists",
+                       "status":  "FAIL",
+                       "detail":  ""
+                   },
+                   {
+                       "id":  "C02.1",
+                       "name":  "elv-stg-broker exists",
+                       "status":  "FAIL",
+                       "detail":  ""
+                   },
+                   {
+                       "id":  "C04.1",
+                       "name":  "broker task runs as elv-stg-broker, Limited",
+                       "status":  "FAIL",
+                       "detail":  ""
+                   },
+                   {
+                       "id":  "C05.0",
+                       "name":  "firewall profiles enabled and honouring local rules",
+                       "status":  "PASS",
+                       "detail":  ""
+                   },
+                   {
+                       "id":  "C05.1",
+                       "name":  "ELEVARIQ-STG-Worker-Block-IPv6 present, enabled, outbound block, bound to the CURRENT worker SID",
+                       "status":  "FAIL",
+                       "detail":  ""
+                   },
+                   {
+                       "id":  "C05.1",
+                       "name":  "ELEVARIQ-STG-Worker-Block-IPv4 present, enabled, outbound block, bound to the CURRENT worker SID",
+                       "status":  "FAIL",
+                       "detail":  ""
+                   },
+                   {
+                       "id":  "C05.2",
+                       "name":  "no staging ALLOW rules (r1 leftovers)",
+                       "status":  "PASS",
+                       "detail":  ""
+                   },
+                   {
+                       "id":  "C05.3",
+                       "name":  "host-level SMB/WebDAV delegation rules present (H3; optional, separately authorized)",
+                       "status":  "INFO",
+                       "detail":  "0 host rules"
+                   },
+                   {
+                       "id":  "C05.4",
+                       "name":  "service WebClient state (H3 delegation vector)",
+                       "status":  "INFO",
+                       "detail":  "Stopped/Manual"
+                   },
+                   {
+                       "id":  "C05.4",
+                       "name":  "service BITS state (H3 delegation vector)",
+                       "status":  "INFO",
+                       "detail":  "Running/Automatic"
+                   },
+                   {
+                       "id":  "C06.1",
+                       "name":  "worker task runs as elv-stg-worker, Limited",
+                       "status":  "FAIL",
+                       "detail":  ""
+                   },
+                   {
+                       "id":  "P0",
+                       "name":  "production task present and running",
+                       "status":  "PASS",
+                       "detail":  "Running"
+                   },
+                   {
+                       "id":  "P1",
+                       "name":  "production supervisor process alive (found by command line)",
+                       "status":  "PASS",
+                       "detail":  "pids=8992"
+                   },
+                   {
+                       "id":  "P2",
+                       "name":  "production HEAD = e60278f",
+                       "status":  "PASS",
+                       "detail":  "e60278f"
+                   },
+                   {
+                       "id":  "P3",
+                       "name":  "production task action still points at the checkout script",
+                       "status":  "PASS",
+                       "detail":  ""
+                   }
+               ],
+    "error":  null,
+    "path":  "E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110\\reports\\07-verify-config-20261110-160014-1132.json"
+}

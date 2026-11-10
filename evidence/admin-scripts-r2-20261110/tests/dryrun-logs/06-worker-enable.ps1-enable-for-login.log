@@ -1,0 +1,32 @@
+﻿== 06-worker-enable-for-login (DRY-RUN, revision r2-20261110) ==
+  [WARN] R7 trusted script location + SHA256SUMS broad write on 
+E:\Agent\v2-staging\worker-isolation\admin-scripts-r2-20261110; broad write on 
+E:\Agent\v2-staging\worker-isolation\admin-scripts-r2-20261110\00-isolation-group-deny.ps1; broad write on 
+E:\Agent\v2-staging\worker-isolation\admin-scripts-r2-20261110\00a-remove-test-residue.ps1; broad write on 
+E:\Agent\v2-staging\worker-isolation\admin-scripts-r2-20261110\01-staging-volume.ps1; broad write on 
+E:\Agent\v2-staging\worker-isolation\admin-scripts-r2-20261110\02-identities-and-rights.ps1; broad write on 
+E:\Agent\v2-staging\worker-isolation\admin-scripts-r2-20261110\03-staging-layout.ps1; broad write on 
+E:\Agent\v2-staging\worker-isolation\admin-scripts-r2-20261110\04-broker-install.ps1; broad write on 
+E:\Agent\v2-staging\worker-isolation\admin-scripts-r2-20261110\05-firewall-egress.ps1; broad write on 
+E:\Agent\v2-staging\worker-isolation\admin-scripts-r2-20261110\06-worker-enable.ps1; broad write on 
+E:\Agent\v2-staging\worker-isolation\admin-scripts-r2-20261110\07-verify-config.ps1; broad write on 
+E:\Agent\v2-staging\worker-isolation\admin-scripts-r2-20261110\09-rollback.ps1; broad write on 
+E:\Agent\v2-staging\worker-isolation\admin-scripts-r2-20261110\Freeze-AdminScripts.ps1; broad write on 
+E:\Agent\v2-staging\worker-isolation\admin-scripts-r2-20261110\_common.ps1; SHA256SUMS missing
+  [FAIL] GATE worker exists 
+  [FAIL] GATE worker in deny group 
+  [FAIL] GATE explicit DENY on E:\ and F:\ 
+  [FAIL] GATE staging work\ exists 
+  [FAIL] GATE worker DENY on broker\ 
+  [FAIL] GATE worker firewall rules present 
+  DRY-RUN enable-localuser: elv-stg-worker -- owner sets password; enable; then runas + claude login (worker's own 
+login)
+  [PASS] P0 production task present and running Running
+  [PASS] P1 production supervisor PID 8992 alive 
+  [PASS] P2 production HEAD = e60278f e60278f
+  [PASS] P3 production task action still points at the checkout script 
+
+Report: 
+E:\Agent\v2-staging\worker-isolation\admin-scripts-r2-20261110\reports\06-worker-enable-for-login-20261110-140334.json
+Changes: 1  Refusals: 0  Checks: 11  Mode: DRY-RUN
+

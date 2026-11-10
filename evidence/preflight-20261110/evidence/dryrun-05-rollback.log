@@ -1,0 +1,12 @@
+﻿== 05 Rollback (DRY-RUN) ==
+  DRY-RUN unregister-scheduledtask: ElevariqWorker -- remove
+  DRY-RUN remove-netfirewallrule: ELEVARIQ-Worker-Allow-Anthropic -- remove
+  DRY-RUN remove-netfirewallrule: ELEVARIQ-Worker-Allow-Proxy -- remove
+  DRY-RUN remove-netfirewallrule: ELEVARIQ-Worker-Block-Other -- remove
+  DRY-RUN icacls-remove-deny: C:\Users\Roman\.claude -- no backup; remove DENY elevariq-worker
+  DRY-RUN icacls-remove-deny: E:\Agent\Personal-agent -- no backup; remove DENY elevariq-worker
+  DRY-RUN icacls-remove-deny: C:\Users\Roman\AppData\Local\ElevariqAgent -- no backup; remove DENY elevariq-worker
+  DRY-RUN noop: elevariq-worker -- account not present
+
+Report written: E:\Agent\v2-staging\trusted-execution-20261110-0249\admin-scripts\reports\05-rollback-20261110-031319.json
+Changes: 8  Refusals: 0  Mode: DRY-RUN

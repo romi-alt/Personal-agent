@@ -1,0 +1,8 @@
+﻿sandbox-run.exe : [probe] start mode=sandboxed t=1794250989484
+At line:2 char:1
++ & $SB --name elevariq-worker-isotest --mem-mb 2048 --rw "$ISO\ws" --r ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: ([probe] start m...t=1794250989484:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+[probe] C1 BLOCKED t=1794250989489

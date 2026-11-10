@@ -1,0 +1,21 @@
+﻿
+ProcessId ParentProcessId Name           CreationDate          WS_MB Cmd                                                                                                                                                             
+--------- --------------- ----           ------------          ----- ---                                                                                                                                                             
+    20280           10892 claude.exe     11/6/2026 3:19:23 PM     77 "C:\Program Files\WindowsApps\Claude_4.23118.0.0_x64__pzs8sxrjxfjjc\app\claude.exe"                                                                             
+    12236           20280 claude.exe     11/6/2026 3:19:24 PM      2 "C:\Program Files\WindowsApps\Claude_4.23118.0.0_x64__pzs8sxrjxfjjc\app\claude.exe" --type=crashpad-handler --user-data-dir=C:\Users\Roman\AppData\Local\Claude-
+     5180           20280 claude.exe     11/6/2026 3:19:25 PM     65 "C:\Program Files\WindowsApps\Claude_4.23118.0.0_x64__pzs8sxrjxfjjc\app\claude.exe" --type=gpu-process --user-data-dir="C:\Users\Roman\AppData\Local\Claude-Data
+    15724           20280 claude.exe     11/6/2026 3:19:25 PM     21 "C:\Program Files\WindowsApps\Claude_4.23118.0.0_x64__pzs8sxrjxfjjc\app\claude.exe" --type=utility --utility-sub-type=network.mojom.NetworkService --lang=en-US 
+    10840           20280 claude.exe     11/6/2026 3:19:26 PM      7 "C:\Program Files\WindowsApps\Claude_4.23118.0.0_x64__pzs8sxrjxfjjc\app\claude.exe" --type=renderer --user-data-dir="C:\Users\Roman\AppData\Local\Claude-Data\cl
+    21460           20280 claude.exe     11/6/2026 3:19:27 PM   1048 "C:\Program Files\WindowsApps\Claude_4.23118.0.0_x64__pzs8sxrjxfjjc\app\claude.exe" --type=renderer --user-data-dir="C:\Users\Roman\AppData\Local\Claude-Data\cl
+    18316           20280 claude.exe     11/6/2026 3:23:41 PM      6 "C:\Program Files\WindowsApps\Claude_4.23118.0.0_x64__pzs8sxrjxfjjc\app\claude.exe" --type=utility --utility-sub-type=audio.mojom.AudioService --lang=en-US --se
+     9268           20280 claude.exe     11/6/2026 3:23:41 PM      5 "C:\Program Files\WindowsApps\Claude_4.23118.0.0_x64__pzs8sxrjxfjjc\app\claude.exe" --type=utility --utility-sub-type=video_capture.mojom.VideoCaptureService --
+      684           20280 claude.exe     11/7/2026 12:35:18 AM     5 "C:\Program Files\WindowsApps\Claude_4.23118.0.0_x64__pzs8sxrjxfjjc\app\claude.exe" --type=utility --utility-sub-type=node.mojom.NodeService --lang=en-US --serv
+     7720            6552 claude.exe     11/7/2026 5:57:11 AM    290 "C:\Users\Roman\.local\bin\claude.exe"                                                                                                                          
+    11232           20280 claude.exe     11/7/2026 2:21:42 PM     17 "C:\Program Files\WindowsApps\Claude_4.23118.0.0_x64__pzs8sxrjxfjjc\app\claude.exe" --type=renderer --user-data-dir="C:\Users\Roman\AppData\Local\Claude-Data\cl
+    18536           20280 claude.exe     11/7/2026 2:21:43 PM     16 "C:\Program Files\WindowsApps\Claude_4.23118.0.0_x64__pzs8sxrjxfjjc\app\claude.exe" --type=renderer --user-data-dir="C:\Users\Roman\AppData\Local\Claude-Data\cl
+    13380            2948 powershell.exe 11/9/2026 6:07:55 PM     11 "powershell.exe" -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy RemoteSigned -File "E:\Agent\Personal-agent\scripts\windows\run-supervisor.ps1"
+     8992           13380 node.exe       11/9/2026 6:07:57 PM     46 "C:\Program Files\nodejs\node.exe" "E:\Agent\Personal-agent\dist\cli\index.js" start                                                                            
+
+
+
+FreeMB=970 TotalMB=8029 LastBoot=11/05/2026 03:44:16 CommitFreeMB=1098

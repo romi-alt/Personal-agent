@@ -1,0 +1,54 @@
+﻿{
+    "script":  "02-configure-acls",
+    "startedAt":  "2026-11-10T03:27:39.1905996+05:00",
+    "dryRun":  true,
+    "stagingOnly":  true,
+    "changes":  [
+                    {
+                        "action":  "identity",
+                        "target":  "elv-stg-worker",
+                        "detail":  "worker SID=; owner SID=S-1-5-21-3837883729-3478098758-1729361560-1001",
+                        "applied":  false,
+                        "at":  "2026-11-10T03:27:39.3340431+05:00"
+                    },
+                    {
+                        "action":  "icacls",
+                        "target":  "C:\\ElevariqStaging\\work",
+                        "detail":  "worker M; owner+SYSTEM Full; inheritance reset [args: C:\\ElevariqStaging\\work /inheritance:r /grant:r *S-1-5-18:(OI)(CI)F /grant:r *S-1-5-21-3837883729-3478098758-1729361560-1001:(OI)(CI)F /grant:r \u003cworker-SID\u003e:(OI)(CI)M]",
+                        "applied":  false,
+                        "at":  "2026-11-10T03:27:39.3515810+05:00"
+                    },
+                    {
+                        "action":  "icacls",
+                        "target":  "C:\\ElevariqStaging\\broker",
+                        "detail":  "worker DENY all; owner+SYSTEM Full; inheritance reset [args: C:\\ElevariqStaging\\broker /inheritance:r /grant:r *S-1-5-18:(OI)(CI)F /grant:r *S-1-5-21-3837883729-3478098758-1729361560-1001:(OI)(CI)F /deny \u003cworker-SID\u003e:(OI)(CI)F]",
+                        "applied":  false,
+                        "at":  "2026-11-10T03:27:39.3665860+05:00"
+                    },
+                    {
+                        "action":  "icacls",
+                        "target":  "C:\\ElevariqStaging\\home",
+                        "detail":  "worker M; owner+SYSTEM Full; inheritance reset [args: C:\\ElevariqStaging\\home /inheritance:r /grant:r *S-1-5-18:(OI)(CI)F /grant:r *S-1-5-21-3837883729-3478098758-1729361560-1001:(OI)(CI)F /grant:r \u003cworker-SID\u003e:(OI)(CI)M]",
+                        "applied":  false,
+                        "at":  "2026-11-10T03:27:39.3697728+05:00"
+                    },
+                    {
+                        "action":  "icacls",
+                        "target":  "C:\\ElevariqStaging\\decoys",
+                        "detail":  "SYNTHETIC decoys: worker DENY (stand-ins for prod/owner; nothing real touched) [args: C:\\ElevariqStaging\\decoys /inheritance:r /grant:r *S-1-5-18:(OI)(CI)F /grant:r *S-1-5-21-3837883729-3478098758-1729361560-1001:(OI)(CI)F /deny \u003cworker-SID\u003e:(OI)(CI)F]",
+                        "applied":  false,
+                        "at":  "2026-11-10T03:27:39.3697728+05:00"
+                    },
+                    {
+                        "action":  "report-only",
+                        "target":  "E:\\",
+                        "detail":  "Authenticated Users:Modify on E:\\ is inherited by production. A new worker is an Authenticated User, so it could reach production via that grant. The PILOT does NOT change this (owner constraint). Closing it is the separate PRODUCTION_ISOLATION_STAGE.",
+                        "applied":  false,
+                        "at":  "2026-11-10T03:27:39.3697728+05:00"
+                    }
+                ],
+    "refusals":  [
+
+                 ],
+    "path":  "E:\\Agent\\v2-staging\\trusted-execution-20261110-0249\\admin-scripts\\reports\\02-configure-acls-20261110-032739.json"
+}

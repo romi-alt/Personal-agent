@@ -1,0 +1,116 @@
+﻿{
+    "script":  "01-create-worker-account",
+    "startedAt":  "2026-11-10T03:13:18.0834636+05:00",
+    "dryRun":  true,
+    "changes":  [
+                    {
+                        "action":  "create-localuser",
+                        "target":  "elevariq-worker",
+                        "detail":  "standard user, random password, PasswordNeverExpires",
+                        "applied":  false,
+                        "at":  "2026-11-10T03:13:18.1920384+05:00"
+                    },
+                    {
+                        "action":  "add-to-group",
+                        "target":  "Users",
+                        "detail":  "add elevariq-worker to BUILTIN\\Users only",
+                        "applied":  false,
+                        "at":  "2026-11-10T03:13:18.1920384+05:00"
+                    },
+                    {
+                        "action":  "record-password",
+                        "target":  "C:\\ElevariqBroker\\worker-cred.xml",
+                        "detail":  "DPAPI-protected credential, broker-root only (not created in dry-run)",
+                        "applied":  false,
+                        "at":  "2026-11-10T03:13:18.1920384+05:00"
+                    },
+                    {
+                        "action":  "plan-deny-privilege",
+                        "target":  "elevariq-worker",
+                        "detail":  "SeDebugPrivilege",
+                        "applied":  false,
+                        "at":  "2026-11-10T03:13:18.1920384+05:00"
+                    },
+                    {
+                        "action":  "plan-deny-privilege",
+                        "target":  "elevariq-worker",
+                        "detail":  "SeImpersonatePrivilege",
+                        "applied":  false,
+                        "at":  "2026-11-10T03:13:18.1920384+05:00"
+                    },
+                    {
+                        "action":  "plan-deny-privilege",
+                        "target":  "elevariq-worker",
+                        "detail":  "SeAssignPrimaryTokenPrivilege",
+                        "applied":  false,
+                        "at":  "2026-11-10T03:13:18.1920384+05:00"
+                    },
+                    {
+                        "action":  "plan-deny-privilege",
+                        "target":  "elevariq-worker",
+                        "detail":  "SeBackupPrivilege",
+                        "applied":  false,
+                        "at":  "2026-11-10T03:13:18.1920384+05:00"
+                    },
+                    {
+                        "action":  "plan-deny-privilege",
+                        "target":  "elevariq-worker",
+                        "detail":  "SeRestorePrivilege",
+                        "applied":  false,
+                        "at":  "2026-11-10T03:13:18.2049139+05:00"
+                    },
+                    {
+                        "action":  "plan-deny-privilege",
+                        "target":  "elevariq-worker",
+                        "detail":  "SeTakeOwnershipPrivilege",
+                        "applied":  false,
+                        "at":  "2026-11-10T03:13:18.2065111+05:00"
+                    },
+                    {
+                        "action":  "plan-deny-privilege",
+                        "target":  "elevariq-worker",
+                        "detail":  "SeLoadDriverPrivilege",
+                        "applied":  false,
+                        "at":  "2026-11-10T03:13:18.2081291+05:00"
+                    },
+                    {
+                        "action":  "plan-deny-privilege",
+                        "target":  "elevariq-worker",
+                        "detail":  "SeCreateGlobalPrivilege",
+                        "applied":  false,
+                        "at":  "2026-11-10T03:13:18.2092529+05:00"
+                    },
+                    {
+                        "action":  "plan-deny-privilege",
+                        "target":  "elevariq-worker",
+                        "detail":  "SeCreateServicePrivilege",
+                        "applied":  false,
+                        "at":  "2026-11-10T03:13:18.2092529+05:00"
+                    },
+                    {
+                        "action":  "plan-deny-privilege",
+                        "target":  "elevariq-worker",
+                        "detail":  "SeSystemtimePrivilege",
+                        "applied":  false,
+                        "at":  "2026-11-10T03:13:18.2092529+05:00"
+                    },
+                    {
+                        "action":  "plan-deny-privilege",
+                        "target":  "elevariq-worker",
+                        "detail":  "SeShutdownPrivilege",
+                        "applied":  false,
+                        "at":  "2026-11-10T03:13:18.2092529+05:00"
+                    },
+                    {
+                        "action":  "plan-deny-privilege",
+                        "target":  "elevariq-worker",
+                        "detail":  "SeRemoteShutdownPrivilege",
+                        "applied":  false,
+                        "at":  "2026-11-10T03:13:18.2092529+05:00"
+                    }
+                ],
+    "refusals":  [
+
+                 ],
+    "path":  "E:\\Agent\\v2-staging\\trusted-execution-20261110-0249\\admin-scripts\\reports\\01-create-worker-account-20261110-031318.json"
+}

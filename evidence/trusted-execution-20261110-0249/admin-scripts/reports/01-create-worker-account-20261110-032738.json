@@ -1,0 +1,96 @@
+﻿{
+    "script":  "01-create-worker-account",
+    "startedAt":  "2026-11-10T03:27:38.5941724+05:00",
+    "dryRun":  true,
+    "stagingOnly":  true,
+    "changes":  [
+                    {
+                        "action":  "create-localuser",
+                        "target":  "elv-stg-worker",
+                        "detail":  "standard user, random password, PasswordNeverExpires, Users group only",
+                        "applied":  false,
+                        "at":  "2026-11-10T03:27:38.7722602+05:00"
+                    },
+                    {
+                        "action":  "mkdir",
+                        "target":  "C:\\ElevariqStaging",
+                        "detail":  "create staging root",
+                        "applied":  false,
+                        "at":  "2026-11-10T03:27:38.7749356+05:00"
+                    },
+                    {
+                        "action":  "secure-broker-root",
+                        "target":  "C:\\ElevariqStaging\\broker",
+                        "detail":  "owner USER SID + SYSTEM Full, inheritance reset, BEFORE writing credential",
+                        "applied":  false,
+                        "at":  "2026-11-10T03:27:38.7749356+05:00"
+                    },
+                    {
+                        "action":  "record-password",
+                        "target":  "C:\\ElevariqStaging\\broker\\worker-cred.xml",
+                        "detail":  "DPAPI credential (owner identity); not written in dry-run",
+                        "applied":  false,
+                        "at":  "2026-11-10T03:27:38.7749356+05:00"
+                    },
+                    {
+                        "action":  "expect-absent-privilege",
+                        "target":  "elv-stg-worker",
+                        "detail":  "SeDebugPrivilege",
+                        "applied":  false,
+                        "at":  "2026-11-10T03:27:38.7797332+05:00"
+                    },
+                    {
+                        "action":  "expect-absent-privilege",
+                        "target":  "elv-stg-worker",
+                        "detail":  "SeImpersonatePrivilege",
+                        "applied":  false,
+                        "at":  "2026-11-10T03:27:38.7807389+05:00"
+                    },
+                    {
+                        "action":  "expect-absent-privilege",
+                        "target":  "elv-stg-worker",
+                        "detail":  "SeAssignPrimaryTokenPrivilege",
+                        "applied":  false,
+                        "at":  "2026-11-10T03:27:38.7807389+05:00"
+                    },
+                    {
+                        "action":  "expect-absent-privilege",
+                        "target":  "elv-stg-worker",
+                        "detail":  "SeBackupPrivilege",
+                        "applied":  false,
+                        "at":  "2026-11-10T03:27:38.7832360+05:00"
+                    },
+                    {
+                        "action":  "expect-absent-privilege",
+                        "target":  "elv-stg-worker",
+                        "detail":  "SeRestorePrivilege",
+                        "applied":  false,
+                        "at":  "2026-11-10T03:27:38.7832360+05:00"
+                    },
+                    {
+                        "action":  "expect-absent-privilege",
+                        "target":  "elv-stg-worker",
+                        "detail":  "SeTakeOwnershipPrivilege",
+                        "applied":  false,
+                        "at":  "2026-11-10T03:27:38.7832360+05:00"
+                    },
+                    {
+                        "action":  "expect-absent-privilege",
+                        "target":  "elv-stg-worker",
+                        "detail":  "SeLoadDriverPrivilege",
+                        "applied":  false,
+                        "at":  "2026-11-10T03:27:38.7832360+05:00"
+                    },
+                    {
+                        "action":  "expect-absent-privilege",
+                        "target":  "elv-stg-worker",
+                        "detail":  "SeCreateServicePrivilege",
+                        "applied":  false,
+                        "at":  "2026-11-10T03:27:38.7888903+05:00"
+                    }
+                ],
+    "refusals":  [
+
+                 ],
+    "path":  "E:\\Agent\\v2-staging\\trusted-execution-20261110-0249\\admin-scripts\\reports\\01-create-worker-account-20261110-032738.json"
+}

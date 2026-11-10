@@ -1,0 +1,136 @@
+﻿== 03-staging-layout (DRY-RUN, revision r2-20261110) ==
+  [WARN] R7 trusted script location + SHA256SUMS broad write on 
+E:\Agent\v2-staging\worker-isolation\admin-scripts-r2-20261110; broad write on 
+E:\Agent\v2-staging\worker-isolation\admin-scripts-r2-20261110\00-isolation-group-deny.ps1; broad write on 
+E:\Agent\v2-staging\worker-isolation\admin-scripts-r2-20261110\00a-remove-test-residue.ps1; broad write on 
+E:\Agent\v2-staging\worker-isolation\admin-scripts-r2-20261110\01-staging-volume.ps1; broad write on 
+E:\Agent\v2-staging\worker-isolation\admin-scripts-r2-20261110\02-identities-and-rights.ps1; broad write on 
+E:\Agent\v2-staging\worker-isolation\admin-scripts-r2-20261110\03-staging-layout.ps1; broad write on 
+E:\Agent\v2-staging\worker-isolation\admin-scripts-r2-20261110\04-broker-install.ps1; broad write on 
+E:\Agent\v2-staging\worker-isolation\admin-scripts-r2-20261110\05-firewall-egress.ps1; broad write on 
+E:\Agent\v2-staging\worker-isolation\admin-scripts-r2-20261110\06-worker-enable.ps1; broad write on 
+E:\Agent\v2-staging\worker-isolation\admin-scripts-r2-20261110\07-verify-config.ps1; broad write on 
+E:\Agent\v2-staging\worker-isolation\admin-scripts-r2-20261110\09-rollback.ps1; broad write on 
+E:\Agent\v2-staging\worker-isolation\admin-scripts-r2-20261110\Freeze-AdminScripts.ps1; broad write on 
+E:\Agent\v2-staging\worker-isolation\admin-scripts-r2-20261110\_common.ps1; SHA256SUMS missing
+  [FAIL] PRE 01 + 02 applied (volume mounted, identities exist) 
+  DRY-RUN icacls: C:\ElevariqStaging -- clear prior worker/broker ACEs (idempotent) [icacls C:\ElevariqStaging /remove 
+*<worker-SID> *<broker-SID>]
+  DRY-RUN icacls: C:\ElevariqStaging -- SYSTEM + Administrators Full [icacls C:\ElevariqStaging /grant:r 
+*S-1-5-18:(OI)(CI)F *S-1-5-32-544:(OI)(CI)F]
+  DRY-RUN icacls: C:\ElevariqStaging -- O F [icacls C:\ElevariqStaging /grant:r 
+*S-1-5-21-3837883729-3478098758-1729361560-1001:(OI)(CI)F]
+  DRY-RUN icacls: C:\ElevariqStaging -- B RX-this [icacls C:\ElevariqStaging /grant:r *<broker-SID>:(RX)]
+  DRY-RUN icacls: C:\ElevariqStaging -- W RX-this [icacls C:\ElevariqStaging /grant:r *<worker-SID>:(RX)]
+  DRY-RUN icacls: C:\ElevariqStaging\work -- inheritance reset [icacls C:\ElevariqStaging\work /inheritance:r]
+  DRY-RUN icacls: C:\ElevariqStaging\work -- clear prior worker/broker ACEs (idempotent) [icacls 
+C:\ElevariqStaging\work /remove *<worker-SID> *<broker-SID>]
+  DRY-RUN icacls: C:\ElevariqStaging\work -- SYSTEM + Administrators Full [icacls C:\ElevariqStaging\work /grant:r 
+*S-1-5-18:(OI)(CI)F *S-1-5-32-544:(OI)(CI)F]
+  DRY-RUN icacls: C:\ElevariqStaging\work -- O F [icacls C:\ElevariqStaging\work /grant:r 
+*S-1-5-21-3837883729-3478098758-1729361560-1001:(OI)(CI)F]
+  DRY-RUN icacls: C:\ElevariqStaging\work -- W M [icacls C:\ElevariqStaging\work /grant:r *<worker-SID>:(OI)(CI)M]
+  DRY-RUN icacls: C:\ElevariqStaging\home -- inheritance reset [icacls C:\ElevariqStaging\home /inheritance:r]
+  DRY-RUN icacls: C:\ElevariqStaging\home -- clear prior worker/broker ACEs (idempotent) [icacls 
+C:\ElevariqStaging\home /remove *<worker-SID> *<broker-SID>]
+  DRY-RUN icacls: C:\ElevariqStaging\home -- SYSTEM + Administrators Full [icacls C:\ElevariqStaging\home /grant:r 
+*S-1-5-18:(OI)(CI)F *S-1-5-32-544:(OI)(CI)F]
+  DRY-RUN icacls: C:\ElevariqStaging\home -- O F [icacls C:\ElevariqStaging\home /grant:r 
+*S-1-5-21-3837883729-3478098758-1729361560-1001:(OI)(CI)F]
+  DRY-RUN icacls: C:\ElevariqStaging\home -- W M [icacls C:\ElevariqStaging\home /grant:r *<worker-SID>:(OI)(CI)M]
+  DRY-RUN icacls: C:\ElevariqStaging\broker -- inheritance reset [icacls C:\ElevariqStaging\broker /inheritance:r]
+  DRY-RUN icacls: C:\ElevariqStaging\broker -- clear prior worker/broker ACEs (idempotent) [icacls 
+C:\ElevariqStaging\broker /remove *<worker-SID> *<broker-SID>]
+  DRY-RUN icacls: C:\ElevariqStaging\broker -- SYSTEM + Administrators Full [icacls C:\ElevariqStaging\broker /grant:r 
+*S-1-5-18:(OI)(CI)F *S-1-5-32-544:(OI)(CI)F]
+  DRY-RUN icacls: C:\ElevariqStaging\broker -- O F [icacls C:\ElevariqStaging\broker /grant:r 
+*S-1-5-21-3837883729-3478098758-1729361560-1001:(OI)(CI)F]
+  DRY-RUN icacls: C:\ElevariqStaging\broker -- B RX-this [icacls C:\ElevariqStaging\broker /grant:r *<broker-SID>:(RX)]
+  DRY-RUN icacls: C:\ElevariqStaging\broker -- W DENY [icacls C:\ElevariqStaging\broker /deny *<worker-SID>:(OI)(CI)F]
+  DRY-RUN icacls: C:\ElevariqStaging\broker\bin -- inheritance reset [icacls C:\ElevariqStaging\broker\bin 
+/inheritance:r]
+  DRY-RUN icacls: C:\ElevariqStaging\broker\bin -- clear prior worker/broker ACEs (idempotent) [icacls 
+C:\ElevariqStaging\broker\bin /remove *<worker-SID> *<broker-SID>]
+  DRY-RUN icacls: C:\ElevariqStaging\broker\bin -- SYSTEM + Administrators Full [icacls C:\ElevariqStaging\broker\bin 
+/grant:r *S-1-5-18:(OI)(CI)F *S-1-5-32-544:(OI)(CI)F]
+  DRY-RUN icacls: C:\ElevariqStaging\broker\bin -- O RX [icacls C:\ElevariqStaging\broker\bin /grant:r 
+*S-1-5-21-3837883729-3478098758-1729361560-1001:(OI)(CI)RX]
+  DRY-RUN icacls: C:\ElevariqStaging\broker\bin -- B RX [icacls C:\ElevariqStaging\broker\bin /grant:r 
+*<broker-SID>:(OI)(CI)RX]
+  DRY-RUN icacls: C:\ElevariqStaging\broker\bin -- W DENY [icacls C:\ElevariqStaging\broker\bin /deny 
+*<worker-SID>:(OI)(CI)F]
+  DRY-RUN icacls: C:\ElevariqStaging\broker\state -- inheritance reset [icacls C:\ElevariqStaging\broker\state 
+/inheritance:r]
+  DRY-RUN icacls: C:\ElevariqStaging\broker\state -- clear prior worker/broker ACEs (idempotent) [icacls 
+C:\ElevariqStaging\broker\state /remove *<worker-SID> *<broker-SID>]
+  DRY-RUN icacls: C:\ElevariqStaging\broker\state -- SYSTEM + Administrators Full [icacls 
+C:\ElevariqStaging\broker\state /grant:r *S-1-5-18:(OI)(CI)F *S-1-5-32-544:(OI)(CI)F]
+  DRY-RUN icacls: C:\ElevariqStaging\broker\state -- O F [icacls C:\ElevariqStaging\broker\state /grant:r 
+*S-1-5-21-3837883729-3478098758-1729361560-1001:(OI)(CI)F]
+  DRY-RUN icacls: C:\ElevariqStaging\broker\state -- B M [icacls C:\ElevariqStaging\broker\state /grant:r 
+*<broker-SID>:(OI)(CI)M]
+  DRY-RUN icacls: C:\ElevariqStaging\broker\state -- W DENY [icacls C:\ElevariqStaging\broker\state /deny 
+*<worker-SID>:(OI)(CI)F]
+  DRY-RUN icacls: C:\ElevariqStaging\spool -- inheritance reset [icacls C:\ElevariqStaging\spool /inheritance:r]
+  DRY-RUN icacls: C:\ElevariqStaging\spool -- clear prior worker/broker ACEs (idempotent) [icacls 
+C:\ElevariqStaging\spool /remove *<worker-SID> *<broker-SID>]
+  DRY-RUN icacls: C:\ElevariqStaging\spool -- SYSTEM + Administrators Full [icacls C:\ElevariqStaging\spool /grant:r 
+*S-1-5-18:(OI)(CI)F *S-1-5-32-544:(OI)(CI)F]
+  DRY-RUN icacls: C:\ElevariqStaging\spool -- O F [icacls C:\ElevariqStaging\spool /grant:r 
+*S-1-5-21-3837883729-3478098758-1729361560-1001:(OI)(CI)F]
+  DRY-RUN icacls: C:\ElevariqStaging\spool -- B RX-this [icacls C:\ElevariqStaging\spool /grant:r *<broker-SID>:(RX)]
+  DRY-RUN icacls: C:\ElevariqStaging\spool -- W RX-this [icacls C:\ElevariqStaging\spool /grant:r *<worker-SID>:(RX)]
+  DRY-RUN icacls: C:\ElevariqStaging\spool\requests -- inheritance reset [icacls C:\ElevariqStaging\spool\requests 
+/inheritance:r]
+  DRY-RUN icacls: C:\ElevariqStaging\spool\requests -- clear prior worker/broker ACEs (idempotent) [icacls 
+C:\ElevariqStaging\spool\requests /remove *<worker-SID> *<broker-SID>]
+  DRY-RUN icacls: C:\ElevariqStaging\spool\requests -- SYSTEM + Administrators Full [icacls 
+C:\ElevariqStaging\spool\requests /grant:r *S-1-5-18:(OI)(CI)F *S-1-5-32-544:(OI)(CI)F]
+  DRY-RUN icacls: C:\ElevariqStaging\spool\requests -- O F [icacls C:\ElevariqStaging\spool\requests /grant:r 
+*S-1-5-21-3837883729-3478098758-1729361560-1001:(OI)(CI)F]
+  DRY-RUN icacls: C:\ElevariqStaging\spool\requests -- B M [icacls C:\ElevariqStaging\spool\requests /grant:r 
+*<broker-SID>:(OI)(CI)M]
+  DRY-RUN icacls: C:\ElevariqStaging\spool\requests -- W W [icacls C:\ElevariqStaging\spool\requests /grant:r 
+*<worker-SID>:(OI)(CI)W]
+  DRY-RUN icacls: C:\ElevariqStaging\spool\approvals -- inheritance reset [icacls C:\ElevariqStaging\spool\approvals 
+/inheritance:r]
+  DRY-RUN icacls: C:\ElevariqStaging\spool\approvals -- clear prior worker/broker ACEs (idempotent) [icacls 
+C:\ElevariqStaging\spool\approvals /remove *<worker-SID> *<broker-SID>]
+  DRY-RUN icacls: C:\ElevariqStaging\spool\approvals -- SYSTEM + Administrators Full [icacls 
+C:\ElevariqStaging\spool\approvals /grant:r *S-1-5-18:(OI)(CI)F *S-1-5-32-544:(OI)(CI)F]
+  DRY-RUN icacls: C:\ElevariqStaging\spool\approvals -- O M [icacls C:\ElevariqStaging\spool\approvals /grant:r 
+*S-1-5-21-3837883729-3478098758-1729361560-1001:(OI)(CI)M]
+  DRY-RUN icacls: C:\ElevariqStaging\spool\approvals -- B M [icacls C:\ElevariqStaging\spool\approvals /grant:r 
+*<broker-SID>:(OI)(CI)M]
+  DRY-RUN icacls: C:\ElevariqStaging\spool\approvals -- W DENY [icacls C:\ElevariqStaging\spool\approvals /deny 
+*<worker-SID>:(OI)(CI)F]
+  DRY-RUN icacls: C:\ElevariqStaging\spool\decisions -- inheritance reset [icacls C:\ElevariqStaging\spool\decisions 
+/inheritance:r]
+  DRY-RUN icacls: C:\ElevariqStaging\spool\decisions -- clear prior worker/broker ACEs (idempotent) [icacls 
+C:\ElevariqStaging\spool\decisions /remove *<worker-SID> *<broker-SID>]
+  DRY-RUN icacls: C:\ElevariqStaging\spool\decisions -- SYSTEM + Administrators Full [icacls 
+C:\ElevariqStaging\spool\decisions /grant:r *S-1-5-18:(OI)(CI)F *S-1-5-32-544:(OI)(CI)F]
+  DRY-RUN icacls: C:\ElevariqStaging\spool\decisions -- O F [icacls C:\ElevariqStaging\spool\decisions /grant:r 
+*S-1-5-21-3837883729-3478098758-1729361560-1001:(OI)(CI)F]
+  DRY-RUN icacls: C:\ElevariqStaging\spool\decisions -- B M [icacls C:\ElevariqStaging\spool\decisions /grant:r 
+*<broker-SID>:(OI)(CI)M]
+  DRY-RUN icacls: C:\ElevariqStaging\spool\decisions -- W RX [icacls C:\ElevariqStaging\spool\decisions /grant:r 
+*<worker-SID>:(OI)(CI)RX]
+  DRY-RUN icacls: C:\ElevariqStaging\decoys -- inheritance reset [icacls C:\ElevariqStaging\decoys /inheritance:r]
+  DRY-RUN icacls: C:\ElevariqStaging\decoys -- clear prior worker/broker ACEs (idempotent) [icacls 
+C:\ElevariqStaging\decoys /remove *<worker-SID> *<broker-SID>]
+  DRY-RUN icacls: C:\ElevariqStaging\decoys -- SYSTEM + Administrators Full [icacls C:\ElevariqStaging\decoys /grant:r 
+*S-1-5-18:(OI)(CI)F *S-1-5-32-544:(OI)(CI)F]
+  DRY-RUN icacls: C:\ElevariqStaging\decoys -- O F [icacls C:\ElevariqStaging\decoys /grant:r 
+*S-1-5-21-3837883729-3478098758-1729361560-1001:(OI)(CI)F]
+  DRY-RUN icacls: C:\ElevariqStaging\decoys -- W DENY [icacls C:\ElevariqStaging\decoys /deny *<worker-SID>:(OI)(CI)F]
+  DRY-RUN write-decoy: C:\ElevariqStaging\decoys\fake-claude\.credentials.json -- synthetic marker file
+  DRY-RUN write-decoy: C:\ElevariqStaging\decoys\fake-prod-checkout\.env -- synthetic marker file
+  [PASS] P0 production task present and running Running
+  [PASS] P1 production supervisor PID 8992 alive 
+  [PASS] P2 production HEAD = e60278f e60278f
+  [PASS] P3 production task action still points at the checkout script 
+
+Report: E:\Agent\v2-staging\worker-isolation\admin-scripts-r2-20261110\reports\03-staging-layout-20261110-140331.json
+Changes: 64  Refusals: 0  Checks: 6  Mode: DRY-RUN
+

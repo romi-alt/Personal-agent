@@ -1,0 +1,8 @@
+﻿Q1-assignment exit=0 [assignment:add --file "E:\Agent\v2-staging\rr\stage-qa2\assignment.json"]
+Q2-task-B exit=0 [task:add --project qa-rerun --title "Flaky B" --instructions x --criteria "src/b.ts exports b" --verify CHANGES_EXIST]
+Q3-start exit=0 [start --detach]
+Q4 qa rounds: 1=FAILED,2=PASSED
+Q5-qa exit=0 [qa]
+Q5-tasks exit=0 [tasks]
+Q6-stop exit=0 [stop --wait 30000]
+Q7 tasks: ID                      TITLE                      STATUS     PRIO  ATTEMPTS  ELIGIBLE  ERROR | ----------------------  -------------------------  ---------  ----  --------  --------  ----- | tsk_mw9b23p23c9eab775d  Flaky B                    COMPLETED  0     0/3       -         - | tsk_mw9b24z1dfa38d9f6c  Review: Flaky B            COMPLETED  2000  0/3       -         - | tsk_mw9b25am69aa0cc5a7  Fix: Flaky B (QA round 1)  COMPLETED  1500  0/3       -         - | tsk_mw9b25x5207c1ab960  Review: Flaky B (round 2)  COMPLETED  2000  0/3       -         -

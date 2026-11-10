@@ -1,0 +1,1 @@
+refused: "src" is not a generated scratch directory name (.qa-*, .scratch-*, .tmp-*) (E:\Agent\v2-staging\rr\stage\workspaces\staging-rehearsal\src)

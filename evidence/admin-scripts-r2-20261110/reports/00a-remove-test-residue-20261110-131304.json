@@ -1,0 +1,49 @@
+﻿{
+    "script":  "00a-remove-test-residue",
+    "revision":  "r2-20261110",
+    "startedAt":  "2026-11-10T13:13:04.2597161+05:00",
+    "dryRun":  true,
+    "user":  "DESKTOP-QGGLG8D\\Roman",
+    "changes":  [
+                    {
+                        "action":  "icacls",
+                        "target":  "E:\\Agent\\v2-staging\\hardening\\isotest\\outside",
+                        "detail":  "remove explicit allow for S-1-1-0 [icacls E:\\Agent\\v2-staging\\hardening\\isotest\\outside /remove:g *S-1-1-0]",
+                        "applied":  false,
+                        "at":  "2026-11-10T13:13:04.3091167+05:00"
+                    },
+                    {
+                        "action":  "icacls",
+                        "target":  "E:\\Agent\\v2-staging\\hardening\\repo",
+                        "detail":  "remove explicit allow for S-1-15-2-2956649102-4223940443-41726279-2319145132-3979920432-1607303059-3113665130 [icacls E:\\Agent\\v2-staging\\hardening\\repo /remove:g *S-1-15-2-2956649102-4223940443-41726279-2319145132-3979920432-1607303059-3113665130]",
+                        "applied":  false,
+                        "at":  "2026-11-10T13:13:04.3215267+05:00"
+                    },
+                    {
+                        "action":  "icacls",
+                        "target":  "E:\\Agent\\v2-staging\\hardening\\isotest\\tools",
+                        "detail":  "remove explicit allow for S-1-15-2-2956649102-4223940443-41726279-2319145132-3979920432-1607303059-3113665130 [icacls E:\\Agent\\v2-staging\\hardening\\isotest\\tools /remove:g *S-1-15-2-2956649102-4223940443-41726279-2319145132-3979920432-1607303059-3113665130]",
+                        "applied":  false,
+                        "at":  "2026-11-10T13:13:04.3343535+05:00"
+                    },
+                    {
+                        "action":  "manual",
+                        "target":  "HKCU AppContainer mappings",
+                        "detail":  "owner, non-elevated: Remove-Item HKCU:\\Software\\Classes\\Local Settings\\Software\\Microsoft\\Windows\\CurrentVersion\\AppContainer\\Mappings\\\u003cprofile-SID\u003e for elevariq-iso-smoke / elevariq-worker-isotest (identify by Moniker value first)",
+                        "applied":  false,
+                        "at":  "2026-11-10T13:13:04.3343535+05:00"
+                    }
+                ],
+    "refusals":  [
+
+                 ],
+    "checks":  [
+                   {
+                       "id":  "R7",
+                       "name":  "trusted script location + SHA256SUMS",
+                       "status":  "WARN",
+                       "detail":  "broad write on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r2-20261110; broad write on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r2-20261110\\00-isolation-group-deny.ps1; broad write on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r2-20261110\\00a-remove-test-residue.ps1; broad write on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r2-20261110\\01-staging-volume.ps1; broad write on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r2-20261110\\02-identities-and-rights.ps1; broad write on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r2-20261110\\03-staging-layout.ps1; broad write on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r2-20261110\\04-broker-install.ps1; broad write on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r2-20261110\\05-firewall-egress.ps1; broad write on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r2-20261110\\06-worker-enable.ps1; broad write on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r2-20261110\\07-verify-config.ps1; broad write on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r2-20261110\\09-rollback.ps1; broad write on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r2-20261110\\Freeze-AdminScripts.ps1; broad write on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r2-20261110\\_common.ps1; SHA256SUMS missing"
+                   }
+               ],
+    "path":  "E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r2-20261110\\reports\\00a-remove-test-residue-20261110-131304.json"
+}

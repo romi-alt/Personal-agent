@@ -1,0 +1,3 @@
+ID                      SLUG                               NAME                               STATUS  PRIORITY  PROVIDER    PATH                                                                       ACTIVITY
+----------------------  ---------------------------------  ---------------------------------  ------  --------  ----------  -------------------------------------------------------------------------  ------------------------
+prj_mw6eh6rhb83bc6d83d  elevariq-retail-operations-portal  ELEVARIQ Retail Operations Portal  ACTIVE  0         claude-cli  E:\Agent\v2-staging\rr\stage\workspaces\elevariq-retail-operations-portal  2026-11-08T21:55:12.854Z

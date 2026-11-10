@@ -1,0 +1,21 @@
+﻿C:\Users\Roman\AppData\Local\ElevariqAgent exists=True
+C:\Users\Roman\AppData\Local\ElevariqAgent\agent.db exists=True
+C:\Users\Roman\AppData\Local\ElevariqAgent\dashboard.token exists=False
+C:\Users\Roman\.claude\.credentials.json exists=True
+E:\Agent\Personal-agent\.env exists=True
+whoami=desktop-qgglg8d\roman
+C:\Users\Roman\AppData\Local\ElevariqAgent NT AUTHORITY\SYSTEM:(I)(OI)(CI)(F)
+                                           BUILTIN\Administrators:(I)(OI)(CI)(F)
+                                           DESKTOP-QGGLG8D\Roman:(I)(OI)(CI)(F)
+
+Successfully processed 1 files; Failed processing 0 files
+
+Successfully processed 0 files; Failed processing 1 files
+
+E:\Agent\Personal-agent\.env BUILTIN\Administrators:(I)(F)
+                             NT AUTHORITY\SYSTEM:(I)(F)
+                             NT AUTHORITY\Authenticated Users:(I)(M)
+                             BUILTIN\Users:(I)(RX)
+
+Successfully processed 1 files; Failed processing 0 files
+

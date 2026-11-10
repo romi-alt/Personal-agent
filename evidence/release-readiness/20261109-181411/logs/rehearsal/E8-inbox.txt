@@ -1,0 +1,4 @@
+1. [LOW] All tasks finished - verification needed: ELEVARIQ Retail Operations Portal  (elevariq-retail-operations-portal)
+     Every task is terminal. Run independent verification before the project can be accepted.
+     since 15.6h ago (2026-11-08T21:55:12.859Z)
+     > npm run agent -- project:verify elevariq-retail-operations-portal

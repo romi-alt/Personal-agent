@@ -1,0 +1,12 @@
+﻿checked_at=2026-11-10T02:05:26.7782336+05:00
+prod HEAD=e60278fcf6d609c28fbd4c247cee4b6a9571e22d branch=deploy/v2 status_lines=0
+prod reflog top: e60278f HEAD@{2026-11-09 18:07:30 +0500}: checkout: moving from feat/windows-compat to deploy/v2
+prod stash count: 0
+dist newest: 11/09/2026 18:07:37 files=164
+.env LastWriteTime: 11/07/2026 15:40:35
+src newest: 11/09/2026 18:07:29
+pid 8992 alive=True start=11/09/2026 18:07:57 cpuS=136
+wrapper 13380 alive=True created=11/09/2026 18:07:55
+task state=Running lastRun=11/10/2026 02:01:49 lastResult=0x800710E0 nextRun=11/10/2026 02:06:48
+agent node processes: 8992:"C:\Program Files\nodejs\node.exe" "E:\Agent\Personal-agent\dist\cli\index.js" s
+prod home files: agent.db@01:51:06, agent.db-shm@18:07:58, agent.db-wal@01:51:08, notifications.cursor@01:23:44, notifications.jsonl@00:37:14

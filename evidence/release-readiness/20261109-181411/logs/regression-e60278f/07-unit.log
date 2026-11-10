@@ -1,0 +1,84 @@
+
+ RUN  v5.1.0 E:/Agent/v2-staging/rr/v2-e60278f
+
+ ✓ tests/unit/capacity-sleep.test.ts (13 tests) 4191ms
+   ✓ A11: host sleep is not charged to the execution budget or the stall window (3)
+     ✓ 11 min of work, 3 h asleep, then finishes: completed (v1: TIMEOUT 15 s after wake, retry consumed) 627ms
+     ✓ a genuine active-time overrun still times out after a sleep, and the message says the sleep was not charged 648ms
+   ✓ A10: the in-process wait ends once the reported reset has passed (sleep-safe resume) (2)
+     ✓ without sleep, a reset that has not yet passed keeps the same process waiting (no premature kill) 626ms
+   ✓ v2 review: stale or unrelated reset times do not steer the wait (2)
+     ✓ a 429 after a non-rejected (warning) event with a far reset is NOT handed off for hours 449ms
+     ✓ a rejected event whose reset is already in the past cannot trigger a capacity_resume loop 556ms
+   ✓ A12: bounded in-process capacity waits and escalation (6)
+     ✓ a wait with no reported reset ends at the ceiling (CLAUDE_CLI_MAX_CAPACITY_WAIT_MS) 379ms
+     ✓ CLAUDE_CLI_MAX_CAPACITY_WAIT_MS=0 restores the v1 unbounded in-process wait (owner opt-out) 542ms
+ ✓ tests/unit/cli-provider.test.ts (18 tests) 4425ms
+   ✓ ClaudeCliProvider: capacity waits are not stalls and not completion (5)
+     ✓ a usage-limit wait suspends the execution timeout; the same process continues when capacity returns 951ms
+     ✓ a confirmed usage-limit wait is exempt from the inactivity (stall) timeout; plain silence is not 1350ms
+     ✓ outside a capacity wait the execution timeout applies (TIMEOUT), not success 311ms
+   ✓ policy hook command (2)
+     ✓ fails closed: a broken invocation exits 2 (blocking), never 0 or 1 1307ms
+ ✓ tests/unit/claude-provider.test.ts (15 tests) 36ms
+ ✓ tests/unit/policy-normalize.test.ts (158 tests) 46ms
+ ✓ tests/unit/scratch-cleanup.test.ts (18 tests) 287ms
+ ✓ tests/unit/status-reconcile.test.ts (2 tests) 88ms
+ ✓ tests/unit/planning.test.ts (24 tests) 80ms
+ ✓ tests/unit/project-intelligence.test.ts (12 tests) 46ms
+ ✓ tests/unit/decide.test.ts (12 tests) 11ms
+ ✓ tests/unit/qa-ownership.test.ts (8 tests) 75ms
+ ✓ tests/unit/readiness-and-hooks.test.ts (16 tests) 7342ms
+   ✓ provider readiness report (5)
+     ✓ importing the SDK is NOT enough: everything else is NO / NOT_VERIFIED by default 847ms
+     ✓ credentials + budget configured still does not make the provider operational without live evidence 774ms
+     ✓ becomes operational only after API access AND a live execution were verified; recovery is a separate level 876ms
+     ✓ evidence goes STALE when the SDK version or the credential changes 907ms
+     ✓ a subscription OAuth token is never accepted as configured credentials 949ms
+   ✓ verifyApiAccess (non-billable, explicit, never automatic) (3)
+     ✓ records evidence only on HTTP 200 904ms
+     ✓ sends only a models-list request (no inference) and reports network errors without leaking the key 1003ms
+     ✓ refuses with no key or a subscription token before any request 1049ms
+ ✓ tests/unit/redact-and-paths.test.ts (14 tests) 65ms
+ ✓ tests/unit/store.test.ts (12 tests) 11666ms
+   ✓ projects and tasks (6)
+     ✓ creates an isolated, git-initialised project workspace 992ms
+     ✓ adds a task in QUEUED with a persisted initial transition 897ms
+     ✓ orders the queue by project priority, task priority, then insertion order 1002ms
+     ✓ rejects duplicate tasks (idempotent enqueue) and supports explicit dedupe keys 1095ms
+     ✓ does not claim a task until its dependencies are COMPLETED 1092ms
+     ✓ respects scheduled start and next-eligible time 1011ms
+   ✓ state machine (3)
+     ✓ rejects invalid transitions centrally and keeps history 1017ms
+     ✓ persists timestamp, reason and execution id for each transition 1304ms
+   ✓ worker leasing (3)
+     ✓ lets only one claimer win when two supervisors race for the same task 915ms
+     ✓ enforces max concurrency and extends the lease on heartbeat only for the holder 1244ms
+     ✓ allows only one live supervisor instance 1092ms
+ ✓ tests/unit/requirement-coverage.test.ts (3 tests) 168ms
+ ✓ tests/unit/windows-scripts.test.ts (12 tests) 27ms
+ ✓ tests/unit/policy-v2-review.test.ts (18 tests) 26ms
+ ✓ tests/unit/agent-control-policy.test.ts (14 tests) 20ms
+ ✓ tests/unit/integrations.test.ts (6 tests) 25ms
+ ✓ tests/unit/process-tree.test.ts (5 tests) 9926ms
+   ✓ process identity (real processes) (1)
+     ✓ reads image name and OS creation time of a live process 1997ms
+   ✓ identity-verified orphan stop (real processes) (4)
+     ✓ never kills a process whose identity differs from the recorded worker 6800ms
+     ✓ accepts the fallback window when the identity was never recorded 1123ms
+ ✓ tests/unit/text-and-git.test.ts (4 tests) 1038ms
+   ✓ gitState (single git call) (1)
+     ✓ reports head, branch and changes for a real repository; non-repos are not repos 1028ms
+ ✓ tests/unit/security-verifier.test.ts (2 tests) 20ms
+ ✓ tests/unit/config.test.ts (5 tests) 24ms
+ ✓ tests/unit/database.test.ts (3 tests) 71ms
+
+ Test Files  23 passed (23)
+      Tests  394 passed (394)
+   Start at  18:17:40
+   Duration  24.52s (tests 91%, import 6%, transform 3%)
+
+    Isolate  23 workers spawned · ~213ms startup each (spawn + environment, per file)
+             at least ~2.24s faster with isolate: false — reuses workers across files instead of one per file
+
+JSON report written to E:/Agent/v2-staging/release-readiness/20261109-181411/logs/regression-e60278f/07-unit.json

@@ -1,0 +1,45 @@
+﻿13:34:21 plan: 39 chunks; run dir E:\Agent\v2-staging\worker-isolation\admin-scripts-r2-20261110\reports\chunked-sweep-20261110-133420; free=1198 MB; prod: task=Running pid=True hb=0s IDLE work=0
+13:43:06 [1/39] ok(exit 0) items=220282 findings=2 unreadable=0 unlistable=0 reparse=1 524s peak=140MB free=955MB :: E:\Agent
+13:43:33 [2/39] ok(exit 0) items=10833 findings=0 unreadable=0 unlistable=0 reparse=0 27s peak=142MB free=960MB :: E:\Claude code
+13:43:41 [3/39] ok(exit 0) items=1154 findings=0 unreadable=0 unlistable=0 reparse=0 6s peak=140MB free=996MB :: E:\Disk C
+13:43:46 [4/39] ok(exit 0) items=84 findings=0 unreadable=0 unlistable=0 reparse=0 4s peak=140MB free=1030MB :: E:\Documents data
+13:43:49 [5/39] ok(exit 0) items=24 findings=0 unreadable=0 unlistable=0 reparse=0 2s peak=0MB free=1021MB :: E:\Dr Nisar Data
+13:43:54 [6/39] ok(exit 0) items=93 findings=0 unreadable=0 unlistable=0 reparse=0 4s peak=140MB free=1056MB :: E:\Elevariq Internship Program
+13:44:03 [7/39] ok(exit 0) items=2171 findings=0 unreadable=0 unlistable=0 reparse=0 8s peak=142MB free=1148MB :: E:\elevariq-ui-tmp
+13:44:08 [8/39] ok(exit 0) items=214 findings=0 unreadable=0 unlistable=0 reparse=0 4s peak=105MB free=1009MB :: E:\Elevariq.io
+13:46:19 [9/39] ok(exit 0) items=56378 findings=0 unreadable=0 unlistable=0 reparse=0 130s peak=140MB free=1220MB :: E:\Latest Desktop
+13:46:22 [10/39] ok(exit 0) items=15 findings=0 unreadable=0 unlistable=0 reparse=0 2s peak=0MB free=1152MB :: E:\New folder
+13:46:27 [11/39] ok(exit 0) items=397 findings=0 unreadable=0 unlistable=0 reparse=0 4s peak=140MB free=1187MB :: E:\Office 365 ProPlus - Online Installer v3.1.1
+13:46:30 [12/39] ok(exit 0) items=20 findings=0 unreadable=0 unlistable=0 reparse=0 2s peak=0MB free=1182MB :: E:\Pelican Cohort 3
+13:46:33 [13/39] ok(exit 0) items=3 findings=0 unreadable=0 unlistable=0 reparse=0 2s peak=0MB free=1178MB :: E:\Python Projects
+13:46:36 [14/39] ok(exit 0) items=23 findings=0 unreadable=0 unlistable=0 reparse=0 2s peak=0MB free=1203MB :: E:\roadriders
+13:46:39 [15/39] ok(exit 0) items=12 findings=0 unreadable=0 unlistable=0 reparse=0 2s peak=0MB free=1196MB :: E:\saif construction
+13:46:42 [16/39] ok(exit 0) items=15 findings=0 unreadable=0 unlistable=0 reparse=0 2s peak=0MB free=1191MB :: E:\UGS Portal
+13:46:45 [17/39] ok(exit 0) items=8 findings=0 unreadable=0 unlistable=0 reparse=0 2s peak=0MB free=1221MB :: E:\ZARVA
+13:46:48 [18/39] ok(exit 0) items=2 findings=0 unreadable=0 unlistable=0 reparse=0 2s peak=0MB free=1216MB :: E:\<files>
+13:46:53 [19/39] ok(exit 0) items=6 findings=0 unreadable=0 unlistable=0 reparse=0 4s peak=105MB free=1311MB :: F:\Agents
+13:47:37 [20/39] ok(exit 0) items=17123 findings=0 unreadable=0 unlistable=0 reparse=0 44s peak=132MB free=1268MB :: F:\Andriod Mobile data
+13:47:40 [21/39] ok(exit 0) items=13 findings=0 unreadable=0 unlistable=0 reparse=0 2s peak=0MB free=1267MB :: F:\cvs
+13:47:45 [22/39] ok(exit 0) items=744 findings=0 unreadable=0 unlistable=0 reparse=0 4s peak=118MB free=1285MB :: F:\Desktop
+13:47:52 [23/39] ok(exit 0) items=1017 findings=0 unreadable=0 unlistable=0 reparse=0 6s peak=132MB free=1291MB :: F:\Google ADK
+13:48:41 [24/39] ok(exit 0) items=13075 findings=0 unreadable=0 unlistable=0 reparse=0 48s peak=132MB free=1450MB :: F:\Letszu Repo
+13:48:44 [25/39] ok(exit 0) items=7 findings=0 unreadable=0 unlistable=0 reparse=0 2s peak=0MB free=1446MB :: F:\machinery
+13:48:49 [26/39] ok(exit 0) items=49 findings=0 unreadable=0 unlistable=0 reparse=0 4s peak=126MB free=1433MB :: F:\new EKA
+13:48:54 [27/39] ok(exit 0) items=659 findings=0 unreadable=0 unlistable=0 reparse=0 4s peak=142MB free=1420MB :: F:\New folder
+13:48:57 [28/39] ok(exit 0) items=24 findings=0 unreadable=0 unlistable=0 reparse=0 2s peak=131MB free=1397MB :: F:\Nisar docs
+13:49:02 [29/39] ok(exit 0) items=30 findings=0 unreadable=0 unlistable=0 reparse=0 4s peak=109MB free=1173MB :: F:\tech-research-portal
+13:49:05 [30/39] ok(exit 0) items=3 findings=0 unreadable=0 unlistable=0 reparse=0 2s peak=108MB free=1122MB :: F:\UI UX
+13:49:10 [31/39] ok(exit 0) items=112 findings=0 unreadable=0 unlistable=0 reparse=0 4s peak=139MB free=1112MB :: F:\UltraViewer
+13:49:13 [32/39] ok(exit 0) items=2 findings=0 unreadable=0 unlistable=0 reparse=0 2s peak=108MB free=1104MB :: F:\VS Projects
+13:49:16 [33/39] ok(exit 0) items=8 findings=0 unreadable=0 unlistable=0 reparse=0 2s peak=0MB free=1104MB :: F:\WEB dev cvs
+13:49:19 [34/39] ok(exit 0) items=2 findings=0 unreadable=0 unlistable=0 reparse=0 2s peak=0MB free=1132MB :: F:\wordpress cvs
+13:49:22 [35/39] ok(exit 0) items=6 findings=0 unreadable=0 unlistable=0 reparse=0 2s peak=0MB free=1130MB :: F:\<files>
+13:49:29 [36/39] ok(exit 0) items=1388 findings=0 unreadable=0 unlistable=0 reparse=0 6s peak=139MB free=1053MB :: C:\Download
+13:49:32 [37/39] ok(exit 0) items=3 findings=3 unreadable=1 unlistable=1 reparse=0 2s peak=0MB free=1006MB :: C:\Intel
+13:50:25 [38/39] ok(exit 0) items=21507 findings=0 unreadable=0 unlistable=0 reparse=0 52s peak=138MB free=910MB :: D:\src
+13:50:30 [39/39] ok(exit 0) items=3 findings=3 unreadable=1 unlistable=1 reparse=0 4s peak=106MB free=702MB :: D:\Intel
+13:50:31 DONE complete=39/39 items=347509 findings=8 prod: task=Running pid=True hb=0s IDLE work=0
+13:50:31   explicit-broad-allow: 3
+13:50:31   reparse-point: 1
+13:50:31   unreadable: 2
+13:50:31   unlistable: 2

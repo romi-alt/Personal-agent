@@ -1,0 +1,9 @@
+﻿== 04 Worker task [verify] (DRY-RUN) ==
+  DRY-RUN verify: G1 worker account exists -- result=False
+  DRY-RUN verify: G2 worker NOT an administrator -- result=True
+  DRY-RUN verify: G3 broker root denies worker -- result=False
+  DRY-RUN verify: G4 owner .ssh denies worker -- result=n/a
+  DRY-RUN verify: G9 worker egress block rule -- result=False
+
+Report written: E:\Agent\v2-staging\trusted-execution-20261110-0249\admin-scripts\reports\04-worker-task-verify-20261110-031320.json
+Changes: 5  Refusals: 0  Mode: DRY-RUN

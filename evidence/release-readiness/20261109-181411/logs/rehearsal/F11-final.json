@@ -1,0 +1,388 @@
+﻿{
+ "file": "E:\\Agent\\v2-staging\\rr\\stage\\home\\agent.db",
+ "integrity": "ok",
+ "fkViolations": 0,
+ "versions": [
+  "1:initial_schema",
+  "2:phase_1_5_fencing_lifecycle_assignments_verification",
+  "3:phase_2_planning_workflows",
+  "4:phase_1_5_cli_worker_supervision",
+  "5:worker_process_identity",
+  "6:phase_2_project_intelligence",
+  "7:phase_3_engineering",
+  "8:phase_4_integration_sync",
+  "10:qa_requirement_ownership_and_review_links",
+  "11:phase_2_stage_5_progress_snapshots"
+ ],
+ "duplicateMigrationNames": [],
+ "schemaHash": "94805f79a0e8abc4",
+ "objects": [
+  "index:idx_chk_task",
+  "index:idx_events_at",
+  "index:idx_events_task",
+  "index:idx_evidence_project",
+  "index:idx_evidence_task",
+  "index:idx_exec_task",
+  "index:idx_plan_reviews_run",
+  "index:idx_progress_project",
+  "index:idx_ptrans_project",
+  "index:idx_qa_review_tasks_task",
+  "index:idx_qa_status",
+  "index:idx_research_project",
+  "index:idx_tasks_project",
+  "index:idx_tasks_status",
+  "index:idx_transitions_task",
+  "index:idx_wfruns_status",
+  "table:activity_events",
+  "table:adrs",
+  "table:approvals",
+  "table:architecture_specs",
+  "table:assignments",
+  "table:checkpoints",
+  "table:epics",
+  "table:executions",
+  "table:external_records",
+  "table:milestones",
+  "table:plan_reviews",
+  "table:plan_tasks",
+  "table:progress_snapshots",
+  "table:project_documents",
+  "table:project_memory",
+  "table:project_transitions",
+  "table:projects",
+  "table:provider_state",
+  "table:provider_verification",
+  "table:qa_review_tasks",
+  "table:qa_reviews",
+  "table:requirements",
+  "table:research_findings",
+  "table:schema_migrations",
+  "table:supervisor_state",
+  "table:sync_cursors",
+  "table:sync_runs",
+  "table:task_outputs",
+  "table:task_transitions",
+  "table:tasks",
+  "table:verification_evidence",
+  "table:workflow_runs",
+  "table:workflow_steps",
+  "table:workspaces"
+ ],
+ "counts": {
+  "projects": 2,
+  "tasks": 155,
+  "executions": 174,
+  "checkpoints": 174,
+  "approvals": 11,
+  "qa_reviews": 70,
+  "task_transitions": 682,
+  "verification_evidence": 437,
+  "assignments": 2,
+  "plan_tasks": 46,
+  "requirements": 41,
+  "milestones": 7,
+  "activity_events": 2459,
+  "task_outputs": 153,
+  "project_documents": 2,
+  "adrs": 11,
+  "workflow_runs": 1,
+  "workflow_steps": 6
+ },
+ "fingerprints": {
+  "projects": "7ca5da72bd16e14a",
+  "tasks": "91b5a52838569965",
+  "executions": "b4f2daeb33828286",
+  "checkpoints": "458051e370fd181b",
+  "approvals": "5fbbf5c428ece749",
+  "qa_reviews": "8b543f92f00b20cf",
+  "task_transitions": "f9da04f70c3498a2",
+  "verification_evidence": "6034a7f5a1bcad11",
+  "assignments": "28ae6620e9641dca",
+  "plan_tasks": "1ed786c578b4eebd",
+  "requirements": "cd198dff90f55650",
+  "milestones": "fb7956e8d16495c9",
+  "activity_events": "e72cac522553ec42",
+  "task_outputs": "fea4c521625bbc01",
+  "project_documents": "710e8c2b1fd168b7",
+  "adrs": "329b0d822fdbe03e",
+  "workflow_runs": "3495b5986d257465",
+  "workflow_steps": "74df102d361ce1a4"
+ },
+ "maxRowid": {
+  "projects": 2,
+  "tasks": 155,
+  "executions": 174,
+  "checkpoints": 174,
+  "approvals": 11,
+  "qa_reviews": 70,
+  "task_transitions": 682,
+  "verification_evidence": 437,
+  "assignments": 2,
+  "plan_tasks": 46,
+  "requirements": 41,
+  "milestones": 7,
+  "activity_events": 2459,
+  "task_outputs": 153,
+  "project_documents": 2,
+  "adrs": 11,
+  "workflow_runs": 1,
+  "workflow_steps": 6
+ },
+ "taskStatus": {
+  "BLOCKED": 1,
+  "COMPLETED": 153,
+  "FAILED": 1
+ },
+ "requirementStatus": {
+  "REVIEWED": 41
+ },
+ "milestoneStatus": {
+  "ACCEPTED": 2,
+  "REVIEWED": 5
+ },
+ "approvalStatus": {
+  "APPROVED": 9,
+  "DENIED": 1,
+  "PENDING": 1
+ },
+ "running": 0,
+ "openExecutions": 0,
+ "qaReviewTasks": 73,
+ "projects": [
+  {
+   "slug": "elevariq-retail-operations-portal",
+   "lifecycle": "VERIFYING",
+   "status": "ACTIVE"
+  },
+  {
+   "slug": "staging-rehearsal",
+   "lifecycle": "IN_DEVELOPMENT",
+   "status": "ACTIVE"
+  }
+ ],
+ "newTasks": [
+  {
+   "title": "Feature A",
+   "status": "COMPLETED",
+   "a": 0,
+   "c": 1794230963252,
+   "s": 1794230965889,
+   "n": 1,
+   "classes": "ok",
+   "sessions": 1,
+   "startLatencyMs": 2637
+  },
+  {
+   "title": "Flaky B",
+   "status": "COMPLETED",
+   "a": 1,
+   "c": 1794230964142,
+   "s": 1794230967245,
+   "n": 2,
+   "classes": "PROCESS_CRASH>ok",
+   "sessions": 1,
+   "startLatencyMs": 3103
+  },
+  {
+   "title": "Fatal C",
+   "status": "FAILED",
+   "a": 2,
+   "c": 1794230964584,
+   "s": 1794230967733,
+   "n": 2,
+   "classes": "TASK_FAILURE>TASK_FAILURE",
+   "sessions": 1,
+   "startLatencyMs": 3149
+  },
+  {
+   "title": "Deploy E",
+   "status": "BLOCKED",
+   "a": 0,
+   "c": 1794230965021,
+   "s": 1794230968181,
+   "n": 1,
+   "classes": "PERMISSION_DENIED",
+   "sessions": 1,
+   "startLatencyMs": 3160
+  },
+  {
+   "title": "Review: Feature A",
+   "status": "COMPLETED",
+   "a": 0,
+   "c": 1794230966750,
+   "s": 1794230966775,
+   "n": 1,
+   "classes": "ok",
+   "sessions": 1,
+   "startLatencyMs": 25
+  },
+  {
+   "title": "Review: Flaky B",
+   "status": "COMPLETED",
+   "a": 0,
+   "c": 1794230970185,
+   "s": 1794230970232,
+   "n": 1,
+   "classes": "ok",
+   "sessions": 1,
+   "startLatencyMs": 47
+  },
+  {
+   "title": "Fix: Flaky B (QA round 1)",
+   "status": "COMPLETED",
+   "a": 0,
+   "c": 1794230970799,
+   "s": 1794230970829,
+   "n": 1,
+   "classes": "ok",
+   "sessions": 1,
+   "startLatencyMs": 30
+  },
+  {
+   "title": "Review: Flaky B (round 2)",
+   "status": "COMPLETED",
+   "a": 0,
+   "c": 1794230971815,
+   "s": 1794230971860,
+   "n": 1,
+   "classes": "ok",
+   "sessions": 1,
+   "startLatencyMs": 45
+  },
+  {
+   "title": "Review: Flaky B (round 2) (repair 1)",
+   "status": "COMPLETED",
+   "a": 0,
+   "c": 1794230972611,
+   "s": 1794230972635,
+   "n": 1,
+   "classes": "ok",
+   "sessions": 1,
+   "startLatencyMs": 24
+  },
+  {
+   "title": "Review: Flaky B (round 2) (repair 2)",
+   "status": "COMPLETED",
+   "a": 0,
+   "c": 1794230973308,
+   "s": 1794230973330,
+   "n": 1,
+   "classes": "ok",
+   "sessions": 1,
+   "startLatencyMs": 22
+  },
+  {
+   "title": "Long D",
+   "status": "COMPLETED",
+   "a": 0,
+   "c": 1794231154253,
+   "s": 1794231154521,
+   "n": 2,
+   "classes": "INTERRUPTED>ok",
+   "sessions": 1,
+   "startLatencyMs": 268
+  },
+  {
+   "title": "Review: Long D",
+   "status": "COMPLETED",
+   "a": 0,
+   "c": 1794231158744,
+   "s": 1794231158768,
+   "n": 1,
+   "classes": "ok",
+   "sessions": 1,
+   "startLatencyMs": 24
+  },
+  {
+   "title": "Gate G",
+   "status": "COMPLETED",
+   "a": 0,
+   "c": 1794231167450,
+   "s": 1794231183346,
+   "n": 1,
+   "classes": "ok",
+   "sessions": 1,
+   "startLatencyMs": 15896
+  },
+  {
+   "title": "Review: Gate G",
+   "status": "COMPLETED",
+   "a": 0,
+   "c": 1794231184384,
+   "s": 1794231184420,
+   "n": 1,
+   "classes": "ok",
+   "sessions": 1,
+   "startLatencyMs": 36
+  }
+ ],
+ "newQa": [
+  {
+   "title": "Feature A",
+   "round": 1,
+   "status": "PASSED"
+  },
+  {
+   "title": "Flaky B",
+   "round": 1,
+   "status": "FAILED"
+  },
+  {
+   "title": "Flaky B",
+   "round": 2,
+   "status": "ESCALATED"
+  },
+  {
+   "title": "Long D",
+   "round": 1,
+   "status": "PASSED"
+  },
+  {
+   "title": "Gate G",
+   "round": 1,
+   "status": "PASSED"
+  }
+ ],
+ "newApprovals": [
+  {
+   "action_type": "publish_release",
+   "status": "DENIED",
+   "decided_by": "owner-cli"
+  },
+  {
+   "action_type": "qa_escalation",
+   "status": "PENDING",
+   "decided_by": null
+  }
+ ],
+ "newEvents": {
+  "approval.decided": 1,
+  "approval.required": 2,
+  "assignment.registered": 1,
+  "assignment.verification_changed": 1,
+  "checkpoint.created": 17,
+  "owner.approval_decided": 1,
+  "project.created": 1,
+  "project.lifecycle": 1,
+  "qa.correction_created": 1,
+  "qa.escalated": 1,
+  "qa.failed": 1,
+  "qa.passed": 3,
+  "qa.review_queued": 7,
+  "recovery.completed": 1,
+  "recovery.task_reconciled": 1,
+  "retry.scheduled": 2,
+  "roadmap.status_reconciled": 1,
+  "supervisor.resource_deferred": 1,
+  "supervisor.started": 4,
+  "supervisor.stopped": 3,
+  "task.enqueue_duplicate": 1,
+  "task.enqueued": 14,
+  "task.transition": 51,
+  "task.verification_policy": 6,
+  "verification.evidence": 27,
+  "worker.launched": 17,
+  "worker.terminated": 16
+ },
+ "overlappingExecutions": 0
+}

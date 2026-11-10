@@ -1,0 +1,10 @@
+CHECK                RESULT  DETAIL
+-------------------  ------  -----------------------------------------------------------------------------------
+node                 OK      v26.13.0 (need >= 22.12)
+config               OK      provider=mock env=test home=E:\Agent\v2-staging\rr\stage\probe-R5-v1-on-v11-staging
+agent home writable  OK      E:\Agent\v2-staging\rr\stage\probe-R5-v1-on-v11-staging
+database             OK      E:\Agent\v2-staging\rr\stage\probe-R5-v1-on-v11-staging\agent.db journal_mode=wal
+git                  OK      git version 2.56.0.windows.4
+claude code cli      OK      2.1.319 (Claude Code)
+provider auth        OK      mock provider (no credentials required)
+supervisor           WARN    STOPPED pid=7760

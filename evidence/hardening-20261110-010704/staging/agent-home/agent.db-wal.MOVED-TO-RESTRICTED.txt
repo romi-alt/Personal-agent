@@ -1,0 +1,1 @@
+﻿RESTRICTED: a database file was here (05-SECURITY-EVIDENCE\hardening-20261110-010704\staging\agent-home\agent.db-wal). Moved to RESTRICTED-LOCAL\evidence-databases\05-SECURITY-EVIDENCE\hardening-20261110-010704\staging\agent-home\agent.db-wal (not in the portable archive; may contain sensitive state). SHA-256 in RESTRICTED-LOCAL manifest.

@@ -1,0 +1,48 @@
+﻿== 00-isolation-group-deny (DRY-RUN, revision r2-20261110) ==
+  [WARN] R7 trusted script location + SHA256SUMS broad write on 
+E:\Agent\v2-staging\worker-isolation\admin-scripts-r2-20261110; broad write on 
+E:\Agent\v2-staging\worker-isolation\admin-scripts-r2-20261110\00-isolation-group-deny.ps1; broad write on 
+E:\Agent\v2-staging\worker-isolation\admin-scripts-r2-20261110\00a-remove-test-residue.ps1; broad write on 
+E:\Agent\v2-staging\worker-isolation\admin-scripts-r2-20261110\01-staging-volume.ps1; broad write on 
+E:\Agent\v2-staging\worker-isolation\admin-scripts-r2-20261110\02-identities-and-rights.ps1; broad write on 
+E:\Agent\v2-staging\worker-isolation\admin-scripts-r2-20261110\03-staging-layout.ps1; broad write on 
+E:\Agent\v2-staging\worker-isolation\admin-scripts-r2-20261110\04-broker-install.ps1; broad write on 
+E:\Agent\v2-staging\worker-isolation\admin-scripts-r2-20261110\05-firewall-egress.ps1; broad write on 
+E:\Agent\v2-staging\worker-isolation\admin-scripts-r2-20261110\06-worker-enable.ps1; broad write on 
+E:\Agent\v2-staging\worker-isolation\admin-scripts-r2-20261110\07-verify-config.ps1; broad write on 
+E:\Agent\v2-staging\worker-isolation\admin-scripts-r2-20261110\09-rollback.ps1; broad write on 
+E:\Agent\v2-staging\worker-isolation\admin-scripts-r2-20261110\Freeze-AdminScripts.ps1; broad write on 
+E:\Agent\v2-staging\worker-isolation\admin-scripts-r2-20261110\_common.ps1; SHA256SUMS missing
+  DRY-RUN targets: E:\, F:\, C:\Download, C:\Intel, D:\src, D:\Intel -- DENY targets (validated by Assert-DenyTarget)
+  [PASS] P0 production task present and running Running
+  [PASS] P1 production supervisor PID 8992 alive 
+  [PASS] P2 production HEAD = e60278f e60278f
+  [PASS] P3 production task action still points at the checkout script 
+  DRY-RUN sweep: E:\, F:\, C:\Download, C:\Intel, D:\src, D:\Intel -- mandatory dirs+files sweep runs before any 
+change in -Apply (use -Sweep to preview)
+  DRY-RUN backup: E:\ -- icacls /save root -> C:\Users\Roman\ElevariqAdmin\acl\E_-root.acl and full tree -> E_-full.acl
+  DRY-RUN backup: F:\ -- icacls /save root -> C:\Users\Roman\ElevariqAdmin\acl\F_-root.acl and full tree -> F_-full.acl
+  DRY-RUN backup: C:\Download -- icacls /save root -> C:\Users\Roman\ElevariqAdmin\acl\C__Download-root.acl and full 
+tree -> C__Download-full.acl
+  DRY-RUN backup: C:\Intel -- icacls /save root -> C:\Users\Roman\ElevariqAdmin\acl\C__Intel-root.acl and full tree -> 
+C__Intel-full.acl
+  DRY-RUN backup: D:\src -- icacls /save root -> C:\Users\Roman\ElevariqAdmin\acl\D__src-root.acl and full tree -> 
+D__src-full.acl
+  DRY-RUN backup: D:\Intel -- icacls /save root -> C:\Users\Roman\ElevariqAdmin\acl\D__Intel-root.acl and full tree -> 
+D__Intel-full.acl
+  DRY-RUN new-localgroup: ElevariqIsolatedIdentities -- create EMPTY group (members added by 02)
+  DRY-RUN icacls: E:\ -- DENY Full for isolation group (inherits to children) [icacls E:\ /deny *<group-SID>:(OI)(CI)F]
+  DRY-RUN icacls: F:\ -- DENY Full for isolation group (inherits to children) [icacls F:\ /deny *<group-SID>:(OI)(CI)F]
+  DRY-RUN icacls: C:\Download -- DENY Full for isolation group (inherits to children) [icacls C:\Download /deny 
+*<group-SID>:(OI)(CI)F]
+  DRY-RUN icacls: C:\Intel -- DENY Full for isolation group (inherits to children) [icacls C:\Intel /deny 
+*<group-SID>:(OI)(CI)F]
+  DRY-RUN icacls: D:\src -- DENY Full for isolation group (inherits to children) [icacls D:\src /deny 
+*<group-SID>:(OI)(CI)F]
+  DRY-RUN icacls: D:\Intel -- DENY Full for isolation group (inherits to children) [icacls D:\Intel /deny 
+*<group-SID>:(OI)(CI)F]
+
+Report: 
+E:\Agent\v2-staging\worker-isolation\admin-scripts-r2-20261110\reports\00-isolation-group-deny-20261110-140327.json
+Changes: 15  Refusals: 0  Checks: 5  Mode: DRY-RUN
+

@@ -1,0 +1,26 @@
+﻿sandbox-run.exe : node:fs:3413
+At E:\Agent\v2-staging\hardening\20261109-234257\scripts\run-isolation-tests.ps1:59 char:14
++ ...    $lines = & $SB --name $NAME --mem-mb 2048 --rw "$ISO\ws" --rx $T - ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (node:fs:3413:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+    const out = binding.lstat(
+                        ^
+
+Error: EPERM: operation not permitted, lstat 'E:\'
+    at Object.realpathSync (node:fs:3413:25)
+    at realpathSync (node:internal/modules/helpers:77:37)
+    at Object.loaderMethodWrapper [as realpathSync] (node:internal/modules/helpers:123:12)
+    at Module._findPath (node:internal/modules/cjs/loader:861:36)
+    at resolveMainPath (node:internal/modules/run_main:37:21)
+    at Module.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:163:20)
+    at node:internal/main/run_main_module:33:47 {
+  errno: -4048,
+  code: 'EPERM',
+  syscall: 'lstat',
+  path: 'E:\\'
+}
+
+Node.js v26.13.0
+sandbox-run: exit=1 peakJobMB=19

@@ -1,0 +1,6 @@
+﻿== 04 Worker task [register] (DRY-RUN) ==
+  DRY-RUN register-scheduledtask: ElevariqWorker -- principal=elevariq-worker (standard); action=powershell -File C:\ElevariqWork\run-worker.ps1; env USERPROFILE/APPDATA/TEMP under C:\ElevariqWork
+  DRY-RUN note: ElevariqWorker -- does NOT alter production task ElevariqPersonalAgent
+
+Report written: E:\Agent\v2-staging\trusted-execution-20261110-0249\admin-scripts\reports\04-worker-task-register-20261110-031322.json
+Changes: 2  Refusals: 0  Mode: DRY-RUN

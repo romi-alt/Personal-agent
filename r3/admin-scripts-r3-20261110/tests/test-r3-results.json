@@ -1,0 +1,730 @@
+﻿[
+    {
+        "n":  "r1 regex bug reproduced (\"$script:X:\\(N\\)\" -\u003e \"\\(N\\)\")",
+        "s":  "PASS"
+    },
+    {
+        "n":  "r2 form keeps the name (\"${script:X}:\")",
+        "s":  "PASS"
+    },
+    {
+        "n":  "staging root accepted",
+        "s":  "PASS"
+    },
+    {
+        "n":  "staging prefix trap rejected",
+        "s":  "PASS"
+    },
+    {
+        "n":  "disk dir accepted",
+        "s":  "PASS"
+    },
+    {
+        "n":  "production checkout rejected",
+        "s":  "PASS"
+    },
+    {
+        "n":  "owner .claude rejected",
+        "s":  "PASS"
+    },
+    {
+        "n":  "prod home rejected",
+        "s":  "PASS"
+    },
+    {
+        "n":  "dot-dot escape rejected",
+        "s":  "PASS"
+    },
+    {
+        "n":  "L1 \\\\?\\ device form refused",
+        "s":  "PASS"
+    },
+    {
+        "n":  "L1 \\\\.\\ device form refused",
+        "s":  "PASS"
+    },
+    {
+        "n":  "L1 admin-share UNC refused",
+        "s":  "PASS"
+    },
+    {
+        "n":  "L1 forward-slash UNC refused",
+        "s":  "PASS"
+    },
+    {
+        "n":  "L1 relative path canonicalised to a drive path",
+        "s":  "PASS"
+    },
+    {
+        "n":  "L1 Assert-ElvNotProduction refuses admin-share form of production",
+        "s":  "PASS"
+    },
+    {
+        "n":  "deny target E:\\ accepted",
+        "s":  "PASS"
+    },
+    {
+        "n":  "deny target C:\\Download accepted",
+        "s":  "PASS"
+    },
+    {
+        "n":  "deny target E:\\$RECYCLE.BIN accepted (M11)",
+        "s":  "PASS"
+    },
+    {
+        "n":  "deny target C:\\Windows rejected",
+        "s":  "PASS"
+    },
+    {
+        "n":  "deny target inside prod rejected even if listed",
+        "s":  "PASS"
+    },
+    {
+        "n":  "L1/M3 listed extra accepted ONLY when it is a coverable sweep finding",
+        "s":  "PASS"
+    },
+    {
+        "n":  "L1 self-authorising -Additional C:\\Windows refused when sweep findings are given",
+        "s":  "PASS"
+    },
+    {
+        "n":  "complement of loopback only",
+        "s":  "PASS"
+    },
+    {
+        "n":  "complement with allow CIDR",
+        "s":  "PASS"
+    },
+    {
+        "n":  "overlapping CIDRs merged",
+        "s":  "PASS"
+    },
+    {
+        "n":  "unaligned CIDR normalised",
+        "s":  "PASS"
+    },
+    {
+        "n":  "bad CIDR throws",
+        "s":  "PASS"
+    },
+    {
+        "n":  "host name rejected",
+        "s":  "PASS"
+    },
+    {
+        "n":  "L6 leading-zero octet (octal trap) rejected",
+        "s":  "PASS"
+    },
+    {
+        "n":  "L6 empty complement (0.0.0.0/0) refused",
+        "s":  "PASS"
+    },
+    {
+        "n":  "INF parse",
+        "s":  "PASS"
+    },
+    {
+        "n":  "INF add keeps existing, adds new right",
+        "s":  "PASS"
+    },
+    {
+        "n":  "INF remove",
+        "s":  "PASS"
+    },
+    {
+        "n":  "INF add idempotent",
+        "s":  "PASS"
+    },
+    {
+        "n":  "L2 remove with case mismatch terminates and removes",
+        "s":  "PASS"
+    },
+    {
+        "n":  "right held by SID or name",
+        "s":  "PASS"
+    },
+    {
+        "n":  "spec M",
+        "s":  "PASS"
+    },
+    {
+        "n":  "spec RX",
+        "s":  "PASS"
+    },
+    {
+        "n":  "spec W",
+        "s":  "PASS"
+    },
+    {
+        "n":  "spec WD-this = add-file only (no list, no delete, no write-dac)",
+        "s":  "PASS"
+    },
+    {
+        "n":  "spec RX+D = read + delete, no write",
+        "s":  "PASS"
+    },
+    {
+        "n":  "spec DENY/none",
+        "s":  "PASS"
+    },
+    {
+        "n":  "layout: bin admin-only, requests WD-this+OwnerRights, approvals broker RX+D",
+        "s":  "PASS"
+    },
+    {
+        "n":  "ConvertTo-ElvGrant specs",
+        "s":  "PASS"
+    },
+    {
+        "n":  "B1 OLD filter misses the explicit inherit-only Everyone:F (reproduces the rejected behaviour)",
+        "s":  "PASS"
+    },
+    {
+        "n":  "B1 NEW classification flags it as explicit-broad-allow (IO)",
+        "s":  "PASS"
+    },
+    {
+        "n":  "B1 OLD protected test (effective mask skips IO) misses protected IO-only Users:M",
+        "s":  "PASS"
+    },
+    {
+        "n":  "B1 NEW classification flags protected-with-broad-access for IO-only broad ACE",
+        "s":  "PASS"
+    },
+    {
+        "n":  "classification: null DACL",
+        "s":  "PASS"
+    },
+    {
+        "n":  "classification: clean protected DACL (SYSTEM/BA only) -\u003e no finding",
+        "s":  "PASS"
+    },
+    {
+        "n":  "classification: inherited broad allow (not explicit, not protected) -\u003e no finding (covered by the ancestor)",
+        "s":  "PASS"
+    },
+    {
+        "n":  "classification: zero-mask broad ACE ignored",
+        "s":  "PASS"
+    },
+    {
+        "n":  "L5 broad SIDs include NTLM (S-1-5-64-10), asserted identity, NETWORK, SERVICE, Guests",
+        "s":  "PASS"
+    },
+    {
+        "n":  "effective mask: ACE ordering deny-before-allow and allow-before-deny (object itself)",
+        "s":  "PASS"
+    },
+    {
+        "n":  "effective mask: generic rights expanded (GR|GW -\u003e 0x12019F)",
+        "s":  "PASS"
+    },
+    {
+        "n":  "effective mask: group membership (SID set) decides; non-member SID ignored",
+        "s":  "PASS"
+    },
+    {
+        "n":  "fixture built",
+        "s":  "PASS"
+    },
+    {
+        "n":  "sweep r3: X (explicit inherit-only Everyone:F) -\u003e explicit-broad-allow",
+        "s":  "PASS"
+    },
+    {
+        "n":  "sweep r3: P (protected, IO-only Users:M) -\u003e explicit-broad-allow + protected-with-broad-access",
+        "s":  "PASS"
+    },
+    {
+        "n":  "sweep r3: O (explicit Everyone:F, own explicit DENY) -\u003e explicit-broad-allow (coverable)",
+        "s":  "PASS"
+    },
+    {
+        "n":  "sweep r3: N, Q (protected owner-only), work, locked -\u003e no finding",
+        "s":  "PASS"
+    },
+    {
+        "n":  "sweep r3: req (worker add-file-only) is UNLISTABLE to the non-elevated runner -\u003e the sweep MUST run elevated",
+        "s":  "PASS"
+    },
+    {
+        "n":  "sweep r3: children of X carry only inherited ACEs -\u003e no finding on them (the finding is on X)",
+        "s":  "PASS"
+    },
+    {
+        "n":  "sweep r3: U\\u.txt unreadable (OWNER RIGHTS strips READ_CONTROL) reported",
+        "s":  "PASS"
+    },
+    {
+        "n":  "sweep r3: junction J reported as reparse-point OUTSIDE and not followed",
+        "s":  "PASS"
+    },
+    {
+        "n":  "sweep r3: stats consistent (findings = rows minus reparse/unreadable/unlistable)",
+        "s":  "PASS"
+    },
+    {
+        "n":  "r2 BASELINE (rejected hash 126d700c): X NOT flagged (B1 reproduced on disk)",
+        "s":  "PASS"
+    },
+    {
+        "n":  "r2 BASELINE: P NOT flagged (B1 protected variant reproduced on disk)",
+        "s":  "PASS"
+    },
+    {
+        "n":  "r2 BASELINE: O IS flagged (non-IO explicit allow was always detected)",
+        "s":  "PASS"
+    },
+    {
+        "n":  "V3: model root itself has mask 0 (explicit DENY applies)",
+        "s":  "PASS"
+    },
+    {
+        "n":  "V3: X\\c.txt EXPOSED (nearer inherited Everyone:F precedes the root DENY)",
+        "s":  "PASS"
+    },
+    {
+        "n":  "V3: nested X\\deep\\deeper\\f.txt EXPOSED",
+        "s":  "PASS"
+    },
+    {
+        "n":  "V3: X itself NOT exposed (inherit-only ACE does not apply to X)",
+        "s":  "PASS"
+    },
+    {
+        "n":  "V3: X\\deep\\locked\\l.txt NOT exposed (protected cut, no broad ACE)",
+        "s":  "PASS"
+    },
+    {
+        "n":  "V3: P\\d.txt EXPOSED (protected parent passes Users:M down, DENY never arrives)",
+        "s":  "PASS"
+    },
+    {
+        "n":  "V3: O\\g.txt NOT exposed (explicit DENY on O sorts before its explicit allow: the AdditionalDenyPaths remedy)",
+        "s":  "PASS"
+    },
+    {
+        "n":  "V3: N\\e.txt NOT exposed (plain inheritance: DENY arrives)",
+        "s":  "PASS"
+    },
+    {
+        "n":  "V3: Q\\h.txt NOT exposed (protected owner-only)",
+        "s":  "PASS"
+    },
+    {
+        "n":  "V3: U\\u.txt unreadable counted as failure",
+        "s":  "PASS"
+    },
+    {
+        "n":  "V3: junction not followed (no rows under J\\)",
+        "s":  "PASS"
+    },
+    {
+        "n":  "V3 with captured token CSV adds the real worker SIDs to the modelled token (integrity-level SIDs filtered)",
+        "s":  "PASS"
+    },
+    {
+        "n":  "REAL: real\\X\\c.txt open-for-read ALLOWED despite the ancestor DENY (demonstrated counterexample, runner token)",
+        "s":  "PASS"
+    },
+    {
+        "n":  "REAL: real\\X\\c.txt open-for-write ALLOWED too (Full, not just read)",
+        "s":  "PASS"
+    },
+    {
+        "n":  "REAL: real\\P\\d.txt ALLOWED (protected parent with IO-only Users:M)",
+        "s":  "PASS"
+    },
+    {
+        "n":  "REAL: real\\N\\e.txt DENIED (inherited DENY works where nothing precedes it)",
+        "s":  "PASS"
+    },
+    {
+        "n":  "REAL: real\\O\\g.txt DENIED (explicit DENY on O precedes its explicit Everyone allow)",
+        "s":  "PASS"
+    },
+    {
+        "n":  "REAL: real\\N\\locked\\l.txt DENIED (protected empty DACL; owner keeps only RC/WDAC)",
+        "s":  "PASS"
+    },
+    {
+        "n":  "REAL agrees with the model on every real\\ case (prediction = observation)",
+        "s":  "PASS"
+    },
+    {
+        "n":  "REAL: junction target outside the deny root is readable through the junction (DENY does not cover reparse targets)",
+        "s":  "PASS"
+    },
+    {
+        "n":  "POSITIVE: authorised work\\ dir: create + write + read succeed",
+        "s":  "PASS"
+    },
+    {
+        "n":  "M9: creator can write a NEW request through the creation handle",
+        "s":  "PASS"
+    },
+    {
+        "n":  "M9: creator can NOT reopen its own request for write (OWNER RIGHTS RC only, no implicit WRITE_DAC)",
+        "s":  "PASS"
+    },
+    {
+        "n":  "M9: creator can NOT read it back either",
+        "s":  "PASS"
+    },
+    {
+        "n":  "M9: creator can NOT change the DACL of its request (WRITE_DAC stripped)",
+        "s":  "PASS"
+    },
+    {
+        "n":  "M9: creator can NOT list the request directory (no FILE_LIST_DIRECTORY)",
+        "s":  "PASS"
+    },
+    {
+        "n":  "R3-N1: inheritable ACE spec on a FILE is refused (icacls would silently drop it with exit 0)",
+        "s":  "PASS"
+    },
+    {
+        "n":  "M1: icacls failure under EAP=Stop is captured and recorded as a refusal with the exit code",
+        "s":  "PASS"
+    },
+    {
+        "n":  "M1: trap saves the report on an unexpected error (00 -Verify without a group throws; report has error)",
+        "s":  "PASS"
+    },
+    {
+        "n":  "M2: second backup run keeps the FIRST baseline-root.sddl and adds a new timestamped copy",
+        "s":  "PASS"
+    },
+    {
+        "n":  "M2: full-tree backup failure (missing target) is an error, not silent",
+        "s":  "PASS"
+    },
+    {
+        "n":  "H1: chunk coverage: chunks over every top-level child -\u003e no missing; one child left out -\u003e reported",
+        "s":  "PASS"
+    },
+    {
+        "n":  "H1: chunk record round-trip (Write/Get, elevated flag recorded as false here)",
+        "s":  "PASS"
+    },
+    {
+        "n":  "L7: Test-ElvLayout passes on a layout applied exactly as 03 would (synthetic root, fake identity SIDs)",
+        "s":  "PASS"
+    },
+    {
+        "n":  "fixture removed cleanly (no residue in the owner profile)",
+        "s":  "PASS"
+    },
+    {
+        "n":  "H2: Test-ElvAdminOnlyWritable reports the OWNER SID as a writer on an owner-writable dir",
+        "s":  "PASS"
+    },
+    {
+        "n":  "H2: canonical manifest is ordinal-sorted, LF, trailing LF",
+        "s":  "PASS"
+    },
+    {
+        "n":  "H2: manifest hash is 64 hex and deterministic",
+        "s":  "PASS"
+    },
+    {
+        "n":  "H2: dry-run from an owner-writable copy -\u003e R7 WARN (never PASS)",
+        "s":  "PASS"
+    },
+    {
+        "n":  "H2: APPLY from an owner-writable copy refused even with the right manifest hash",
+        "s":  "PASS"
+    },
+    {
+        "n":  "H2: APPLY without -ApprovedManifestHash is a recorded problem",
+        "s":  "PASS"
+    },
+    {
+        "n":  "H2: APPLY with a WRONG manifest hash is a recorded problem",
+        "s":  "PASS"
+    },
+    {
+        "n":  "H2: a tampered script is a recorded hash mismatch",
+        "s":  "PASS"
+    },
+    {
+        "n":  "H2: non-canonical SHA256SUMS (CRLF) is a recorded problem",
+        "s":  "PASS"
+    },
+    {
+        "n":  "H2: Freeze refuses to run non-elevated (and -ApprovedSums is mandatory)",
+        "s":  "PASS"
+    },
+    {
+        "n":  "H2: every script exposes -ApprovedManifestHash (00,00a,01..06,09)",
+        "s":  "PASS"
+    },
+    {
+        "n":  "H4: rule bound to a STALE SID is rejected",
+        "s":  "PASS"
+    },
+    {
+        "n":  "H4: rule bound to the current SID accepted",
+        "s":  "PASS"
+    },
+    {
+        "n":  "L9: substring SID (â€¦-100 vs â€¦-1001) rejected",
+        "s":  "PASS"
+    },
+    {
+        "n":  "H4: disabled / allow / inbound rules rejected",
+        "s":  "PASS"
+    },
+    {
+        "n":  "L9: address set compared exactly",
+        "s":  "PASS"
+    },
+    {
+        "n":  "H4: missing rule rejected (fail closed)",
+        "s":  "PASS"
+    },
+    {
+        "n":  "L4: group members via ADSI include the runner (Administrators)",
+        "s":  "PASS"
+    },
+    {
+        "n":  "L4: non-existent group THROWS (fail closed) instead of returning nothing",
+        "s":  "PASS"
+    },
+    {
+        "n":  "L4: Get-ElvAccountGroupNames (DIRECT memberships) for the runner includes Administrators",
+        "s":  "PASS"
+    },
+    {
+        "n":  "H5: shadow enumeration THROWS UNKNOWN when not elevated (fail closed)",
+        "s":  "PASS"
+    },
+    {
+        "n":  "H5: pre-DENY shadow gate THROWS when not elevated (06 gate records FAIL)",
+        "s":  "PASS"
+    },
+    {
+        "n":  "H5: deny-target drives derived (E, F, C, D)",
+        "s":  "PASS"
+    },
+    {
+        "n":  "I1: owner resolved by the fixed SID, not $env:USERNAME",
+        "s":  "PASS"
+    },
+    {
+        "n":  "I2/L8: production state found by command line and .git\\HEAD (no git.exe, no hard-coded PID)",
+        "s":  "PASS"
+    },
+    {
+        "n":  "Get-ElvGitHead reads a symbolic ref correctly on the production checkout",
+        "s":  "PASS"
+    },
+    {
+        "n":  "E:\\ grants broad groups write today (the finding)",
+        "s":  "PASS"
+    },
+    {
+        "n":  "owner profile denies broad groups",
+        "s":  "PASS"
+    },
+    {
+        "n":  "no group DENY exists yet on E:\\ (nothing applied)",
+        "s":  "PASS"
+    },
+    {
+        "n":  "E:\\$RECYCLE.BIN (M11) grants Users add-subdirectory today",
+        "s":  "PASS"
+    },
+    {
+        "n":  "-SweepRoots outside DENY targets refused",
+        "s":  "PASS"
+    },
+    {
+        "n":  "-SweepRoots without -Sweep refused",
+        "s":  "PASS"
+    },
+    {
+        "n":  "-SweepRoots with -Apply refused",
+        "s":  "PASS"
+    },
+    {
+        "n":  "-VerifyRoots without -Verify refused",
+        "s":  "PASS"
+    },
+    {
+        "n":  "-Sweep and -Verify together refused",
+        "s":  "PASS"
+    },
+    {
+        "n":  "-Finalize without -Sweep/-Verify refused",
+        "s":  "PASS"
+    },
+    {
+        "n":  "-ListShadows non-elevated FAILS CLOSED (throws UNKNOWN; report saved with error)",
+        "s":  "PASS"
+    },
+    {
+        "n":  "-Sweep -SweepRoots \u003ctests dir\u003e runs read-only and writes a chunk record",
+        "s":  "PASS"
+    },
+    {
+        "n":  "-Sweep -Finalize on a partial chunk set reports coverage FAIL and complete=false (no exception)",
+        "s":  "PASS"
+    },
+    {
+        "n":  "06 gate dry-run: G5 (verify-complete) and G8 (shadows) FAIL closed with explicit reasons",
+        "s":  "PASS"
+    },
+    {
+        "n":  "parse 00-isolation-group-deny.ps1",
+        "s":  "PASS"
+    },
+    {
+        "n":  "parse 00a-remove-test-residue.ps1",
+        "s":  "PASS"
+    },
+    {
+        "n":  "parse 01-staging-volume.ps1",
+        "s":  "PASS"
+    },
+    {
+        "n":  "parse 02-identities-and-rights.ps1",
+        "s":  "PASS"
+    },
+    {
+        "n":  "parse 03-staging-layout.ps1",
+        "s":  "PASS"
+    },
+    {
+        "n":  "parse 04-broker-install.ps1",
+        "s":  "PASS"
+    },
+    {
+        "n":  "parse 05-firewall-egress.ps1",
+        "s":  "PASS"
+    },
+    {
+        "n":  "parse 06-worker-enable.ps1",
+        "s":  "PASS"
+    },
+    {
+        "n":  "parse 07-verify-config.ps1",
+        "s":  "PASS"
+    },
+    {
+        "n":  "parse 09-rollback.ps1",
+        "s":  "PASS"
+    },
+    {
+        "n":  "parse Freeze-AdminScripts.ps1",
+        "s":  "PASS"
+    },
+    {
+        "n":  "parse _common.ps1",
+        "s":  "PASS"
+    },
+    {
+        "n":  "dry-run 00-isolation-group-deny.ps1 ",
+        "s":  "PASS"
+    },
+    {
+        "n":  "dry-run 00a-remove-test-residue.ps1 ",
+        "s":  "PASS"
+    },
+    {
+        "n":  "dry-run 01-staging-volume.ps1 ",
+        "s":  "PASS"
+    },
+    {
+        "n":  "dry-run 02-identities-and-rights.ps1 ",
+        "s":  "PASS"
+    },
+    {
+        "n":  "dry-run 02-identities-and-rights.ps1 -VolumeQuotaMB=2048",
+        "s":  "PASS"
+    },
+    {
+        "n":  "dry-run 03-staging-layout.ps1 ",
+        "s":  "PASS"
+    },
+    {
+        "n":  "dry-run 04-broker-install.ps1 ",
+        "s":  "PASS"
+    },
+    {
+        "n":  "dry-run 05-firewall-egress.ps1 -AllowIPv4Cidrs=160.79.104.0/23",
+        "s":  "PASS"
+    },
+    {
+        "n":  "dry-run 05-firewall-egress.ps1 -HostRules=True",
+        "s":  "PASS"
+    },
+    {
+        "n":  "dry-run 06-worker-enable.ps1 -Mode=enable-for-login",
+        "s":  "PASS"
+    },
+    {
+        "n":  "dry-run 06-worker-enable.ps1 -Mode=lockdown",
+        "s":  "PASS"
+    },
+    {
+        "n":  "dry-run 06-worker-enable.ps1 -Mode=register-task",
+        "s":  "PASS"
+    },
+    {
+        "n":  "dry-run 07-verify-config.ps1 -Stage=00",
+        "s":  "PASS"
+    },
+    {
+        "n":  "dry-run 07-verify-config.ps1 -Stage=06",
+        "s":  "PASS"
+    },
+    {
+        "n":  "dry-run 09-rollback.ps1 ",
+        "s":  "PASS"
+    },
+    {
+        "n":  "dry-run 09-rollback.ps1 -IncludeProductionDeny=True",
+        "s":  "PASS"
+    },
+    {
+        "n":  "system unchanged after dry-runs: users",
+        "s":  "PASS"
+    },
+    {
+        "n":  "system unchanged after dry-runs: groups",
+        "s":  "PASS"
+    },
+    {
+        "n":  "system unchanged after dry-runs: tasks",
+        "s":  "PASS"
+    },
+    {
+        "n":  "system unchanged after dry-runs: fw",
+        "s":  "PASS"
+    },
+    {
+        "n":  "system unchanged after dry-runs: eRoot",
+        "s":  "PASS"
+    },
+    {
+        "n":  "system unchanged after dry-runs: fRoot",
+        "s":  "PASS"
+    },
+    {
+        "n":  "system unchanged after dry-runs: staging",
+        "s":  "PASS"
+    },
+    {
+        "n":  "system unchanged after dry-runs: disk",
+        "s":  "PASS"
+    },
+    {
+        "n":  "system unchanged after dry-runs: prodEnv",
+        "s":  "PASS"
+    },
+    {
+        "n":  "production untouched (task Running, supervisor alive, HEAD e60278f)",
+        "s":  "PASS"
+    }
+]

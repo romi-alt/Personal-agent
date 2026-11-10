@@ -1,0 +1,158 @@
+From 1e5b7d48cfeb8fe06839db05e4efc96b68c7be34 Mon Sep 17 00:00:00 2001
+From: "ELEVARIQ Agent (Claude)" <connectroman3@gmail.com>
+Date: Tue, 10 Nov 2026 01:45:20 +0500
+Subject: [PATCH 4/4] fix(security): Phase G findings from the real Claude Code
+ staging run
+
+1. False positive (V2.1 regression): a worker wrote a test file through a data
+   heredoc whose body contained `import ... from '../src/slugify.ts'`. The path
+   check tokenized the body, resolved ../src to <agent home>/workspaces/src and
+   denied the call. Heredoc bodies are now removed before the path-resolution
+   check, but ONLY when the shell analyzer classifies them as data. Heredocs fed
+   to an interpreter, unquoted bodies with substitutions and heredoc-written files
+   executed in the same command keep the raw text. The literal agent-path check
+   still sees bodies. Replay of the real transcript: the denied call is now allowed.
+2. Usage accounting: the key-name redaction rule matched "token" and stored every
+   execution's inputTokens/outputTokens as [REDACTED]. Numbers and booleans are no
+   longer redacted by key name; string values still are.
+
+69 probes: 0 bypasses, 0 legitimate regressions. Rule K matrix: 0 FN, 4 FP (unchanged).
+---
+ src/security/hardening.ts        | 24 +++++++++++++++++++
+ src/security/policy.ts           |  7 +++++-
+ src/security/redact.ts           |  5 +++-
+ tests/unit/phase-bde-v21.test.ts | 40 ++++++++++++++++++++++++++++++++
+ 4 files changed, 74 insertions(+), 2 deletions(-)
+
+diff --git a/src/security/hardening.ts b/src/security/hardening.ts
+index 0bbc33d..7261ccf 100644
+--- a/src/security/hardening.ts
++++ b/src/security/hardening.ts
+@@ -249,6 +249,30 @@ function tokens(segment: string): string[] {
+   return out.map((t) => t.replace(/^--?[\w-]+=/, '').replace(/^@/, '')).filter(Boolean);
+ }
+ 
++/**
++ * Removes heredoc BODIES (keeps the `cat > f <<'EOF'` line, so the redirect target is still checked). Phase G finding:
++ * a real worker wrote a test file through a heredoc whose body contained `import ... from '../src/slugify.ts'`; the
++ * body was tokenized as paths, `../src` resolved to `<agent home>/workspaces/src` and the call was denied. Callers
++ * must only use this when the shell analyzer classified the heredoc as DATA (`useRaw` false): heredocs fed to an
++ * interpreter, unquoted bodies with substitutions and files executed in the same command keep the raw text.
++ */
++export function stripHeredocBodies(command: string): string {
++  const out: string[] = [];
++  const pending: { delim: string; tabs: boolean }[] = [];
++  for (const line of command.split('\n')) {
++    if (pending.length) {
++      const h = pending[0]!;
++      const cmp = (h.tabs ? line.replace(/^\t+/, '') : line).replace(/\r$/, '');
++      if (cmp === h.delim) pending.shift();
++      continue;
++    }
++    out.push(line);
++    for (const m of line.matchAll(/(?<!<)<<(-?)\s*(['"]?)([A-Za-z_][\w.-]*)\2/g))
++      pending.push({ delim: m[3]!, tabs: m[1] === '-' });
++  }
++  return out.join('\n');
++}
++
+ /**
+  * Resolves path-like words of a command (tracking `cd`) and reports whether any of them names a protected
+  * location outside the workspace. Complements the literal-substring check of V2 (`mentionsProtectedPath`).
+diff --git a/src/security/policy.ts b/src/security/policy.ts
+index 5accd79..e27276d 100644
+--- a/src/security/policy.ts
++++ b/src/security/policy.ts
+@@ -10,6 +10,7 @@ import {
+   packageScriptBodies,
+   reachesProtectedPath,
+   stripEscapes,
++  stripHeredocBodies,
+ } from './hardening.js';
+ 
+ /**
+@@ -292,10 +293,14 @@ export function evaluateToolUse(
+       };
+     const hard = hardDenyV21(command, toolName === 'Bash' ? commandTextForRules(expanded) : undefined);
+     if (hard) return { allow: false, reason: `${hard.reason} (V2.1 class ${hard.cls})` };
++    // Phase G: heredoc bodies the analyzer classifies as data are not path arguments (the literal-substring check
++    // below still sees them, so a heredoc naming the agent home verbatim stays denied).
++    const pathText =
++      toolName === 'Bash' && !analyzeShellCommand(command).useRaw ? stripHeredocBodies(command) : command;
+     if (
+       options.protectedPaths?.length &&
+       (views.some((v) => mentionsProtectedPath(v, workspace, options.protectedPaths!)) ||
+-        reachesProtectedPath(command, workspace, options.protectedPaths) !== null)
++        reachesProtectedPath(pathText, workspace, options.protectedPaths) !== null)
+     )
+       return {
+         allow: false,
+diff --git a/src/security/redact.ts b/src/security/redact.ts
+index a27cc68..0747afa 100644
+--- a/src/security/redact.ts
++++ b/src/security/redact.ts
+@@ -84,8 +84,11 @@ export function redactValue(value: unknown, depth = 0): unknown {
+   if (value && typeof value === 'object') {
+     const out: Record<string, unknown> = {};
+     for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
++      // Numbers and booleans are not secrets: `inputTokens: 1234` (usage accounting) must survive the key-name rule,
++      // which matches "token" (Phase G finding: every execution's token counts were stored as [REDACTED]).
++      const scalar = typeof v === 'number' || typeof v === 'boolean';
+       out[k] =
+-        SENSITIVE_KEY.test(k) && v !== null && v !== undefined && v !== ''
++        SENSITIVE_KEY.test(k) && !scalar && v !== null && v !== undefined && v !== ''
+           ? REDACTED
+           : redactValue(v, depth + 1);
+     }
+diff --git a/tests/unit/phase-bde-v21.test.ts b/tests/unit/phase-bde-v21.test.ts
+index ac0657f..08bbb4a 100644
+--- a/tests/unit/phase-bde-v21.test.ts
++++ b/tests/unit/phase-bde-v21.test.ts
+@@ -320,4 +320,44 @@ describe('Phase E: the real hook process fails closed', () => {
+   });
+ });
+ 
++// ---------------------------------------------------------------------------------------------------------------
++describe('Phase G findings from the real Claude Code staging run', () => {
++  const home = path.join(tmpdir(), 'g-home');
++  const ws = path.join(home, 'workspaces', 'proj');
++  const o: PolicyOptions = { protectedPaths: [home] };
++  const bash = (c: string) => verdict(evaluateToolUse('Bash', { command: c }, ws, o));
++  it('a test file written through a data heredoc may import ../src (the exact pattern the worker used)', () => {
++    expect(
++      bash(
++        "mkdir -p src test && cat > test/slugify.test.ts <<'EOF'\nimport { test } from 'node:test';\nimport { slugify } from '../src/slugify.ts';\nEOF\nnode --test",
++      ),
++    ).toBe('ALLOW');
++  });
++  it('heredocs that may execute, and redirect targets, are still path-checked', () => {
++    expect(bash("node <<'EOF'\nconsole.log(require('fs').readFileSync('../../notes.txt','utf8'))\nEOF")).toBe(
++      'DENY',
++    );
++    expect(bash("cat > ../../planted.txt <<'EOF'\nhello\nEOF")).toBe('DENY');
++    expect(bash('cat > f.txt <<EOF\n$(cat ../../notes.txt)\nEOF')).toBe('DENY');
++    expect(bash("cat > run.sh <<'EOF'\ncat ../../notes.txt\nEOF\nbash run.sh")).toBe('DENY');
++  });
++  it('stripHeredocBodies keeps here-strings and the lines after a terminated body', async () => {
++    const { stripHeredocBodies } = await import('../../src/security/hardening.js');
++    expect(stripHeredocBodies("cat > a <<'EOF'\nbody ../x\nEOF\nls ../../y")).toBe(
++      "cat > a <<'EOF'\nls ../../y",
++    );
++    expect(stripHeredocBodies('cat <<< ../x\nls ../../y')).toBe('cat <<< ../x\nls ../../y');
++    expect(stripHeredocBodies('cat > a <<-EOF\n\tbody\n\tEOF\nls')).toBe('cat > a <<-EOF\nls');
++  });
++  it('usage token counts are not redacted by the key-name rule; string secrets under such keys still are', async () => {
++    const { redactValue } = await import('../../src/security/redact.js');
++    expect(redactValue({ inputTokens: 1234, outputTokens: 56, token: 'abc-secret', ok: true })).toEqual({
++      inputTokens: 1234,
++      outputTokens: 56,
++      token: '[REDACTED]',
++      ok: true,
++    });
++  });
++});
++
+ void os;
+-- 
+2.56.0.windows.4
+

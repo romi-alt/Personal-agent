@@ -1,0 +1,109 @@
+﻿{
+    "script":  "02-configure-acls",
+    "startedAt":  "2026-11-10T03:00:16.8836007+05:00",
+    "dryRun":  true,
+    "changes":  [
+                    {
+                        "action":  "note",
+                        "target":  "elevariq-worker",
+                        "detail":  "worker account not present yet; icacls would use its SID in Apply",
+                        "applied":  false,
+                        "at":  "2026-11-10T03:00:17.0090688+05:00"
+                    },
+                    {
+                        "action":  "mkdir",
+                        "target":  "C:\\ElevariqWork",
+                        "detail":  "create worker tree",
+                        "applied":  false,
+                        "at":  "2026-11-10T03:00:17.0187569+05:00"
+                    },
+                    {
+                        "action":  "icacls-grant",
+                        "target":  "C:\\ElevariqWork",
+                        "detail":  "elevariq-worker:(OI)(CI)M ; SYSTEM:F ; Administrators:F ; remove Users/Authenticated Users",
+                        "applied":  false,
+                        "at":  "2026-11-10T03:00:17.0187569+05:00"
+                    },
+                    {
+                        "action":  "mkdir",
+                        "target":  "C:\\ElevariqBroker",
+                        "detail":  "create broker-root (approvals, audit, signing key)",
+                        "applied":  false,
+                        "at":  "2026-11-10T03:00:17.0218824+05:00"
+                    },
+                    {
+                        "action":  "icacls-deny",
+                        "target":  "C:\\ElevariqBroker",
+                        "detail":  "elevariq-worker:(OI)(CI)(DENY)F ; SYSTEM:F ; Administrators:F ; owner:F",
+                        "applied":  false,
+                        "at":  "2026-11-10T03:00:17.0234249+05:00"
+                    },
+                    {
+                        "action":  "skip-absent",
+                        "target":  "C:\\Users\\Roman\\.ssh",
+                        "detail":  "path not present",
+                        "applied":  false,
+                        "at":  "2026-11-10T03:00:17.0234249+05:00"
+                    },
+                    {
+                        "action":  "skip-absent",
+                        "target":  "C:\\Users\\Roman\\.aws",
+                        "detail":  "path not present",
+                        "applied":  false,
+                        "at":  "2026-11-10T03:00:17.0291092+05:00"
+                    },
+                    {
+                        "action":  "icacls-deny",
+                        "target":  "C:\\Users\\Roman\\.claude",
+                        "detail":  "add DENY elevariq-worker (worker cannot traverse/read)",
+                        "applied":  false,
+                        "at":  "2026-11-10T03:00:17.0291092+05:00"
+                    },
+                    {
+                        "action":  "skip-absent",
+                        "target":  "C:\\Users\\Roman\\.config",
+                        "detail":  "path not present",
+                        "applied":  false,
+                        "at":  "2026-11-10T03:00:17.0291092+05:00"
+                    },
+                    {
+                        "action":  "skip-absent",
+                        "target":  "C:\\Users\\Roman\\.git-credentials",
+                        "detail":  "path not present",
+                        "applied":  false,
+                        "at":  "2026-11-10T03:00:17.0291092+05:00"
+                    },
+                    {
+                        "action":  "skip-absent",
+                        "target":  "C:\\Users\\Roman\\AppData\\Roaming\\GitHub CLI",
+                        "detail":  "path not present",
+                        "applied":  false,
+                        "at":  "2026-11-10T03:00:17.0347196+05:00"
+                    },
+                    {
+                        "action":  "icacls-deny",
+                        "target":  "E:\\Agent\\Personal-agent",
+                        "detail":  "add DENY elevariq-worker (worker cannot traverse/read)",
+                        "applied":  false,
+                        "at":  "2026-11-10T03:00:17.0363053+05:00"
+                    },
+                    {
+                        "action":  "icacls-deny",
+                        "target":  "C:\\Users\\Roman\\AppData\\Local\\ElevariqAgent",
+                        "detail":  "add DENY elevariq-worker (worker cannot traverse/read)",
+                        "applied":  false,
+                        "at":  "2026-11-10T03:00:17.0363053+05:00"
+                    },
+                    {
+                        "action":  "report-only",
+                        "target":  "E:\\",
+                        "detail":  "Authenticated Users has Modify on E:\\ (inherited by production). Recommend targeted removal via 02b; NOT changed here.",
+                        "applied":  false,
+                        "at":  "2026-11-10T03:00:17.1190937+05:00"
+                    }
+                ],
+    "refusals":  [
+
+                 ],
+    "path":  "E:\\Agent\\v2-staging\\trusted-execution-20261110-0249\\admin-scripts\\reports\\02-configure-acls-20261110-030016.json"
+}

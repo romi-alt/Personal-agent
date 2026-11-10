@@ -1,0 +1,116 @@
+﻿{
+    "script":  "02-identities-and-rights",
+    "revision":  "r3-20261110",
+    "startedAt":  "2026-11-10T16:20:38.5542945+05:00",
+    "finishedAt":  "2026-11-10T16:20:40.1894579+05:00",
+    "dryRun":  true,
+    "user":  "DESKTOP-QGGLG8D\\Roman",
+    "elevated":  false,
+    "changes":  [
+                    {
+                        "action":  "new-localuser",
+                        "target":  "elv-stg-worker",
+                        "detail":  "standard user, DISABLED, random unstored password",
+                        "applied":  false,
+                        "at":  "2026-11-10T16:20:38.7192694+05:00"
+                    },
+                    {
+                        "action":  "add-localgroupmember",
+                        "target":  "Users/elv-stg-worker",
+                        "detail":  "add",
+                        "applied":  false,
+                        "at":  "2026-11-10T16:20:38.7300160+05:00"
+                    },
+                    {
+                        "action":  "add-localgroupmember",
+                        "target":  "ElevariqIsolatedIdentities/elv-stg-worker",
+                        "detail":  "add",
+                        "applied":  false,
+                        "at":  "2026-11-10T16:20:38.7300160+05:00"
+                    },
+                    {
+                        "action":  "new-localuser",
+                        "target":  "elv-stg-broker",
+                        "detail":  "standard user, DISABLED, random unstored password",
+                        "applied":  false,
+                        "at":  "2026-11-10T16:20:38.7300160+05:00"
+                    },
+                    {
+                        "action":  "add-localgroupmember",
+                        "target":  "Users/elv-stg-broker",
+                        "detail":  "add",
+                        "applied":  false,
+                        "at":  "2026-11-10T16:20:38.7300160+05:00"
+                    },
+                    {
+                        "action":  "add-localgroupmember",
+                        "target":  "ElevariqIsolatedIdentities/elv-stg-broker",
+                        "detail":  "add",
+                        "applied":  false,
+                        "at":  "2026-11-10T16:20:38.7300160+05:00"
+                    },
+                    {
+                        "action":  "secedit",
+                        "target":  "USER_RIGHTS",
+                        "detail":  "02 add=SeDenyRemoteInteractiveLogonRight:*\u003cworker-SID\u003e+*\u003cbroker-SID\u003e;SeDenyNetworkLogonRight:*\u003cworker-SID\u003e+*\u003cbroker-SID\u003e;SeBatchLogonRight:*\u003cworker-SID\u003e+*\u003cbroker-SID\u003e;SeDenyInteractiveLogonRight:*\u003cbroker-SID\u003e remove= (backup export to C:\\Users\\Roman\\ElevariqAdmin\\rights; re-export + verify after configure)",
+                        "applied":  false,
+                        "at":  "2026-11-10T16:20:38.7809584+05:00"
+                    },
+                    {
+                        "action":  "note",
+                        "target":  "quota",
+                        "detail":  "no NTFS quota requested (-VolumeQuotaMB 0): the worker can fill C:, %TEMP%, ProgramData, Public (M11 residual)",
+                        "applied":  false,
+                        "at":  "2026-11-10T16:20:38.7809584+05:00"
+                    }
+                ],
+    "refusals":  [
+
+                 ],
+    "checks":  [
+                   {
+                       "id":  "R7",
+                       "name":  "trusted admin-only script location + canonical SHA256SUMS + out-of-band manifest hash",
+                       "status":  "WARN",
+                       "detail":  "owner S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110; inheritance not cut on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110; write 0x10116 for S-1-5-11 on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110; write 0x10116 for S-1-5-11(IO) on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110; owner S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110\\00-isolation-group-deny.ps1; write 0x10116 for S-1-5-11 on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110\\00-isolation-group-deny.ps1; owner S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110\\00a-remove-test-residue.ps1; write 0x10116 for S-1-5-11 on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110\\00a-remove-test-residue.ps1; owner S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110\\01-staging-volume.ps1; write 0x10116 for S-1-5-11 on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110\\01-staging-volume.ps1; owner S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110\\02-identities-and-rights.ps1; write 0x10116 for S-1-5-11 on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110\\02-identities-and-rights.ps1; owner S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110\\03-staging-layout.ps1; write 0x10116 for S-1-5-11 on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110\\03-staging-layout.ps1; owner S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110\\04-broker-install.ps1; write 0x10116 for S-1-5-11 on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110\\04-broker-install.ps1; owner S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110\\05-firewall-egress.ps1; write 0x10116 for S-1-5-11 on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110\\05-firewall-egress.ps1; owner S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110\\06-worker-enable.ps1; write 0x10116 for S-1-5-11 on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110\\06-worker-enable.ps1; owner S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110\\07-verify-config.ps1; write 0x10116 for S-1-5-11 on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110\\07-verify-config.ps1; owner S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110\\09-rollback.ps1; write 0x10116 for S-1-5-11 on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110\\09-rollback.ps1; owner S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110\\Freeze-AdminScripts.ps1; write 0x10116 for S-1-5-11 on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110\\Freeze-AdminScripts.ps1; owner S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110\\_common.ps1; write 0x10116 for S-1-5-11 on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110\\_common.ps1; SHA256SUMS missing"
+                   },
+                   {
+                       "id":  "PRE00",
+                       "name":  "deny group + DENY on E:\\, F:\\",
+                       "status":  "FAIL",
+                       "detail":  ""
+                   },
+                   {
+                       "id":  "PRE01",
+                       "name":  "staging volume mounted",
+                       "status":  "FAIL",
+                       "detail":  ""
+                   },
+                   {
+                       "id":  "P0",
+                       "name":  "production task present and running",
+                       "status":  "PASS",
+                       "detail":  "Running"
+                   },
+                   {
+                       "id":  "P1",
+                       "name":  "production supervisor process alive (found by command line)",
+                       "status":  "PASS",
+                       "detail":  "pids=8992"
+                   },
+                   {
+                       "id":  "P2",
+                       "name":  "production HEAD = e60278f",
+                       "status":  "PASS",
+                       "detail":  "e60278f"
+                   },
+                   {
+                       "id":  "P3",
+                       "name":  "production task action still points at the checkout script",
+                       "status":  "PASS",
+                       "detail":  ""
+                   }
+               ],
+    "error":  null,
+    "path":  "E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r3-20261110\\reports\\02-identities-and-rights-20261110-162038-17456.json"
+}

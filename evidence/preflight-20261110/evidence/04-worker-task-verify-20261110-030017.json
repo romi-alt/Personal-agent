@@ -1,0 +1,53 @@
+﻿{
+    "script":  "04-worker-task-verify",
+    "startedAt":  "2026-11-10T03:00:17.6078782+05:00",
+    "dryRun":  true,
+    "changes":  [
+                    {
+                        "action":  "verify",
+                        "target":  "G1 worker account exists",
+                        "detail":  "result=False",
+                        "applied":  false,
+                        "at":  "2026-11-10T03:00:19.9254067+05:00"
+                    },
+                    {
+                        "action":  "verify",
+                        "target":  "G2 worker NOT an administrator",
+                        "detail":  "result=True",
+                        "applied":  false,
+                        "at":  "2026-11-10T03:00:19.9271567+05:00"
+                    },
+                    {
+                        "action":  "verify",
+                        "target":  "G3 broker root denies worker",
+                        "detail":  "result=False",
+                        "applied":  false,
+                        "at":  "2026-11-10T03:00:19.9298277+05:00"
+                    },
+                    {
+                        "action":  "verify",
+                        "target":  "G4 owner .ssh denies worker",
+                        "detail":  "result=n/a",
+                        "applied":  false,
+                        "at":  "2026-11-10T03:00:19.9313814+05:00"
+                    },
+                    {
+                        "action":  "verify",
+                        "target":  "G9 worker egress block rule",
+                        "detail":  "result=False",
+                        "applied":  false,
+                        "at":  "2026-11-10T03:00:19.9313814+05:00"
+                    }
+                ],
+    "refusals":  [
+
+                 ],
+    "path":  "E:\\Agent\\v2-staging\\trusted-execution-20261110-0249\\admin-scripts\\reports\\04-worker-task-verify-20261110-030017.json",
+    "verifyResults":  {
+                          "G1 worker account exists":  false,
+                          "G2 worker NOT an administrator":  true,
+                          "G3 broker root denies worker":  false,
+                          "G4 owner .ssh denies worker":  "n/a",
+                          "G9 worker egress block rule":  false
+                      }
+}

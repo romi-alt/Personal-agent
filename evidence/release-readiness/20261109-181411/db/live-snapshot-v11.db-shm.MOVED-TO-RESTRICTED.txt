@@ -1,0 +1,1 @@
+﻿RESTRICTED: a database file was here (05-SECURITY-EVIDENCE\release-readiness\20261109-181411\db\live-snapshot-v11.db-shm). Moved to RESTRICTED-LOCAL\evidence-databases\05-SECURITY-EVIDENCE\release-readiness\20261109-181411\db\live-snapshot-v11.db-shm (not in the portable archive; may contain sensitive state). SHA-256 in RESTRICTED-LOCAL manifest.

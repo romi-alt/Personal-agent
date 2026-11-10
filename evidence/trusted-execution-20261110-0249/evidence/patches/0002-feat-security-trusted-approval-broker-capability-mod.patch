@@ -1,0 +1,1274 @@
+From 9ffb07f4bdb54e968b4716ec8fe97aa8e5cadef5 Mon Sep 17 00:00:00 2001
+From: "ELEVARIQ Agent (Claude)" <connectroman3@gmail.com>
+Date: Tue, 10 Nov 2026 02:48:53 +0500
+Subject: [PATCH 2/3] feat(security): trusted approval broker, capability
+ model, signed audit chain (app-level)
+
+Application-level control plane for V2.1 trusted execution (NOT yet an OS boundary):
+- canonical.ts: canonical serialization + action fingerprint binding (category, tool,
+  canonical args, target, worker, task, cwd, policy version).
+- capability.ts: default-deny, task-scoped, non-inheritable grants (dirs/ops, execs,
+  network, limits, integrations, approval categories, expiry).
+- approval-grant.ts: single-use, action-bound, nonce'd, expiring approvals with atomic
+  consumption and replay prevention; supersession and revocation.
+- audit-chain.ts: append-only hash-chained HMAC-signed events; verifyChain detects
+  edit/delete/insert/reorder and forged tails; signed checkpoints.
+- broker.ts: validates every request field, enforces capability, requires a bound
+  single-use approval for consequential categories, rejects worker self-approval and
+  replays, fails closed, audits every decision.
+- ipc.ts: transport-agnostic request validation (size/shape/skew/caller-SID), with the
+  same-SID caveat documented.
+24 synthetic unit tests. No OS object, credential, pipe or account is used.
+---
+ src/security/broker/approval-grant.ts | 157 +++++++++++
+ src/security/broker/audit-chain.ts    | 143 ++++++++++
+ src/security/broker/broker.ts         | 177 ++++++++++++
+ src/security/broker/canonical.ts      |  96 +++++++
+ src/security/broker/capability.ts     | 149 ++++++++++
+ src/security/broker/ipc.ts            |  93 +++++++
+ tests/unit/broker-approval.test.ts    | 376 ++++++++++++++++++++++++++
+ 7 files changed, 1191 insertions(+)
+ create mode 100644 src/security/broker/approval-grant.ts
+ create mode 100644 src/security/broker/audit-chain.ts
+ create mode 100644 src/security/broker/broker.ts
+ create mode 100644 src/security/broker/canonical.ts
+ create mode 100644 src/security/broker/capability.ts
+ create mode 100644 src/security/broker/ipc.ts
+ create mode 100644 tests/unit/broker-approval.test.ts
+
+diff --git a/src/security/broker/approval-grant.ts b/src/security/broker/approval-grant.ts
+new file mode 100644
+index 0000000..32a61c2
+--- /dev/null
++++ b/src/security/broker/approval-grant.ts
+@@ -0,0 +1,157 @@
++/**
++ * Single-use, action-bound approval grants (V2.1 trusted-execution).
++ *
++ * An owner decision authorizes ONE action: it is bound to the action fingerprint (canonical.ts), carries a random
++ * nonce, expires quickly, and is consumed atomically the first time it is used. A changed command, argument, worker,
++ * target or policy version produces a different fingerprint, so the previous grant no longer matches.
++ *
++ * SCOPE: application-level. The grant store must live under the broker/supervisor identity; while the worker shares
++ * the owner's Windows identity it can edit this state directly (same-user finding). See docs.
++ */
++import { randomBytes } from 'node:crypto';
++import { actionFingerprint, type BoundAction } from './canonical.js';
++
++export type GrantState = 'PENDING' | 'APPROVED' | 'DENIED' | 'CONSUMED' | 'EXPIRED' | 'REVOKED';
++
++export interface ApprovalGrant {
++  id: string;
++  nonce: string;
++  fingerprint: string;
++  action: BoundAction;
++  state: GrantState;
++  requestedAt: number;
++  expiresAt: number;
++  decidedAt: number | null;
++  decidedBy: string | null;
++  consumedAt: number | null;
++  reason: string | null;
++}
++
++export interface ConsumeResult {
++  ok: boolean;
++  reason: string;
++  grantId?: string;
++}
++
++/** Default grant lifetime: short, per the mandate (owner-configurable). */
++export const DEFAULT_GRANT_TTL_MS = 5 * 60 * 1000;
++
++/**
++ * In-memory grant store with atomic single-use consumption. Persistence is the broker's responsibility (a store the
++ * worker identity cannot write). Exposed as a class so a persistent backend can subclass the three storage hooks.
++ */
++export class ApprovalGrantStore {
++  private grants = new Map<string, ApprovalGrant>();
++  /** At most one live (PENDING/APPROVED) grant per fingerprint, so a reused action cannot stockpile approvals. */
++  private liveByFingerprint = new Map<string, string>();
++
++  constructor(
++    private readonly now: () => number,
++    private readonly newId: () => string,
++    private readonly onEvent?: (e: { type: string; grant: ApprovalGrant }) => void,
++  ) {}
++
++  /** Create a PENDING grant for an action. Supersedes any earlier live grant for the same fingerprint. */
++  request(action: BoundAction, ttlMs: number = DEFAULT_GRANT_TTL_MS): ApprovalGrant {
++    const fingerprint = actionFingerprint(action);
++    const prior = this.liveByFingerprint.get(fingerprint);
++    if (prior) {
++      const p = this.grants.get(prior);
++      if (p && (p.state === 'PENDING' || p.state === 'APPROVED')) {
++        p.state = 'REVOKED';
++        p.reason = 'superseded by a newer request for the same action';
++        this.onEvent?.({ type: 'grant.superseded', grant: p });
++      }
++    }
++    const t = this.now();
++    const grant: ApprovalGrant = {
++      id: this.newId(),
++      nonce: randomBytes(32).toString('hex'),
++      fingerprint,
++      action,
++      state: 'PENDING',
++      requestedAt: t,
++      expiresAt: t + ttlMs,
++      decidedAt: null,
++      decidedBy: null,
++      consumedAt: null,
++      reason: null,
++    };
++    this.grants.set(grant.id, grant);
++    this.liveByFingerprint.set(fingerprint, grant.id);
++    this.onEvent?.({ type: 'grant.requested', grant });
++    return grant;
++  }
++
++  /** Owner decision. `decidedBy` must be an owner/broker principal, never the worker (caller enforces identity). */
++  decide(grantId: string, decision: 'APPROVED' | 'DENIED', decidedBy: string): ApprovalGrant {
++    const g = this.require(grantId);
++    this.expireIfDue(g);
++    if (g.state !== 'PENDING') throw new Error(`grant ${grantId} is ${g.state}, cannot be decided`);
++    g.state = decision;
++    g.decidedAt = this.now();
++    g.decidedBy = decidedBy;
++    if (decision === 'DENIED') this.liveByFingerprint.delete(g.fingerprint);
++    this.onEvent?.({ type: `grant.${decision.toLowerCase()}`, grant: g });
++    return g;
++  }
++
++  /**
++   * Atomically consume a grant for an action. Succeeds only when: the grant exists, is APPROVED, not expired, the
++   * nonce matches, and the presented action's fingerprint equals the bound one. On success the grant becomes
++   * CONSUMED and can never be used again (replay prevention). Fail-closed: any mismatch denies.
++   */
++  consume(grantId: string, nonce: string, action: BoundAction): ConsumeResult {
++    const g = this.grants.get(grantId);
++    if (!g) return { ok: false, reason: 'no such approval grant' };
++    this.expireIfDue(g);
++    if (g.state === 'CONSUMED')
++      return { ok: false, reason: 'approval already used (replay denied)', grantId };
++    if (g.state === 'EXPIRED') return { ok: false, reason: 'approval expired', grantId };
++    if (g.state !== 'APPROVED') return { ok: false, reason: `approval is ${g.state}`, grantId };
++    if (nonce !== g.nonce) return { ok: false, reason: 'approval nonce mismatch', grantId };
++    if (actionFingerprint(action) !== g.fingerprint)
++      return { ok: false, reason: 'action does not match the approved action', grantId };
++    g.state = 'CONSUMED';
++    g.consumedAt = this.now();
++    this.liveByFingerprint.delete(g.fingerprint);
++    this.onEvent?.({ type: 'grant.consumed', grant: g });
++    return { ok: true, reason: 'approval consumed', grantId };
++  }
++
++  revoke(grantId: string, by: string, reason: string): ApprovalGrant {
++    const g = this.require(grantId);
++    if (g.state === 'CONSUMED') throw new Error('cannot revoke an already-consumed approval');
++    g.state = 'REVOKED';
++    g.decidedBy = by;
++    g.reason = reason;
++    this.liveByFingerprint.delete(g.fingerprint);
++    this.onEvent?.({ type: 'grant.revoked', grant: g });
++    return g;
++  }
++
++  get(grantId: string): ApprovalGrant | undefined {
++    const g = this.grants.get(grantId);
++    if (g) this.expireIfDue(g);
++    return g;
++  }
++
++  list(): ApprovalGrant[] {
++    for (const g of this.grants.values()) this.expireIfDue(g);
++    return [...this.grants.values()];
++  }
++
++  private require(grantId: string): ApprovalGrant {
++    const g = this.grants.get(grantId);
++    if (!g) throw new Error(`no such approval grant ${grantId}`);
++    return g;
++  }
++
++  private expireIfDue(g: ApprovalGrant): void {
++    if ((g.state === 'PENDING' || g.state === 'APPROVED') && this.now() >= g.expiresAt) {
++      g.state = 'EXPIRED';
++      this.liveByFingerprint.delete(g.fingerprint);
++      this.onEvent?.({ type: 'grant.expired', grant: g });
++    }
++  }
++}
+diff --git a/src/security/broker/audit-chain.ts b/src/security/broker/audit-chain.ts
+new file mode 100644
+index 0000000..6eea835
+--- /dev/null
++++ b/src/security/broker/audit-chain.ts
+@@ -0,0 +1,143 @@
++/**
++ * Append-only, hash-chained, signed audit log (V2.1 trusted-execution).
++ *
++ * Each event carries a monotonic sequence number and the hash of the previous event; the chain hash is signed with an
++ * HMAC key. Verification recomputes the chain and the signatures, so any insertion, deletion, reordering or edit is
++ * detectable WITHOUT the key, and forging a new valid tail is infeasible WITHOUT the key.
++ *
++ * SCOPE AND HONEST LIMITS:
++ *  - Tamper-EVIDENCE only: a same-user attacker can still delete or rewrite the whole file, but cannot produce a file
++ *    that VERIFIES unless they also hold the signing key.
++ *  - The protection is real only when the signing key and the log live under a separate identity the worker cannot
++ *    read or write. On this machine that is NOT yet true (same-user). The key here is SYNTHETIC and the guarantee is
++ *    "tamper-evident given key secrecy", which is not satisfied same-user. See docs AUDIT_INTEGRITY_ARCHITECTURE.md.
++ */
++import { createHmac, timingSafeEqual } from 'node:crypto';
++import { canonicalJson, sha256Hex } from './canonical.js';
++
++export interface AuditEvent {
++  seq: number;
++  at: number;
++  type: string;
++  /** Redacted payload (redaction happens before this layer; see redact.ts). */
++  data: Record<string, unknown>;
++  /** Hash of the previous event's `entryHash`; the genesis uses GENESIS_PREV. */
++  prevHash: string;
++  /** sha256 over the canonical event body (everything except signatures/entryHash). */
++  entryHash: string;
++  /** HMAC-SHA256(entryHash) under the signing key. */
++  signature: string;
++}
++
++export const GENESIS_PREV = '0'.repeat(64);
++
++function entryBody(e: Omit<AuditEvent, 'entryHash' | 'signature'>): string {
++  return canonicalJson({ seq: e.seq, at: e.at, type: e.type, data: e.data, prevHash: e.prevHash });
++}
++
++export interface AuditSink {
++  /** Durable append of one event line. Must be append-only at the storage layer where possible. */
++  append(line: string): void;
++  /** All event lines in order. */
++  readAll(): string[];
++}
++
++/** In-memory sink for tests; production uses a file sink owned by the broker identity. */
++export class MemoryAuditSink implements AuditSink {
++  private lines: string[] = [];
++  append(line: string): void {
++    this.lines.push(line);
++  }
++  readAll(): string[] {
++    return [...this.lines];
++  }
++}
++
++export class AuditChain {
++  private lastHash: string;
++  private nextSeq: number;
++
++  constructor(
++    private readonly sink: AuditSink,
++    private readonly signingKey: Buffer,
++    private readonly now: () => number,
++  ) {
++    const existing = sink.readAll();
++    if (existing.length === 0) {
++      this.lastHash = GENESIS_PREV;
++      this.nextSeq = 0;
++    } else {
++      const last = JSON.parse(existing[existing.length - 1]!) as AuditEvent;
++      this.lastHash = last.entryHash;
++      this.nextSeq = last.seq + 1;
++    }
++  }
++
++  private sign(entryHash: string): string {
++    return createHmac('sha256', this.signingKey).update(entryHash).digest('hex');
++  }
++
++  /** Append one event. Returns it. The chain and signature are computed here; callers cannot forge them. */
++  append(type: string, data: Record<string, unknown>): AuditEvent {
++    const base = { seq: this.nextSeq, at: this.now(), type, data, prevHash: this.lastHash };
++    const entryHash = sha256Hex(entryBody(base));
++    const event: AuditEvent = { ...base, entryHash, signature: this.sign(entryHash) };
++    this.sink.append(JSON.stringify(event));
++    this.lastHash = entryHash;
++    this.nextSeq += 1;
++    return event;
++  }
++
++  /** A signed checkpoint over the current head: seq and head hash, signed. Store it separately for recovery. */
++  checkpoint(): { seq: number; headHash: string; at: number; signature: string } {
++    const at = this.now();
++    const headSeq = this.nextSeq - 1;
++    const body = canonicalJson({ kind: 'checkpoint', seq: headSeq, headHash: this.lastHash, at });
++    const h = sha256Hex(body);
++    return { seq: headSeq, headHash: this.lastHash, at, signature: this.sign(h) };
++  }
++}
++
++export interface VerifyResult {
++  ok: boolean;
++  count: number;
++  /** First problem found, if any. */
++  error?: string;
++  /** Sequence number where verification failed. */
++  failedAtSeq?: number;
++}
++
++/** Recompute the chain and verify every signature. Detects edits, deletions, insertions and reordering. */
++export function verifyChain(sink: AuditSink, signingKey: Buffer): VerifyResult {
++  const lines = sink.readAll();
++  let prev = GENESIS_PREV;
++  let expectedSeq = 0;
++  for (const line of lines) {
++    let e: AuditEvent;
++    try {
++      e = JSON.parse(line) as AuditEvent;
++    } catch {
++      return { ok: false, count: expectedSeq, error: 'unparseable event line', failedAtSeq: expectedSeq };
++    }
++    if (e.seq !== expectedSeq)
++      return {
++        ok: false,
++        count: expectedSeq,
++        error: `sequence gap (expected ${expectedSeq}, got ${e.seq})`,
++        failedAtSeq: expectedSeq,
++      };
++    if (e.prevHash !== prev)
++      return { ok: false, count: expectedSeq, error: 'broken hash chain', failedAtSeq: e.seq };
++    const recomputed = sha256Hex(entryBody(e));
++    if (recomputed !== e.entryHash)
++      return { ok: false, count: expectedSeq, error: 'event body was altered', failedAtSeq: e.seq };
++    const expectedSig = createHmac('sha256', signingKey).update(e.entryHash).digest('hex');
++    const a = Buffer.from(expectedSig, 'hex');
++    const b = Buffer.from(e.signature, 'hex');
++    if (a.length !== b.length || !timingSafeEqual(a, b))
++      return { ok: false, count: expectedSeq, error: 'invalid signature', failedAtSeq: e.seq };
++    prev = e.entryHash;
++    expectedSeq += 1;
++  }
++  return { ok: true, count: expectedSeq };
++}
+diff --git a/src/security/broker/broker.ts b/src/security/broker/broker.ts
+new file mode 100644
+index 0000000..664b46a
+--- /dev/null
++++ b/src/security/broker/broker.ts
+@@ -0,0 +1,177 @@
++/**
++ * Trusted approval broker (V2.1 trusted-execution).
++ *
++ * The broker is the single decision point between a worker's request and a privileged effect. It:
++ *  - validates every field of a typed request (never trusts worker-supplied status),
++ *  - checks the task capability (default-deny),
++ *  - computes the bound action and requires a single-use, action-bound owner approval for consequential categories,
++ *  - records every decision (allow, deny, approval request/consume) in the signed audit chain,
++ *  - rejects replays and expired approvals, and fails closed on any inconsistency.
++ *
++ * SCOPE: application-level control. The broker is a boundary only when it runs under a DIFFERENT OS identity from the
++ * worker, so the worker cannot (a) call `decide` as the owner, (b) edit the grant store or audit log, or (c) debug or
++ * replace the broker process. Those require the Windows isolation in the admin scripts. Until then, classify as
++ * "implemented, awaiting OS-level verification". A worker that approves via owner identity is out of scope here.
++ */
++import { actionFingerprint, canonicalArgsFor, type BoundAction } from './canonical.js';
++import { type Capability, requiresApproval } from './capability.js';
++import { ApprovalGrantStore, type ConsumeResult, DEFAULT_GRANT_TTL_MS } from './approval-grant.js';
++import { AuditChain } from './audit-chain.js';
++
++/** A typed request from a worker, as it arrives over the IPC interface. Every field is validated. */
++export interface BrokerRequest {
++  workerId: string;
++  taskId: string;
++  executionId: string;
++  projectId: string;
++  tool: string;
++  toolInput: Record<string, unknown>;
++  /** The policy category the supervisor assigned (consequential actions only); null for ordinary calls. */
++  category: string | null;
++  target: string | null;
++  cwd: string;
++  policyVersion: string;
++  requestId: string;
++  at: number;
++  /** Present when the worker is presenting a previously granted approval to execute. */
++  approval?: { grantId: string; nonce: string };
++}
++
++export type BrokerOutcome =
++  | { decision: 'allow'; reason: string }
++  | { decision: 'deny'; reason: string }
++  | { decision: 'needs_approval'; reason: string; grantId: string; nonce: string; expiresAt: number };
++
++export interface BrokerDeps {
++  /** Resolve the capability grant for a task; the broker never takes it from the worker. */
++  capabilityFor(taskId: string): Capability | undefined;
++  grants: ApprovalGrantStore;
++  audit: AuditChain;
++  normalizeCommand: (command: string) => string;
++  now: () => number;
++  /** Owner/broker principals allowed to decide approvals; used to reject a worker deciding its own. */
++  isOwnerPrincipal: (principal: string) => boolean;
++  grantTtlMs?: number;
++}
++
++export class ApprovalBroker {
++  constructor(private readonly d: BrokerDeps) {}
++
++  /** Seen requestIds, to reject duplicate submissions (replay at the request layer). */
++  private seenRequests = new Set<string>();
++
++  private boundAction(req: BrokerRequest, cap: Capability): BoundAction {
++    return {
++      category: req.category ?? 'none',
++      tool: req.tool,
++      canonicalArgs: canonicalArgsFor(req.tool, req.toolInput, this.d.normalizeCommand),
++      target: req.target,
++      workerId: cap.workerId,
++      taskId: req.taskId,
++      projectId: req.projectId,
++      executionId: req.executionId,
++      cwd: req.cwd,
++      policyVersion: req.policyVersion,
++    };
++  }
++
++  /** Validate a request's identity/consistency against the capability. Returns a deny reason or null. */
++  private validate(req: BrokerRequest, cap: Capability): string | null {
++    if (!req.requestId) return 'missing request id';
++    if (this.seenRequests.has(req.requestId)) return 'duplicate request id (replay)';
++    if (req.taskId !== cap.taskId) return 'task mismatch';
++    if (req.projectId !== cap.projectId) return 'project mismatch';
++    if (req.workerId !== cap.workerId) return 'worker identity mismatch';
++    if (req.policyVersion !== cap.policyVersion) return 'policy version mismatch (grant is stale)';
++    if (this.d.now() >= cap.expiresAt) return 'capability grant has expired';
++    return null;
++  }
++
++  /**
++   * Decide a request. For a consequential category with no presented approval, returns `needs_approval` with a fresh
++   * single-use grant bound to this exact action. When the worker presents an approval, it is consumed atomically and
++   * must match the action.
++   */
++  authorize(req: BrokerRequest): BrokerOutcome {
++    const cap = this.d.capabilityFor(req.taskId);
++    if (!cap) return this.deny(req, 'no capability grant for this task');
++
++    const invalid = this.validate(req, cap);
++    if (invalid) return this.deny(req, invalid);
++    this.seenRequests.add(req.requestId);
++
++    // Ordinary (non-consequential) call: capability governs it elsewhere (paths/execs/network). The broker records it.
++    if (!req.category) {
++      this.d.audit.append('broker.allow', { requestId: req.requestId, tool: req.tool, taskId: req.taskId });
++      return { decision: 'allow', reason: 'no approval category; governed by capability' };
++    }
++
++    const permitted = requiresApproval(cap, req.category);
++    if (!permitted.allow) return this.deny(req, permitted.reason);
++
++    const action = this.boundAction(req, cap);
++
++    if (req.approval) {
++      const result: ConsumeResult = this.d.grants.consume(req.approval.grantId, req.approval.nonce, action);
++      this.d.audit.append('broker.approval_consume', {
++        requestId: req.requestId,
++        grantId: req.approval.grantId,
++        ok: result.ok,
++        reason: result.reason,
++        fingerprint: actionFingerprint(action),
++      });
++      return result.ok
++        ? { decision: 'allow', reason: 'single-use approval consumed for this exact action' }
++        : this.deny(req, result.reason);
++    }
++
++    // No approval presented: create a bound, single-use grant for the owner to decide.
++    const grant = this.d.grants.request(action, this.d.grantTtlMs ?? DEFAULT_GRANT_TTL_MS);
++    this.d.audit.append('broker.approval_request', {
++      requestId: req.requestId,
++      grantId: grant.id,
++      category: req.category,
++      fingerprint: grant.fingerprint,
++      expiresAt: grant.expiresAt,
++    });
++    return {
++      decision: 'needs_approval',
++      reason: `owner approval required for ${req.category}`,
++      grantId: grant.id,
++      nonce: grant.nonce,
++      expiresAt: grant.expiresAt,
++    };
++  }
++
++  /** Owner decision path. Rejects a non-owner principal (e.g. the worker deciding its own request). */
++  decide(
++    grantId: string,
++    decision: 'APPROVED' | 'DENIED',
++    decidedBy: string,
++  ): { ok: boolean; reason: string } {
++    if (!this.d.isOwnerPrincipal(decidedBy)) {
++      this.d.audit.append('broker.decide_rejected', { grantId, decidedBy, reason: 'not an owner principal' });
++      return { ok: false, reason: 'only an owner principal may decide approvals' };
++    }
++    const g = this.d.grants.decide(grantId, decision, decidedBy);
++    this.d.audit.append('broker.decided', { grantId, decision, decidedBy, fingerprint: g.fingerprint });
++    return { ok: true, reason: `grant ${decision.toLowerCase()}` };
++  }
++
++  revoke(grantId: string, by: string, reason: string): { ok: boolean; reason: string } {
++    if (!this.d.isOwnerPrincipal(by)) return { ok: false, reason: 'only an owner principal may revoke' };
++    this.d.grants.revoke(grantId, by, reason);
++    this.d.audit.append('broker.revoked', { grantId, by, reason });
++    return { ok: true, reason: 'revoked' };
++  }
++
++  private deny(req: BrokerRequest, reason: string): BrokerOutcome {
++    this.d.audit.append('broker.deny', {
++      requestId: req.requestId,
++      tool: req.tool,
++      taskId: req.taskId,
++      reason,
++    });
++    return { decision: 'deny', reason };
++  }
++}
+diff --git a/src/security/broker/canonical.ts b/src/security/broker/canonical.ts
+new file mode 100644
+index 0000000..b1db264
+--- /dev/null
++++ b/src/security/broker/canonical.ts
+@@ -0,0 +1,96 @@
++/**
++ * Canonical serialization and action binding for the trusted approval broker (V2.1 trusted-execution).
++ *
++ * The point of this module: two descriptions of "the same action" must produce the SAME fingerprint, and any
++ * meaningful change (argument, target, worker, policy version) must produce a DIFFERENT one. An approval is then
++ * bound to a fingerprint, so a worker cannot get one action approved and run another.
++ *
++ * SCOPE: this is an application-level control. It binds an approval to an action description that the SUPERVISOR
++ * computed from the worker's request; it does not, by itself, stop a worker that runs code under the owner's Windows
++ * identity from editing the broker's state. OS identity separation (design + admin scripts) is what makes it a
++ * boundary. See docs TRUSTED_APPROVAL_BROKER.md.
++ */
++import { createHash } from 'node:crypto';
++
++/** A JSON value with object keys in a stable order; the basis for a reproducible hash. */
++export function canonicalize(value: unknown): unknown {
++  if (value === null || typeof value !== 'object') return value;
++  if (Array.isArray(value)) return value.map(canonicalize);
++  const out: Record<string, unknown> = {};
++  for (const key of Object.keys(value as Record<string, unknown>).sort())
++    out[key] = canonicalize((value as Record<string, unknown>)[key]);
++  return out;
++}
++
++/** Deterministic JSON string: sorted keys, no incidental whitespace. */
++export function canonicalJson(value: unknown): string {
++  return JSON.stringify(canonicalize(value));
++}
++
++export function sha256Hex(input: string): string {
++  return createHash('sha256').update(input, 'utf8').digest('hex');
++}
++
++/**
++ * The action an approval authorizes. Every field is part of the binding: change any of them and the fingerprint
++ * changes, which invalidates a previously granted approval.
++ */
++export interface BoundAction {
++  /** Approval category (policy.ts), e.g. 'protected_branch_push'. */
++  category: string;
++  /** Tool the action runs through, e.g. 'Bash'. */
++  tool: string;
++  /** Canonical arguments the supervisor derived from the request (e.g. the normalized command). */
++  canonicalArgs: Record<string, unknown>;
++  /** Target resource when applicable (a repo+branch, a URL host, a file path), else null. */
++  target: string | null;
++  /** The worker's identity (OS SID once separation exists; a logical id meanwhile). */
++  workerId: string;
++  /** Task, project and execution the action belongs to. */
++  taskId: string;
++  projectId: string;
++  executionId: string;
++  /** Working directory the action runs in. */
++  cwd: string;
++  /** Policy version in force; a policy change invalidates in-flight approvals. */
++  policyVersion: string;
++}
++
++/** The stable fingerprint of a bound action. Two equal actions hash equally; any change diverges. */
++export function actionFingerprint(a: BoundAction): string {
++  // canonicalArgs is canonicalized recursively; the rest are scalars pinned in a fixed shape.
++  return sha256Hex(
++    canonicalJson({
++      category: a.category,
++      tool: a.tool,
++      canonicalArgs: a.canonicalArgs,
++      target: a.target,
++      workerId: a.workerId,
++      taskId: a.taskId,
++      projectId: a.projectId,
++      executionId: a.executionId,
++      cwd: a.cwd,
++      policyVersion: a.policyVersion,
++    }),
++  );
++}
++
++/**
++ * Derive the canonical arguments for a tool request. Keeps only what defines the action's effect, so cosmetic
++ * differences (extra whitespace) do not force re-approval while meaningful ones do. The command is normalized through
++ * the same shell analyzer the policy uses, so `git  push   origin main` and `git push origin main` bind equally, but
++ * `git push origin main` and `git push --force origin main` do not.
++ */
++export function canonicalArgsFor(
++  tool: string,
++  input: Record<string, unknown>,
++  normalize: (command: string) => string,
++): Record<string, unknown> {
++  if ((tool === 'Bash' || tool === 'PowerShell') && typeof input['command'] === 'string')
++    return { command: normalize(input['command'] as string) };
++  // File tools: the path is the effect-defining argument.
++  for (const key of ['file_path', 'notebook_path', 'path'])
++    if (typeof input[key] === 'string') return { [key]: input[key] };
++  // Fallback: the whole input, canonicalized.
++  return canonicalize(input) as Record<string, unknown>;
++}
+diff --git a/src/security/broker/capability.ts b/src/security/broker/capability.ts
+new file mode 100644
+index 0000000..85a3a84
+--- /dev/null
++++ b/src/security/broker/capability.ts
+@@ -0,0 +1,149 @@
++/**
++ * Task capability model (V2.1 trusted-execution). A capability grant is the full set of authority a single task's
++ * worker has. It is DEFAULT-DENY: anything not listed is refused. It is task-scoped and non-inheritable: each task
++ * gets a fresh grant derived from its assignment, never from another task.
++ *
++ * SCOPE: application-level. The broker consults a grant before authorizing an action; the OS worker identity (admin
++ * scripts) is what stops a worker from reaching beyond the grant by running its own code.
++ */
++
++export type FileOp = 'read' | 'write' | 'delete';
++
++export interface NetworkCapability {
++  /** Outbound hosts the worker's documented tools may reach. Empty => no network. */
++  allowedHosts: string[];
++  /** Loopback (127.0.0.1/::1) allowed. Default false. */
++  loopback: boolean;
++}
++
++export interface ResourceLimits {
++  maxProcesses: number;
++  maxMemoryMb: number;
++  maxWallSeconds: number;
++}
++
++export interface Capability {
++  /** The one project this grant authorizes. */
++  projectId: string;
++  taskId: string;
++  /** Logical worker identity (OS SID once separation exists). */
++  workerId: string;
++  /** Directories the worker may touch, with the operations allowed in each (default-deny outside these). */
++  directories: { path: string; ops: FileOp[] }[];
++  /** Executable base names the worker may launch (lower-case, no extension). Empty => none beyond the provider. */
++  executables: string[];
++  network: NetworkCapability;
++  limits: ResourceLimits;
++  /** Integration systems (e.g. 'erp') the task may read. */
++  integrations: string[];
++  /** Approval categories pre-authorized for this task (still require a bound, single-use approval to execute). */
++  approvalCategories: string[];
++  /** Absolute expiry (epoch ms). After this, the grant authorizes nothing. */
++  expiresAt: number;
++  /** Policy version the grant was derived under. */
++  policyVersion: string;
++}
++
++export interface CapabilityDecision {
++  allow: boolean;
++  reason: string;
++}
++
++const DENY = (reason: string): CapabilityDecision => ({ allow: false, reason });
++const ALLOW = (reason: string): CapabilityDecision => ({ allow: true, reason });
++
++/** Lexical containment without touching the filesystem (the OS ACL is the real check; this is the model's view). */
++function isInside(child: string, parent: string): boolean {
++  const norm = (p: string) => p.replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase();
++  const c = norm(child);
++  const p = norm(parent);
++  return c === p || c.startsWith(`${p}/`);
++}
++
++/**
++ * Is a file operation within this grant? `resolvedPath` must already be the real, canonical path (symlinks/junctions
++ * resolved) so a link cannot smuggle access past the lexical check.
++ */
++export function canAccessPath(
++  cap: Capability,
++  resolvedPath: string,
++  op: FileOp,
++  now: number,
++): CapabilityDecision {
++  if (now >= cap.expiresAt) return DENY('capability grant has expired');
++  for (const d of cap.directories)
++    if (isInside(resolvedPath, d.path))
++      return d.ops.includes(op)
++        ? ALLOW(`${op} permitted in ${d.path}`)
++        : DENY(`${op} not permitted in ${d.path} (allowed: ${d.ops.join(',') || 'none'})`);
++  return DENY(`path is outside every permitted directory`);
++}
++
++export function canRunExecutable(cap: Capability, exe: string, now: number): CapabilityDecision {
++  if (now >= cap.expiresAt) return DENY('capability grant has expired');
++  const base = (exe.split(/[\\/]/).pop() ?? exe).toLowerCase().replace(/\.(exe|cmd|bat|com|ps1)$/, '');
++  return cap.executables.includes(base)
++    ? ALLOW(`executable ${base} permitted`)
++    : DENY(`executable ${base} not in the task's allow-list`);
++}
++
++export function canReachHost(cap: Capability, host: string, now: number): CapabilityDecision {
++  if (now >= cap.expiresAt) return DENY('capability grant has expired');
++  const h = host.toLowerCase();
++  if (h === '127.0.0.1' || h === '::1' || h === 'localhost')
++    return cap.network.loopback ? ALLOW('loopback permitted') : DENY('loopback not permitted');
++  return cap.network.allowedHosts.map((x) => x.toLowerCase()).includes(h)
++    ? ALLOW(`host ${h} permitted`)
++    : DENY(`host ${h} not in the task's allow-list`);
++}
++
++export function requiresApproval(cap: Capability, category: string): CapabilityDecision {
++  return cap.approvalCategories.includes(category)
++    ? ALLOW(`category ${category} is pre-authorized for this task (bound approval still required)`)
++    : DENY(`category ${category} is not permitted for this task`);
++}
++
++/**
++ * Build a fresh grant for a task. Non-inheritable by construction: the inputs are the task's own project, workspace
++ * and assignment; nothing from another task is read. Conservative defaults: one workspace dir, no network beyond
++ * loopback-off, one process class, short expiry.
++ */
++export function deriveCapability(input: {
++  projectId: string;
++  taskId: string;
++  workerId: string;
++  workspaceDir: string;
++  tempDir: string;
++  readOnlyRefs?: string[];
++  executables?: string[];
++  allowedHosts?: string[];
++  loopback?: boolean;
++  integrations?: string[];
++  approvalCategories?: string[];
++  policyVersion: string;
++  now: number;
++  ttlMs?: number;
++  limits?: Partial<ResourceLimits>;
++}): Capability {
++  return {
++    projectId: input.projectId,
++    taskId: input.taskId,
++    workerId: input.workerId,
++    directories: [
++      { path: input.workspaceDir, ops: ['read', 'write', 'delete'] },
++      { path: input.tempDir, ops: ['read', 'write', 'delete'] },
++      ...(input.readOnlyRefs ?? []).map((p) => ({ path: p, ops: ['read'] as FileOp[] })),
++    ],
++    executables: input.executables ?? [],
++    network: { allowedHosts: input.allowedHosts ?? [], loopback: input.loopback ?? false },
++    limits: {
++      maxProcesses: input.limits?.maxProcesses ?? 32,
++      maxMemoryMb: input.limits?.maxMemoryMb ?? 2048,
++      maxWallSeconds: input.limits?.maxWallSeconds ?? 1800,
++    },
++    integrations: input.integrations ?? [],
++    approvalCategories: input.approvalCategories ?? [],
++    expiresAt: input.now + (input.ttlMs ?? 60 * 60 * 1000),
++    policyVersion: input.policyVersion,
++  };
++}
+diff --git a/src/security/broker/ipc.ts b/src/security/broker/ipc.ts
+new file mode 100644
+index 0000000..0d0648a
+--- /dev/null
++++ b/src/security/broker/ipc.ts
+@@ -0,0 +1,93 @@
++/**
++ * Trusted IPC interface to the broker (V2.1 trusted-execution).
++ *
++ * The worker never calls the broker in-process; it sends a typed, size-bounded, authenticated request over a
++ * transport. This module is transport-agnostic: the server validates and dispatches; a Windows named-pipe transport
++ * (design in docs) plugs in underneath. Kept transport-agnostic so the validation logic is unit-testable without
++ * admin rights or a real pipe.
++ *
++ * CRITICAL CAVEAT (documented, not worked around): a named pipe whose ACL admits the worker's SID does NOT separate
++ * two processes that run under the SAME SID. Caller-SID verification is only meaningful once the worker runs under a
++ * DISTINCT Windows account. Until then, treat the "authenticated caller" as advisory. See docs TRUSTED IPC section.
++ */
++import { ApprovalBroker, type BrokerOutcome, type BrokerRequest } from './broker.js';
++
++export const MAX_REQUEST_BYTES = 64 * 1024;
++
++export type IpcResponse = { ok: true; outcome: BrokerOutcome } | { ok: false; error: string };
++
++export interface IpcServerDeps {
++  broker: ApprovalBroker;
++  /** Verify the OS identity of the caller against the claimed workerId. Returns null if acceptable, else a reason. */
++  verifyCaller: (claimedWorkerId: string, callerSid: string | null) => string | null;
++  now: () => number;
++  /** Reject requests older/newer than this skew (ms) to bound replay windows. */
++  maxClockSkewMs?: number;
++}
++
++/** Minimal runtime validation of an untrusted request object. Returns a reason string on failure, else null. */
++export function validateRequestShape(value: unknown): string | null {
++  if (typeof value !== 'object' || value === null) return 'request is not an object';
++  const r = value as Record<string, unknown>;
++  const str = (k: string) => typeof r[k] === 'string' && (r[k] as string).length > 0;
++  for (const k of [
++    'workerId',
++    'taskId',
++    'executionId',
++    'projectId',
++    'tool',
++    'cwd',
++    'policyVersion',
++    'requestId',
++  ])
++    if (!str(k)) return `missing or invalid field: ${k}`;
++  if (typeof r['toolInput'] !== 'object' || r['toolInput'] === null) return 'missing toolInput';
++  if (typeof r['at'] !== 'number') return 'missing at';
++  if (r['category'] !== null && typeof r['category'] !== 'string') return 'invalid category';
++  if (r['target'] !== null && typeof r['target'] !== 'string') return 'invalid target';
++  if (r['approval'] !== undefined) {
++    const a = r['approval'];
++    if (typeof a !== 'object' || a === null) return 'invalid approval';
++    const ap = a as Record<string, unknown>;
++    if (typeof ap['grantId'] !== 'string' || typeof ap['nonce'] !== 'string')
++      return 'invalid approval fields';
++  }
++  return null;
++}
++
++export class BrokerIpcServer {
++  constructor(private readonly d: IpcServerDeps) {}
++
++  /**
++   * Handle one raw request frame. `callerSid` is the OS-verified SID of the connecting process (null when the
++   * transport cannot provide it, e.g. in-process tests). Fails closed on every validation error.
++   */
++  handle(rawBytes: Buffer | string, callerSid: string | null): IpcResponse {
++    const text = typeof rawBytes === 'string' ? rawBytes : rawBytes.toString('utf8');
++    if (Buffer.byteLength(text, 'utf8') > MAX_REQUEST_BYTES) return { ok: false, error: 'request too large' };
++
++    let parsed: unknown;
++    try {
++      parsed = JSON.parse(text);
++    } catch {
++      return { ok: false, error: 'malformed JSON' };
++    }
++    const shapeError = validateRequestShape(parsed);
++    if (shapeError) return { ok: false, error: shapeError };
++    const req = parsed as BrokerRequest;
++
++    const skew = this.d.maxClockSkewMs ?? 60_000;
++    if (Math.abs(this.d.now() - req.at) > skew)
++      return { ok: false, error: 'request timestamp outside allowed skew' };
++
++    const callerError = this.d.verifyCaller(req.workerId, callerSid);
++    if (callerError) return { ok: false, error: `caller identity rejected: ${callerError}` };
++
++    try {
++      return { ok: true, outcome: this.d.broker.authorize(req) };
++    } catch (err) {
++      // Fail closed: an internal error is a denial, never an allow.
++      return { ok: false, error: `broker error (fail-closed): ${(err as Error).message}` };
++    }
++  }
++}
+diff --git a/tests/unit/broker-approval.test.ts b/tests/unit/broker-approval.test.ts
+new file mode 100644
+index 0000000..a4c63dc
+--- /dev/null
++++ b/tests/unit/broker-approval.test.ts
+@@ -0,0 +1,376 @@
++/**
++ * V2.1 trusted-execution: synthetic tests for the application-level approval broker, capability model, single-use
++ * action-bound approvals, hash-chained signed audit, and the IPC validation layer. Nothing here is an OS boundary;
++ * these verify the application logic. No real credential, pipe, account or system object is used.
++ */
++import { describe, expect, it } from 'vitest';
++import { randomBytes } from 'node:crypto';
++import {
++  actionFingerprint,
++  canonicalArgsFor,
++  canonicalJson,
++  type BoundAction,
++} from '../../src/security/broker/canonical.js';
++import {
++  deriveCapability,
++  canAccessPath,
++  canRunExecutable,
++  canReachHost,
++} from '../../src/security/broker/capability.js';
++import { ApprovalGrantStore, DEFAULT_GRANT_TTL_MS } from '../../src/security/broker/approval-grant.js';
++import { AuditChain, MemoryAuditSink, verifyChain } from '../../src/security/broker/audit-chain.js';
++import { ApprovalBroker, type BrokerRequest } from '../../src/security/broker/broker.js';
++import { BrokerIpcServer, validateRequestShape, MAX_REQUEST_BYTES } from '../../src/security/broker/ipc.js';
++
++const identity = (c: string) => c.replace(/\s+/g, ' ').trim();
++
++function fakeNow() {
++  const clock = { t: 1_800_000_000_000 };
++  return { now: () => clock.t, advance: (ms: number) => (clock.t += ms), clock };
++}
++let counter = 0;
++const newId = () => `grant_${(++counter).toString(36)}`;
++
++const baseAction = (over: Partial<BoundAction> = {}): BoundAction => ({
++  category: 'protected_branch_push',
++  tool: 'Bash',
++  canonicalArgs: { command: 'git push origin main' },
++  target: 'origin/main',
++  workerId: 'worker-1',
++  taskId: 'task-1',
++  projectId: 'proj-1',
++  executionId: 'exec-1',
++  cwd: 'C:/ws/proj',
++  policyVersion: 'v1',
++  ...over,
++});
++
++describe('canonical binding', () => {
++  it('canonicalizes object key order so equal actions hash equally', () => {
++    expect(canonicalJson({ b: 1, a: 2 })).toBe(canonicalJson({ a: 2, b: 1 }));
++    expect(actionFingerprint(baseAction())).toBe(actionFingerprint(baseAction()));
++  });
++  it('any meaningful change diverges the fingerprint', () => {
++    const base = actionFingerprint(baseAction());
++    expect(
++      actionFingerprint(baseAction({ canonicalArgs: { command: 'git push --force origin main' } })),
++    ).not.toBe(base);
++    expect(actionFingerprint(baseAction({ target: 'origin/other' }))).not.toBe(base);
++    expect(actionFingerprint(baseAction({ workerId: 'worker-2' }))).not.toBe(base);
++    expect(actionFingerprint(baseAction({ taskId: 'task-2' }))).not.toBe(base);
++    expect(actionFingerprint(baseAction({ cwd: 'C:/ws/other' }))).not.toBe(base);
++    expect(actionFingerprint(baseAction({ policyVersion: 'v2' }))).not.toBe(base);
++  });
++  it('canonicalArgsFor normalizes commands so cosmetic differences do not force re-approval', () => {
++    const a = canonicalArgsFor('Bash', { command: 'git   push   origin main' }, identity);
++    const b = canonicalArgsFor('Bash', { command: 'git push origin main' }, identity);
++    expect(a).toEqual(b);
++  });
++});
++
++describe('capability model (default-deny, task-scoped)', () => {
++  const nowH = fakeNow();
++  const cap = deriveCapability({
++    projectId: 'proj-1',
++    taskId: 'task-1',
++    workerId: 'worker-1',
++    workspaceDir: 'C:/ws/proj',
++    tempDir: 'C:/tmp/task-1',
++    readOnlyRefs: ['C:/ref/lib'],
++    executables: ['node', 'git'],
++    allowedHosts: ['registry.npmjs.org'],
++    integrations: ['erp'],
++    approvalCategories: ['protected_branch_push'],
++    policyVersion: 'v1',
++    now: nowH.now(),
++  });
++  it('permits writes in the workspace and temp, read-only in refs, denies elsewhere', () => {
++    expect(canAccessPath(cap, 'C:/ws/proj/src/a.ts', 'write', nowH.now()).allow).toBe(true);
++    expect(canAccessPath(cap, 'C:/tmp/task-1/x', 'delete', nowH.now()).allow).toBe(true);
++    expect(canAccessPath(cap, 'C:/ref/lib/readme.md', 'read', nowH.now()).allow).toBe(true);
++    expect(canAccessPath(cap, 'C:/ref/lib/readme.md', 'write', nowH.now()).allow).toBe(false);
++    expect(canAccessPath(cap, 'C:/Users/Roman/.ssh/id_rsa', 'read', nowH.now()).allow).toBe(false);
++  });
++  it('allows only listed executables and hosts; loopback off by default', () => {
++    expect(canRunExecutable(cap, 'C:/Program Files/nodejs/node.exe', nowH.now()).allow).toBe(true);
++    expect(canRunExecutable(cap, 'powershell.exe', nowH.now()).allow).toBe(false);
++    expect(canReachHost(cap, 'registry.npmjs.org', nowH.now()).allow).toBe(true);
++    expect(canReachHost(cap, 'evil.example', nowH.now()).allow).toBe(false);
++    expect(canReachHost(cap, '127.0.0.1', nowH.now()).allow).toBe(false);
++  });
++  it('denies everything after expiry', () => {
++    const h = fakeNow();
++    const c = deriveCapability({
++      projectId: 'p',
++      taskId: 't',
++      workerId: 'w',
++      workspaceDir: 'C:/ws',
++      tempDir: 'C:/tmp',
++      policyVersion: 'v1',
++      now: h.now(),
++      ttlMs: 1000,
++    });
++    h.advance(2000);
++    expect(canAccessPath(c, 'C:/ws/a', 'read', h.now()).allow).toBe(false);
++  });
++});
++
++describe('single-use, action-bound approval grants', () => {
++  it('a grant approves exactly one action and cannot be replayed', () => {
++    const h = fakeNow();
++    const store = new ApprovalGrantStore(h.now, newId);
++    const action = baseAction();
++    const g = store.request(action);
++    expect(g.state).toBe('PENDING');
++    // cannot consume before approval
++    expect(store.consume(g.id, g.nonce, action).ok).toBe(false);
++    store.decide(g.id, 'APPROVED', 'owner');
++    // first consume ok
++    expect(store.consume(g.id, g.nonce, action).ok).toBe(true);
++    // replay denied
++    const replay = store.consume(g.id, g.nonce, action);
++    expect(replay.ok).toBe(false);
++    expect(replay.reason).toMatch(/already used/);
++  });
++  it('a changed action does not match the approval', () => {
++    const h = fakeNow();
++    const store = new ApprovalGrantStore(h.now, newId);
++    const g = store.request(baseAction());
++    store.decide(g.id, 'APPROVED', 'owner');
++    const tampered = baseAction({ canonicalArgs: { command: 'git push --force origin main' } });
++    expect(store.consume(g.id, g.nonce, tampered).ok).toBe(false);
++  });
++  it('a wrong nonce is rejected even for the right action', () => {
++    const h = fakeNow();
++    const store = new ApprovalGrantStore(h.now, newId);
++    const g = store.request(baseAction());
++    store.decide(g.id, 'APPROVED', 'owner');
++    expect(store.consume(g.id, randomBytes(32).toString('hex'), baseAction()).ok).toBe(false);
++  });
++  it('expires after its TTL and cannot be consumed', () => {
++    const h = fakeNow();
++    const store = new ApprovalGrantStore(h.now, newId);
++    const g = store.request(baseAction());
++    store.decide(g.id, 'APPROVED', 'owner');
++    h.advance(DEFAULT_GRANT_TTL_MS + 1);
++    const r = store.consume(g.id, g.nonce, baseAction());
++    expect(r.ok).toBe(false);
++    expect(r.reason).toMatch(/expired/);
++  });
++  it('revocation and supersession invalidate a grant', () => {
++    const h = fakeNow();
++    const store = new ApprovalGrantStore(h.now, newId);
++    const g1 = store.request(baseAction());
++    store.decide(g1.id, 'APPROVED', 'owner');
++    store.revoke(g1.id, 'owner', 'changed my mind');
++    expect(store.consume(g1.id, g1.nonce, baseAction()).ok).toBe(false);
++    // re-requesting the same action supersedes any prior live grant
++    const g2 = store.request(baseAction());
++    const g3 = store.request(baseAction());
++    expect(store.get(g2.id)?.state).toBe('REVOKED');
++    expect(store.get(g3.id)?.state).toBe('PENDING');
++  });
++});
++
++describe('hash-chained signed audit', () => {
++  it('appends a verifiable chain and detects edits, deletion and reordering', () => {
++    const h = fakeNow();
++    const key = randomBytes(32);
++    const sink = new MemoryAuditSink();
++    const chain = new AuditChain(sink, key, h.now);
++    chain.append('a', { x: 1 });
++    chain.append('b', { y: 2 });
++    chain.append('c', { z: 3 });
++    expect(verifyChain(sink, key).ok).toBe(true);
++    expect(verifyChain(sink, key).count).toBe(3);
++
++    // edit event 1's data
++    const lines = sink.readAll();
++    const edited = new MemoryAuditSink();
++    const e1 = JSON.parse(lines[1]!);
++    e1.data = { y: 999 };
++    for (const [i, l] of lines.entries()) edited.append(i === 1 ? JSON.stringify(e1) : l);
++    const r = verifyChain(edited, key);
++    expect(r.ok).toBe(false);
++    expect(r.error).toMatch(/altered/);
++
++    // delete the middle event
++    const deleted = new MemoryAuditSink();
++    lines.filter((_, i) => i !== 1).forEach((l) => deleted.append(l));
++    expect(verifyChain(deleted, key).ok).toBe(false);
++
++    // reorder
++    const reordered = new MemoryAuditSink();
++    [lines[0]!, lines[2]!, lines[1]!].forEach((l) => reordered.append(l));
++    expect(verifyChain(reordered, key).ok).toBe(false);
++  });
++  it('a forged tail fails without the signing key, and the real key verifies', () => {
++    const h = fakeNow();
++    const key = randomBytes(32);
++    const sink = new MemoryAuditSink();
++    const chain = new AuditChain(sink, key, h.now);
++    chain.append('a', {});
++    // attacker without the key appends a plausible but wrongly-signed event
++    const forged = new MemoryAuditSink();
++    sink.readAll().forEach((l) => forged.append(l));
++    const last = JSON.parse(sink.readAll()[0]!);
++    forged.append(
++      JSON.stringify({
++        seq: 1,
++        at: h.now(),
++        type: 'forged',
++        data: {},
++        prevHash: last.entryHash,
++        entryHash: 'deadbeef',
++        signature: 'deadbeef',
++      }),
++    );
++    expect(verifyChain(forged, key).ok).toBe(false);
++    // verifying under a DIFFERENT key fails too (signatures are key-bound)
++    expect(verifyChain(sink, randomBytes(32)).ok).toBe(false);
++  });
++  it('a signed checkpoint reflects the head', () => {
++    const h = fakeNow();
++    const key = randomBytes(32);
++    const sink = new MemoryAuditSink();
++    const chain = new AuditChain(sink, key, h.now);
++    chain.append('a', {});
++    chain.append('b', {});
++    const cp = chain.checkpoint();
++    expect(cp.seq).toBe(1);
++    expect(cp.headHash).toHaveLength(64);
++  });
++});
++
++function makeBroker() {
++  const h = fakeNow();
++  const key = randomBytes(32);
++  const sink = new MemoryAuditSink();
++  const audit = new AuditChain(sink, key, h.now);
++  const grants = new ApprovalGrantStore(h.now, newId, (e) => audit.append(e.type, { grantId: e.grant.id }));
++  const cap = deriveCapability({
++    projectId: 'proj-1',
++    taskId: 'task-1',
++    workerId: 'worker-1',
++    workspaceDir: 'C:/ws/proj',
++    tempDir: 'C:/tmp/task-1',
++    policyVersion: 'v1',
++    now: h.now(),
++    approvalCategories: ['protected_branch_push'],
++  });
++  const broker = new ApprovalBroker({
++    capabilityFor: (id) => (id === 'task-1' ? cap : undefined),
++    grants,
++    audit,
++    normalizeCommand: identity,
++    now: h.now,
++    isOwnerPrincipal: (p) => p === 'owner',
++  });
++  return { h, broker, grants, audit, sink, key };
++}
++
++const req = (over: Partial<BrokerRequest> = {}): BrokerRequest => ({
++  workerId: 'worker-1',
++  taskId: 'task-1',
++  executionId: 'exec-1',
++  projectId: 'proj-1',
++  tool: 'Bash',
++  toolInput: { command: 'git push origin main' },
++  category: 'protected_branch_push',
++  target: 'origin/main',
++  cwd: 'C:/ws/proj',
++  policyVersion: 'v1',
++  requestId: `r-${Math.random()}`,
++  at: 1_800_000_000_000,
++  ...over,
++});
++
++describe('broker end to end', () => {
++  it('consequential action needs approval; the owner approves; the worker consumes it once', () => {
++    const { broker } = makeBroker();
++    const out = broker.authorize(req());
++    expect(out.decision).toBe('needs_approval');
++    if (out.decision !== 'needs_approval') return;
++    expect(broker.decide(out.grantId, 'APPROVED', 'owner').ok).toBe(true);
++    const run = broker.authorize(
++      req({ requestId: 'r-run', approval: { grantId: out.grantId, nonce: out.nonce } }),
++    );
++    expect(run.decision).toBe('allow');
++    // replay with a new requestId but same consumed grant -> deny
++    const replay = broker.authorize(
++      req({ requestId: 'r-run2', approval: { grantId: out.grantId, nonce: out.nonce } }),
++    );
++    expect(replay.decision).toBe('deny');
++  });
++  it('the worker cannot approve its own request', () => {
++    const { broker } = makeBroker();
++    const out = broker.authorize(req());
++    if (out.decision !== 'needs_approval') throw new Error('expected needs_approval');
++    expect(broker.decide(out.grantId, 'APPROVED', 'worker-1').ok).toBe(false);
++    expect(broker.decide(out.grantId, 'APPROVED', 'owner-cli').ok).toBe(false);
++  });
++  it('an approval for one command does not authorize a different command', () => {
++    const { broker } = makeBroker();
++    const out = broker.authorize(req());
++    if (out.decision !== 'needs_approval') throw new Error();
++    broker.decide(out.grantId, 'APPROVED', 'owner');
++    const other = broker.authorize(
++      req({
++        requestId: 'r-other',
++        toolInput: { command: 'git push --force origin main' },
++        approval: { grantId: out.grantId, nonce: out.nonce },
++      }),
++    );
++    expect(other.decision).toBe('deny');
++  });
++  it('a category the task did not pre-authorize is denied', () => {
++    const { broker } = makeBroker();
++    const out = broker.authorize(req({ category: 'production_deploy' }));
++    expect(out.decision).toBe('deny');
++  });
++  it('duplicate requestId is rejected', () => {
++    const { broker } = makeBroker();
++    broker.authorize(req({ requestId: 'dup', category: null, toolInput: { command: 'ls' } }));
++    const again = broker.authorize(req({ requestId: 'dup', category: null, toolInput: { command: 'ls' } }));
++    expect(again.decision).toBe('deny');
++  });
++  it('mismatched worker/policy/project is denied; every decision is audited verifiably', () => {
++    const { broker, sink, key } = makeBroker();
++    expect(broker.authorize(req({ workerId: 'worker-2' })).decision).toBe('deny');
++    expect(broker.authorize(req({ policyVersion: 'v2' })).decision).toBe('deny');
++    expect(broker.authorize(req({ projectId: 'proj-9' })).decision).toBe('deny');
++    expect(verifyChain(sink, key).ok).toBe(true);
++  });
++});
++
++describe('IPC validation (fail-closed)', () => {
++  const server = () => {
++    const { broker } = makeBroker();
++    return new BrokerIpcServer({
++      broker,
++      verifyCaller: (claimed, sid) => (sid === null || sid === claimed ? null : `sid ${sid} != ${claimed}`),
++      now: () => 1_800_000_000_000,
++    });
++  };
++  it('rejects malformed JSON, bad shapes and oversized frames', () => {
++    const s = server();
++    expect(s.handle('not json', null).ok).toBe(false);
++    expect(s.handle(JSON.stringify({ tool: 'Bash' }), null).ok).toBe(false);
++    expect(s.handle('x'.repeat(MAX_REQUEST_BYTES + 1), null).ok).toBe(false);
++  });
++  it('rejects a request whose timestamp is outside the skew window', () => {
++    const s = server();
++    const bad = JSON.stringify(req({ at: 1 }));
++    expect(s.handle(bad, null).ok).toBe(false);
++  });
++  it('rejects a caller SID that does not match the claimed worker', () => {
++    const s = server();
++    const r = JSON.stringify(req({ category: null, toolInput: { command: 'ls' } }));
++    expect(s.handle(r, 'worker-2').ok).toBe(false);
++    expect(s.handle(r, 'worker-1').ok).toBe(true);
++  });
++  it('validateRequestShape catches each missing field', () => {
++    expect(validateRequestShape(null)).toMatch(/not an object/);
++    expect(validateRequestShape({})).toMatch(/workerId/);
++  });
++});
+-- 
+2.56.0.windows.4
+

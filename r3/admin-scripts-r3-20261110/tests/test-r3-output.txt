@@ -1,0 +1,507 @@
+
+### A. r1/r2 regressions kept
+PASS r1 regex bug reproduced ("$script:X:\(N\)" -> "\(N\)")
+PASS r2 form keeps the name ("${script:X}:")
+
+### B. path guards (L1)
+PASS staging root accepted
+WARNING:   REFUSED: outside C:\ElevariqStaging / C:\ElevariqStagingDisk (C:\ElevariqStagingEvil\x)
+PASS staging prefix trap rejected
+PASS disk dir accepted
+WARNING:   REFUSED: production/owner path is never a privileged target (E:\Agent\Personal-agent\dist)
+PASS production checkout rejected
+WARNING:   REFUSED: production/owner path is never a privileged target (C:\Users\Roman\.claude)
+PASS owner .claude rejected
+WARNING:   REFUSED: production/owner path is never a privileged target 
+(C:\Users\Roman\AppData\Local\ElevariqAgent\agent.db)
+PASS prod home rejected
+WARNING:   REFUSED: outside C:\ElevariqStaging / C:\ElevariqStagingDisk (C:\ElevariqStaging\..\Windows)
+PASS dot-dot escape rejected
+PASS L1 \\?\ device form refused
+PASS L1 \\.\ device form refused
+PASS L1 admin-share UNC refused
+PASS L1 forward-slash UNC refused
+PASS L1 relative path canonicalised to a drive path
+PASS L1 Assert-ElvNotProduction refuses admin-share form of production
+PASS deny target E:\ accepted
+PASS deny target C:\Download accepted
+PASS deny target E:\$RECYCLE.BIN accepted (M11)
+WARNING:   REFUSED: not an approved DENY target (C:\Windows)
+PASS deny target C:\Windows rejected
+WARNING:   REFUSED: production/owner path is never a privileged target (E:\Agent\Personal-agent\dist)
+PASS deny target inside prod rejected even if listed
+WARNING:   REFUSED: AdditionalDenyPaths entry is not a coverable sweep finding (explicit-broad-allow / 
+protected-with-broad-access) (E:\Agent\v2-staging)
+WARNING:   REFUSED: AdditionalDenyPaths entry is not a coverable sweep finding (explicit-broad-allow / 
+protected-with-broad-access) (C:\Windows)
+PASS L1/M3 listed extra accepted ONLY when it is a coverable sweep finding
+WARNING:   REFUSED: AdditionalDenyPaths entry is not a coverable sweep finding (explicit-broad-allow / 
+protected-with-broad-access) (C:\Windows)
+PASS L1 self-authorising -Additional C:\Windows refused when sweep findings are given
+
+### C. IPv4 complement (L6)
+PASS complement of loopback only
+PASS complement with allow CIDR
+PASS overlapping CIDRs merged
+PASS unaligned CIDR normalised
+PASS bad CIDR throws
+PASS host name rejected
+PASS L6 leading-zero octet (octal trap) rejected
+PASS L6 empty complement (0.0.0.0/0) refused
+
+### D. user-rights INF (L2/L3)
+PASS INF parse
+PASS INF add keeps existing, adds new right
+PASS INF remove
+PASS INF add idempotent
+PASS L2 remove with case mismatch terminates and removes
+PASS right held by SID or name
+
+### E. spec semantics (M9/I4)
+PASS spec M
+PASS spec RX
+PASS spec W
+PASS spec WD-this = add-file only (no list, no delete, no write-dac)
+PASS spec RX+D = read + delete, no write
+PASS spec DENY/none
+PASS layout: bin admin-only, requests WD-this+OwnerRights, approvals broker RX+D
+PASS ConvertTo-ElvGrant specs
+
+### F. B1 classification, pure synthetic SDDL (reviewer counterexample)
+PASS B1 OLD filter misses the explicit inherit-only Everyone:F (reproduces the rejected behaviour)
+PASS B1 NEW classification flags it as explicit-broad-allow (IO)
+PASS B1 OLD protected test (effective mask skips IO) misses protected IO-only Users:M
+PASS B1 NEW classification flags protected-with-broad-access for IO-only broad ACE
+PASS classification: null DACL
+PASS classification: clean protected DACL (SYSTEM/BA only) -> no finding
+PASS classification: inherited broad allow (not explicit, not protected) -> no finding (covered by the ancestor)
+PASS classification: zero-mask broad ACE ignored
+PASS L5 broad SIDs include NTLM (S-1-5-64-10), asserted identity, NETWORK, SERVICE, Guests
+PASS effective mask: ACE ordering deny-before-allow and allow-before-deny (object itself)
+PASS effective mask: generic rights expanded (GR|GW -> 0x12019F)
+PASS effective mask: group membership (SID set) decides; non-member SID ignored
+
+### G. on-disk synthetic fixture: sweep, r2 baseline, per-object verification, REAL open checks
+PASS fixture built
+    SWEEP-SUMMARY items=22 findings=4 unreadable=1 unlistable=1 reparse=1 skipped=0 -> C:\Users\Roman\AppData\Local\Temp\elv-r3-sweep-17456.csv
+PASS sweep r3: X (explicit inherit-only Everyone:F) -> explicit-broad-allow
+PASS sweep r3: P (protected, IO-only Users:M) -> explicit-broad-allow + protected-with-broad-access
+PASS sweep r3: O (explicit Everyone:F, own explicit DENY) -> explicit-broad-allow (coverable)
+PASS sweep r3: N, Q (protected owner-only), work, locked -> no finding
+PASS sweep r3: req (worker add-file-only) is UNLISTABLE to the non-elevated runner -> the sweep MUST run elevated
+PASS sweep r3: children of X carry only inherited ACEs -> no finding on them (the finding is on X)
+PASS sweep r3: U\u.txt unreadable (OWNER RIGHTS strips READ_CONTROL) reported
+PASS sweep r3: junction J reported as reparse-point OUTSIDE and not followed
+PASS sweep r3: stats consistent (findings = rows minus reparse/unreadable/unlistable)
+PASS r2 BASELINE (rejected hash 126d700c): X NOT flagged (B1 reproduced on disk)
+PASS r2 BASELINE: P NOT flagged (B1 protected variant reproduced on disk)
+PASS r2 BASELINE: O IS flagged (non-IO explicit allow was always detected)
+    VERIFY-SUMMARY items=22 exposed=5 unreadable=1 unlistable=1 reparse=1 skipped=0 -> C:\Users\Roman\AppData\Local\Temp\elv-r3-verify-17456.csv
+PASS V3: model root itself has mask 0 (explicit DENY applies)
+PASS V3: X\c.txt EXPOSED (nearer inherited Everyone:F precedes the root DENY)
+PASS V3: nested X\deep\deeper\f.txt EXPOSED
+PASS V3: X itself NOT exposed (inherit-only ACE does not apply to X)
+PASS V3: X\deep\locked\l.txt NOT exposed (protected cut, no broad ACE)
+PASS V3: P\d.txt EXPOSED (protected parent passes Users:M down, DENY never arrives)
+PASS V3: O\g.txt NOT exposed (explicit DENY on O sorts before its explicit allow: the AdditionalDenyPaths remedy)
+PASS V3: N\e.txt NOT exposed (plain inheritance: DENY arrives)
+PASS V3: Q\h.txt NOT exposed (protected owner-only)
+PASS V3: U\u.txt unreadable counted as failure
+PASS V3: junction not followed (no rows under J\)
+PASS V3 with captured token CSV adds the real worker SIDs to the modelled token (integrity-level SIDs filtered)
+PASS REAL: real\X\c.txt open-for-read ALLOWED despite the ancestor DENY (demonstrated counterexample, runner token)
+PASS REAL: real\X\c.txt open-for-write ALLOWED too (Full, not just read)
+PASS REAL: real\P\d.txt ALLOWED (protected parent with IO-only Users:M)
+PASS REAL: real\N\e.txt DENIED (inherited DENY works where nothing precedes it)
+PASS REAL: real\O\g.txt DENIED (explicit DENY on O precedes its explicit Everyone allow)
+PASS REAL: real\N\locked\l.txt DENIED (protected empty DACL; owner keeps only RC/WDAC)
+PASS REAL agrees with the model on every real\ case (prediction = observation)
+PASS REAL: junction target outside the deny root is readable through the junction (DENY does not cover reparse targets)
+PASS POSITIVE: authorised work\ dir: create + write + read succeed
+PASS M9: creator can write a NEW request through the creation handle
+PASS M9: creator can NOT reopen its own request for write (OWNER RIGHTS RC only, no implicit WRITE_DAC)
+PASS M9: creator can NOT read it back either
+PASS M9: creator can NOT change the DACL of its request (WRITE_DAC stripped)
+PASS M9: creator can NOT list the request directory (no FILE_LIST_DIRECTORY)
+WARNING:   REFUSED: inheritance flags on a FILE are silently dropped by icacls (R3-N1) 
+(C:\Users\Roman\AppData\Local\ElevariqR3Fixtures\acl-20261110-162010-17456\model\N\e.txt)
+PASS R3-N1: inheritable ACE spec on a FILE is refused (icacls would silently drop it with exit 0)
+WARNING:   REFUSED: icacls exit 3: C:\elv-does-not-exist-9f3a\zz: The system cannot find the path specified. | 
+Successfully processed 0 files; Failed processing 1 files (C:\elv-does-not-exist-9f3a\zz)
+PASS M1: icacls failure under EAP=Stop is captured and recorded as a refusal with the exit code
+PASS M1: trap saves the report on an unexpected error (00 -Verify without a group throws; report has error)
+PASS M2: second backup run keeps the FIRST baseline-root.sddl and adds a new timestamped copy
+PASS M2: full-tree backup failure (missing target) is an error, not silent
+PASS H1: chunk coverage: chunks over every top-level child -> no missing; one child left out -> reported
+PASS H1: chunk record round-trip (Write/Get, elevated flag recorded as false here)
+PASS L7: Test-ElvLayout passes on a layout applied exactly as 03 would (synthetic root, fake identity SIDs)
+PASS fixture removed cleanly (no residue in the owner profile)
+
+### H. H2 trusted location and manifest
+PASS H2: Test-ElvAdminOnlyWritable reports the OWNER SID as a writer on an owner-writable dir
+PASS H2: canonical manifest is ordinal-sorted, LF, trailing LF
+PASS H2: manifest hash is 64 hex and deterministic
+  [WARN] R7 trusted admin-only script location + canonical SHA256SUMS + out-of-band manifest hash owner S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456; inheritance not cut on C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456; write 0xD0156 for S-1-5-21-3837883729-3478098758-1729361560-1001 on C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456; owner S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456\00-isolation-group-deny.ps1; write 0xD0156 for S-1-5-21-3837883729-3478098758-1729361560-1001 on C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456\00-isolation-group-deny.ps1; owner S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456\00a-remove-test-residue.ps1; write 0xD0156 for S-1-5-21-3837883729-3478098758-1729361560-1001 on C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456\00a-remove-test-residue.ps1; owner S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456\01-staging-volume.ps1; write 0xD0156 for S-1-5-21-3837883729-3478098758-1729361560-1001 on C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456\01-staging-volume.ps1; owner S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456\02-identities-and-rights.ps1; write 0xD0156 for S-1-5-21-3837883729-3478098758-1729361560-1001 on C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456\02-identities-and-rights.ps1; owner S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456\03-staging-layout.ps1; write 0xD0156 for S-1-5-21-3837883729-3478098758-1729361560-1001 on C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456\03-staging-layout.ps1; owner S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456\04-broker-install.ps1; write 0xD0156 for S-1-5-21-3837883729-3478098758-1729361560-1001 on C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456\04-broker-install.ps1; owner S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456\05-firewall-egress.ps1; write 0xD0156 for S-1-5-21-3837883729-3478098758-1729361560-1001 on C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456\05-firewall-egress.ps1; owner S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456\06-worker-enable.ps1; write 0xD0156 for S-1-5-21-3837883729-3478098758-1729361560-1001 on C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456\06-worker-enable.ps1; owner S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456\07-verify-config.ps1; write 0xD0156 for S-1-5-21-3837883729-3478098758-1729361560-1001 on C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456\07-verify-config.ps1; owner S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456\09-rollback.ps1; write 0xD0156 for S-1-5-21-3837883729-3478098758-1729361560-1001 on C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456\09-rollback.ps1; owner S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456\Freeze-AdminScripts.ps1; write 0xD0156 for S-1-5-21-3837883729-3478098758-1729361560-1001 on C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456\Freeze-AdminScripts.ps1; owner S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456\_common.ps1; write 0xD0156 for S-1-5-21-3837883729-3478098758-1729361560-1001 on C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456\_common.ps1; owner S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456\SHA256SUMS; write 0xD0156 for S-1-5-21-3837883729-3478098758-1729361560-1001 on C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456\SHA256SUMS
+PASS H2: dry-run from an owner-writable copy -> R7 WARN (never PASS)
+WARNING:   REFUSED: owner S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on 
+C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456; inheritance not cut on 
+C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456; write 0xD0156 for 
+S-1-5-21-3837883729-3478098758-1729361560-1001 on C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456; owner 
+S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on 
+C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456\00-isolation-group-deny.ps1; write 0xD0156 for 
+S-1-5-21-3837883729-3478098758-1729361560-1001 on 
+C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456\00-isolation-group-deny.ps1; owner 
+S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on 
+C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456\00a-remove-test-residue.ps1; write 0xD0156 for 
+S-1-5-21-3837883729-3478098758-1729361560-1001 on 
+C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456\00a-remove-test-residue.ps1; owner 
+S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on 
+C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456\01-staging-volume.ps1; write 0xD0156 for 
+S-1-5-21-3837883729-3478098758-1729361560-1001 on 
+C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456\01-staging-volume.ps1; owner 
+S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on 
+C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456\02-identities-and-rights.ps1; write 0xD0156 for 
+S-1-5-21-3837883729-3478098758-1729361560-1001 on 
+C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456\02-identities-and-rights.ps1; owner 
+S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on 
+C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456\03-staging-layout.ps1; write 0xD0156 for 
+S-1-5-21-3837883729-3478098758-1729361560-1001 on 
+C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456\03-staging-layout.ps1; owner 
+S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on 
+C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456\04-broker-install.ps1; write 0xD0156 for 
+S-1-5-21-3837883729-3478098758-1729361560-1001 on 
+C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456\04-broker-install.ps1; owner 
+S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on 
+C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456\05-firewall-egress.ps1; write 0xD0156 for 
+S-1-5-21-3837883729-3478098758-1729361560-1001 on 
+C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456\05-firewall-egress.ps1; owner 
+S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on 
+C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456\06-worker-enable.ps1; write 0xD0156 for 
+S-1-5-21-3837883729-3478098758-1729361560-1001 on 
+C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456\06-worker-enable.ps1; owner 
+S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on 
+C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456\07-verify-config.ps1; write 0xD0156 for 
+S-1-5-21-3837883729-3478098758-1729361560-1001 on 
+C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456\07-verify-config.ps1; owner 
+S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on 
+C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456\09-rollback.ps1; write 0xD0156 for 
+S-1-5-21-3837883729-3478098758-1729361560-1001 on 
+C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456\09-rollback.ps1; owner 
+S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on 
+C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456\Freeze-AdminScripts.ps1; write 0xD0156 for 
+S-1-5-21-3837883729-3478098758-1729361560-1001 on 
+C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456\Freeze-AdminScripts.ps1; owner 
+S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on 
+C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456\_common.ps1; write 0xD0156 for 
+S-1-5-21-3837883729-3478098758-1729361560-1001 on C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456\_common.ps1; 
+owner S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on 
+C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456\SHA256SUMS; write 0xD0156 for 
+S-1-5-21-3837883729-3478098758-1729361560-1001 on C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456\SHA256SUMS 
+(C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456)
+PASS H2: APPLY from an owner-writable copy refused even with the right manifest hash
+WARNING:   REFUSED: owner S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on 
+C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456; inheritance not cut on 
+C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456; write 0xD0156 for 
+S-1-5-21-3837883729-3478098758-1729361560-1001 on C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456; owner 
+S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on 
+C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456\00-isolation-group-deny.ps1; write 0xD0156 for 
+S-1-5-21-3837883729-3478098758-1729361560-1001 on 
+C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456\00-isolation-group-deny.ps1; owner 
+S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on 
+C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456\00a-remove-test-residue.ps1; write 0xD0156 for 
+S-1-5-21-3837883729-3478098758-1729361560-1001 on 
+C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456\00a-remove-test-residue.ps1; owner 
+S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on 
+C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456\01-staging-volume.ps1; write 0xD0156 for 
+S-1-5-21-3837883729-3478098758-1729361560-1001 on 
+C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456\01-staging-volume.ps1; owner 
+S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on 
+C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456\02-identities-and-rights.ps1; write 0xD0156 for 
+S-1-5-21-3837883729-3478098758-1729361560-1001 on 
+C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456\02-identities-and-rights.ps1; owner 
+S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on 
+C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456\03-staging-layout.ps1; write 0xD0156 for 
+S-1-5-21-3837883729-3478098758-1729361560-1001 on 
+C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456\03-staging-layout.ps1; owner 
+S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on 
+C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456\04-broker-install.ps1; write 0xD0156 for 
+S-1-5-21-3837883729-3478098758-1729361560-1001 on 
+C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456\04-broker-install.ps1; owner 
+S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on 
+C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456\05-firewall-egress.ps1; write 0xD0156 for 
+S-1-5-21-3837883729-3478098758-1729361560-1001 on 
+C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456\05-firewall-egress.ps1; owner 
+S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on 
+C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456\06-worker-enable.ps1; write 0xD0156 for 
+S-1-5-21-3837883729-3478098758-1729361560-1001 on 
+C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456\06-worker-enable.ps1; owner 
+S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on 
+C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456\07-verify-config.ps1; write 0xD0156 for 
+S-1-5-21-3837883729-3478098758-1729361560-1001 on 
+C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456\07-verify-config.ps1; owner 
+S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on 
+C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456\09-rollback.ps1; write 0xD0156 for 
+S-1-5-21-3837883729-3478098758-1729361560-1001 on 
+C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456\09-rollback.ps1; owner 
+S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on 
+C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456\Freeze-AdminScripts.ps1; write 0xD0156 for 
+S-1-5-21-3837883729-3478098758-1729361560-1001 on 
+C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456\Freeze-AdminScripts.ps1; owner 
+S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on 
+C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456\_common.ps1; write 0xD0156 for 
+S-1-5-21-3837883729-3478098758-1729361560-1001 on C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456\_common.ps1; 
+owner S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on 
+C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456\SHA256SUMS; write 0xD0156 for 
+S-1-5-21-3837883729-3478098758-1729361560-1001 on C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456\SHA256SUMS; 
+-ApprovedManifestHash (64 hex, obtained OUT OF BAND from the review hand-back) is required for -Apply 
+(C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456)
+PASS H2: APPLY without -ApprovedManifestHash is a recorded problem
+WARNING:   REFUSED: owner S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on 
+C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456; inheritance not cut on 
+C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456; write 0xD0156 for 
+S-1-5-21-3837883729-3478098758-1729361560-1001 on C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456; owner 
+S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on 
+C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456\00-isolation-group-deny.ps1; write 0xD0156 for 
+S-1-5-21-3837883729-3478098758-1729361560-1001 on 
+C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456\00-isolation-group-deny.ps1; owner 
+S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on 
+C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456\00a-remove-test-residue.ps1; write 0xD0156 for 
+S-1-5-21-3837883729-3478098758-1729361560-1001 on 
+C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456\00a-remove-test-residue.ps1; owner 
+S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on 
+C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456\01-staging-volume.ps1; write 0xD0156 for 
+S-1-5-21-3837883729-3478098758-1729361560-1001 on 
+C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456\01-staging-volume.ps1; owner 
+S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on 
+C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456\02-identities-and-rights.ps1; write 0xD0156 for 
+S-1-5-21-3837883729-3478098758-1729361560-1001 on 
+C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456\02-identities-and-rights.ps1; owner 
+S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on 
+C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456\03-staging-layout.ps1; write 0xD0156 for 
+S-1-5-21-3837883729-3478098758-1729361560-1001 on 
+C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456\03-staging-layout.ps1; owner 
+S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on 
+C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456\04-broker-install.ps1; write 0xD0156 for 
+S-1-5-21-3837883729-3478098758-1729361560-1001 on 
+C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456\04-broker-install.ps1; owner 
+S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on 
+C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456\05-firewall-egress.ps1; write 0xD0156 for 
+S-1-5-21-3837883729-3478098758-1729361560-1001 on 
+C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456\05-firewall-egress.ps1; owner 
+S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on 
+C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456\06-worker-enable.ps1; write 0xD0156 for 
+S-1-5-21-3837883729-3478098758-1729361560-1001 on 
+C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456\06-worker-enable.ps1; owner 
+S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on 
+C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456\07-verify-config.ps1; write 0xD0156 for 
+S-1-5-21-3837883729-3478098758-1729361560-1001 on 
+C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456\07-verify-config.ps1; owner 
+S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on 
+C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456\09-rollback.ps1; write 0xD0156 for 
+S-1-5-21-3837883729-3478098758-1729361560-1001 on 
+C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456\09-rollback.ps1; owner 
+S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on 
+C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456\Freeze-AdminScripts.ps1; write 0xD0156 for 
+S-1-5-21-3837883729-3478098758-1729361560-1001 on 
+C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456\Freeze-AdminScripts.ps1; owner 
+S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on 
+C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456\_common.ps1; write 0xD0156 for 
+S-1-5-21-3837883729-3478098758-1729361560-1001 on C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456\_common.ps1; 
+owner S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on 
+C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456\SHA256SUMS; write 0xD0156 for 
+S-1-5-21-3837883729-3478098758-1729361560-1001 on C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456\SHA256SUMS; 
+SHA256SUMS does not match the out-of-band ApprovedManifestHash (C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456)
+PASS H2: APPLY with a WRONG manifest hash is a recorded problem
+WARNING:   REFUSED: owner S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on 
+C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456; inheritance not cut on 
+C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456; write 0xD0156 for 
+S-1-5-21-3837883729-3478098758-1729361560-1001 on C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456; owner 
+S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on 
+C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456\00-isolation-group-deny.ps1; write 0xD0156 for 
+S-1-5-21-3837883729-3478098758-1729361560-1001 on 
+C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456\00-isolation-group-deny.ps1; owner 
+S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on 
+C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456\00a-remove-test-residue.ps1; write 0xD0156 for 
+S-1-5-21-3837883729-3478098758-1729361560-1001 on 
+C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456\00a-remove-test-residue.ps1; owner 
+S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on 
+C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456\01-staging-volume.ps1; write 0xD0156 for 
+S-1-5-21-3837883729-3478098758-1729361560-1001 on 
+C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456\01-staging-volume.ps1; owner 
+S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on 
+C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456\02-identities-and-rights.ps1; write 0xD0156 for 
+S-1-5-21-3837883729-3478098758-1729361560-1001 on 
+C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456\02-identities-and-rights.ps1; owner 
+S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on 
+C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456\03-staging-layout.ps1; write 0xD0156 for 
+S-1-5-21-3837883729-3478098758-1729361560-1001 on 
+C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456\03-staging-layout.ps1; owner 
+S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on 
+C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456\04-broker-install.ps1; write 0xD0156 for 
+S-1-5-21-3837883729-3478098758-1729361560-1001 on 
+C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456\04-broker-install.ps1; owner 
+S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on 
+C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456\05-firewall-egress.ps1; write 0xD0156 for 
+S-1-5-21-3837883729-3478098758-1729361560-1001 on 
+C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456\05-firewall-egress.ps1; owner 
+S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on 
+C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456\06-worker-enable.ps1; write 0xD0156 for 
+S-1-5-21-3837883729-3478098758-1729361560-1001 on 
+C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456\06-worker-enable.ps1; owner 
+S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on 
+C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456\07-verify-config.ps1; write 0xD0156 for 
+S-1-5-21-3837883729-3478098758-1729361560-1001 on 
+C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456\07-verify-config.ps1; owner 
+S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on 
+C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456\09-rollback.ps1; write 0xD0156 for 
+S-1-5-21-3837883729-3478098758-1729361560-1001 on 
+C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456\09-rollback.ps1; owner 
+S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on 
+C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456\Freeze-AdminScripts.ps1; write 0xD0156 for 
+S-1-5-21-3837883729-3478098758-1729361560-1001 on 
+C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456\Freeze-AdminScripts.ps1; owner 
+S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on 
+C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456\_common.ps1; write 0xD0156 for 
+S-1-5-21-3837883729-3478098758-1729361560-1001 on C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456\_common.ps1; 
+owner S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on 
+C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456\SHA256SUMS; write 0xD0156 for 
+S-1-5-21-3837883729-3478098758-1729361560-1001 on C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456\SHA256SUMS; 
+hash mismatch 09-rollback.ps1; SHA256SUMS is not in canonical form (regenerate with Freeze-AdminScripts.ps1) 
+(C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456)
+PASS H2: a tampered script is a recorded hash mismatch
+WARNING:   REFUSED: owner S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on 
+C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456; inheritance not cut on 
+C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456; write 0xD0156 for 
+S-1-5-21-3837883729-3478098758-1729361560-1001 on C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456; owner 
+S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on 
+C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456\00-isolation-group-deny.ps1; write 0xD0156 for 
+S-1-5-21-3837883729-3478098758-1729361560-1001 on 
+C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456\00-isolation-group-deny.ps1; owner 
+S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on 
+C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456\00a-remove-test-residue.ps1; write 0xD0156 for 
+S-1-5-21-3837883729-3478098758-1729361560-1001 on 
+C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456\00a-remove-test-residue.ps1; owner 
+S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on 
+C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456\01-staging-volume.ps1; write 0xD0156 for 
+S-1-5-21-3837883729-3478098758-1729361560-1001 on 
+C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456\01-staging-volume.ps1; owner 
+S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on 
+C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456\02-identities-and-rights.ps1; write 0xD0156 for 
+S-1-5-21-3837883729-3478098758-1729361560-1001 on 
+C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456\02-identities-and-rights.ps1; owner 
+S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on 
+C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456\03-staging-layout.ps1; write 0xD0156 for 
+S-1-5-21-3837883729-3478098758-1729361560-1001 on 
+C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456\03-staging-layout.ps1; owner 
+S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on 
+C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456\04-broker-install.ps1; write 0xD0156 for 
+S-1-5-21-3837883729-3478098758-1729361560-1001 on 
+C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456\04-broker-install.ps1; owner 
+S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on 
+C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456\05-firewall-egress.ps1; write 0xD0156 for 
+S-1-5-21-3837883729-3478098758-1729361560-1001 on 
+C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456\05-firewall-egress.ps1; owner 
+S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on 
+C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456\06-worker-enable.ps1; write 0xD0156 for 
+S-1-5-21-3837883729-3478098758-1729361560-1001 on 
+C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456\06-worker-enable.ps1; owner 
+S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on 
+C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456\07-verify-config.ps1; write 0xD0156 for 
+S-1-5-21-3837883729-3478098758-1729361560-1001 on 
+C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456\07-verify-config.ps1; owner 
+S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on 
+C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456\09-rollback.ps1; write 0xD0156 for 
+S-1-5-21-3837883729-3478098758-1729361560-1001 on 
+C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456\09-rollback.ps1; owner 
+S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on 
+C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456\Freeze-AdminScripts.ps1; write 0xD0156 for 
+S-1-5-21-3837883729-3478098758-1729361560-1001 on 
+C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456\Freeze-AdminScripts.ps1; owner 
+S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on 
+C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456\_common.ps1; write 0xD0156 for 
+S-1-5-21-3837883729-3478098758-1729361560-1001 on C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456\_common.ps1; 
+owner S-1-5-21-3837883729-3478098758-1729361560-1001 is not SYSTEM/Administrators on 
+C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456\SHA256SUMS; write 0xD0156 for 
+S-1-5-21-3837883729-3478098758-1729361560-1001 on C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456\SHA256SUMS; 
+SHA256SUMS is not in canonical form (regenerate with Freeze-AdminScripts.ps1); SHA256SUMS does not match the 
+out-of-band ApprovedManifestHash (C:\Users\Roman\AppData\Local\Temp\elv-r3-trusted-17456)
+PASS H2: non-canonical SHA256SUMS (CRLF) is a recorded problem
+PASS H2: Freeze refuses to run non-elevated (and -ApprovedSums is mandatory)
+PASS H2: every script exposes -ApprovedManifestHash (00,00a,01..06,09)
+
+### I. H4 firewall predicate, L4 groups, H5 shadows, I1/I2
+PASS H4: rule bound to a STALE SID is rejected
+PASS H4: rule bound to the current SID accepted
+PASS L9: substring SID (ƒ?Ý-100 vs ƒ?Ý-1001) rejected
+PASS H4: disabled / allow / inbound rules rejected
+PASS L9: address set compared exactly
+PASS H4: missing rule rejected (fail closed)
+PASS L4: group members via ADSI include the runner (Administrators)
+PASS L4: non-existent group THROWS (fail closed) instead of returning nothing
+PASS L4: Get-ElvAccountGroupNames (DIRECT memberships) for the runner includes Administrators
+PASS H5: shadow enumeration THROWS UNKNOWN when not elevated (fail closed)
+PASS H5: pre-DENY shadow gate THROWS when not elevated (06 gate records FAIL)
+PASS H5: deny-target drives derived (E, F, C, D)
+PASS I1: owner resolved by the fixed SID, not $env:USERNAME
+PASS I2/L8: production state found by command line and .git\HEAD (no git.exe, no hard-coded PID)
+PASS Get-ElvGitHead reads a symbolic ref correctly on the production checkout
+
+### J. ACL evaluation against REAL objects (read-only)
+PASS E:\ grants broad groups write today (the finding)
+PASS owner profile denies broad groups
+PASS no group DENY exists yet on E:\ (nothing applied)
+PASS E:\$RECYCLE.BIN (M11) grants Users add-subdirectory today
+
+### K. 00 mode guards and 06 gate (dry-run, fail closed)
+PASS -SweepRoots outside DENY targets refused
+PASS -SweepRoots without -Sweep refused
+PASS -SweepRoots with -Apply refused
+PASS -VerifyRoots without -Verify refused
+PASS -Sweep and -Verify together refused
+PASS -Finalize without -Sweep/-Verify refused
+PASS -ListShadows non-elevated FAILS CLOSED (throws UNKNOWN; report saved with error)
+PASS -Sweep -SweepRoots <tests dir> runs read-only and writes a chunk record
+PASS -Sweep -Finalize on a partial chunk set reports coverage FAIL and complete=false (no exception)
+PASS 06 gate dry-run: G5 (verify-complete) and G8 (shadows) FAIL closed with explicit reasons
+
+### L. every script parses and dry-runs cleanly without changing the system
+PASS parse 00-isolation-group-deny.ps1
+PASS parse 00a-remove-test-residue.ps1
+PASS parse 01-staging-volume.ps1
+PASS parse 02-identities-and-rights.ps1
+PASS parse 03-staging-layout.ps1
+PASS parse 04-broker-install.ps1
+PASS parse 05-firewall-egress.ps1
+PASS parse 06-worker-enable.ps1
+PASS parse 07-verify-config.ps1
+PASS parse 09-rollback.ps1
+PASS parse Freeze-AdminScripts.ps1
+PASS parse _common.ps1
+PASS dry-run 00-isolation-group-deny.ps1 
+PASS dry-run 00a-remove-test-residue.ps1 
+PASS dry-run 01-staging-volume.ps1 
+PASS dry-run 02-identities-and-rights.ps1 
+PASS dry-run 02-identities-and-rights.ps1 -VolumeQuotaMB=2048
+PASS dry-run 03-staging-layout.ps1 
+PASS dry-run 04-broker-install.ps1 
+PASS dry-run 05-firewall-egress.ps1 -AllowIPv4Cidrs=160.79.104.0/23
+PASS dry-run 05-firewall-egress.ps1 -HostRules=True
+PASS dry-run 06-worker-enable.ps1 -Mode=enable-for-login
+PASS dry-run 06-worker-enable.ps1 -Mode=lockdown
+PASS dry-run 06-worker-enable.ps1 -Mode=register-task
+PASS dry-run 07-verify-config.ps1 -Stage=00
+PASS dry-run 07-verify-config.ps1 -Stage=06
+PASS dry-run 09-rollback.ps1 
+PASS dry-run 09-rollback.ps1 -IncludeProductionDeny=True
+PASS system unchanged after dry-runs: users
+PASS system unchanged after dry-runs: groups
+PASS system unchanged after dry-runs: tasks
+PASS system unchanged after dry-runs: fw
+PASS system unchanged after dry-runs: eRoot
+PASS system unchanged after dry-runs: fRoot
+PASS system unchanged after dry-runs: staging
+PASS system unchanged after dry-runs: disk
+PASS system unchanged after dry-runs: prodEnv
+PASS production untouched (task Running, supervisor alive, HEAD e60278f)
+
+TEST-R3 pass=182 fail=0

@@ -1,0 +1,13 @@
+﻿== 07 configuration verification up to stage 00 (READ-ONLY; NOT access tests) ==
+  [FAIL] C00.1 group ElevariqIsolatedIdentities exists 
+  [FAIL] C00.5 test residue Everyone:F removed (00a) 
+  [PASS] P0 production task present and running Running
+  [PASS] P1 production supervisor PID 8992 alive 
+  [PASS] P2 production HEAD = e60278f e60278f
+  [PASS] P3 production task action still points at the checkout script 
+
+CONFIGURATION: 2 FAIL. Reminder: configuration checks are NOT evidence that Windows denies the worker.
+
+Report: E:\Agent\v2-staging\worker-isolation\admin-scripts-r2-20261110\reports\07-verify-config-20261110-140338.json
+Changes: 0  Refusals: 0  Checks: 6  Mode: DRY-RUN
+

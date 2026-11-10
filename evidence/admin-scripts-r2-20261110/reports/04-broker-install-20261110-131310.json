@@ -1,0 +1,79 @@
+﻿{
+    "script":  "04-broker-install",
+    "revision":  "r2-20261110",
+    "startedAt":  "2026-11-10T13:13:10.3763708+05:00",
+    "dryRun":  true,
+    "user":  "DESKTOP-QGGLG8D\\Roman",
+    "changes":  [
+                    {
+                        "action":  "verify-release",
+                        "target":  "",
+                        "detail":  "SHA256SUMS complete + matching; release dir not broad-writable",
+                        "applied":  false,
+                        "at":  "2026-11-10T13:13:10.4187528+05:00"
+                    },
+                    {
+                        "action":  "copy",
+                        "target":  "C:\\ElevariqStaging\\broker\\bin",
+                        "detail":  "replace broker\\bin contents with the verified release; re-verify at destination",
+                        "applied":  false,
+                        "at":  "2026-11-10T13:13:10.4203092+05:00"
+                    },
+                    {
+                        "action":  "set-password+enable",
+                        "target":  "elv-stg-broker",
+                        "detail":  "owner types the broker password (not stored)",
+                        "applied":  false,
+                        "at":  "2026-11-10T13:13:10.4203092+05:00"
+                    },
+                    {
+                        "action":  "register-scheduledtask",
+                        "target":  "ElevariqStagingBroker",
+                        "detail":  "principal=elv-stg-broker Password logon, Limited; action=powershell -File C:\\ElevariqStaging\\broker\\bin\\run-broker.ps1; not started",
+                        "applied":  false,
+                        "at":  "2026-11-10T13:13:10.4203092+05:00"
+                    }
+                ],
+    "refusals":  [
+
+                 ],
+    "checks":  [
+                   {
+                       "id":  "R7",
+                       "name":  "trusted script location + SHA256SUMS",
+                       "status":  "WARN",
+                       "detail":  "broad write on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r2-20261110; broad write on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r2-20261110\\00-isolation-group-deny.ps1; broad write on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r2-20261110\\00a-remove-test-residue.ps1; broad write on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r2-20261110\\01-staging-volume.ps1; broad write on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r2-20261110\\02-identities-and-rights.ps1; broad write on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r2-20261110\\03-staging-layout.ps1; broad write on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r2-20261110\\04-broker-install.ps1; broad write on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r2-20261110\\05-firewall-egress.ps1; broad write on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r2-20261110\\06-worker-enable.ps1; broad write on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r2-20261110\\07-verify-config.ps1; broad write on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r2-20261110\\09-rollback.ps1; broad write on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r2-20261110\\Freeze-AdminScripts.ps1; broad write on E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r2-20261110\\_common.ps1; SHA256SUMS missing"
+                   },
+                   {
+                       "id":  "PRE",
+                       "name":  "03 applied (broker\\bin exists, worker DENY present)",
+                       "status":  "FAIL",
+                       "detail":  ""
+                   },
+                   {
+                       "id":  "P0",
+                       "name":  "production task present and running",
+                       "status":  "PASS",
+                       "detail":  "Running"
+                   },
+                   {
+                       "id":  "P1",
+                       "name":  "production supervisor PID 8992 alive",
+                       "status":  "PASS",
+                       "detail":  ""
+                   },
+                   {
+                       "id":  "P2",
+                       "name":  "production HEAD = e60278f",
+                       "status":  "PASS",
+                       "detail":  "e60278f"
+                   },
+                   {
+                       "id":  "P3",
+                       "name":  "production task action still points at the checkout script",
+                       "status":  "PASS",
+                       "detail":  ""
+                   }
+               ],
+    "path":  "E:\\Agent\\v2-staging\\worker-isolation\\admin-scripts-r2-20261110\\reports\\04-broker-install-20261110-131310.json"
+}

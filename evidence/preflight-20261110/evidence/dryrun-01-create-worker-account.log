@@ -1,0 +1,19 @@
+﻿== 01 Create worker account (DRY-RUN) ==
+  DRY-RUN create-localuser: elevariq-worker -- standard user, random password, PasswordNeverExpires
+  DRY-RUN add-to-group: Users -- add elevariq-worker to BUILTIN\Users only
+  DRY-RUN record-password: C:\ElevariqBroker\worker-cred.xml -- DPAPI-protected credential, broker-root only (not created in dry-run)
+  DRY-RUN plan-deny-privilege: elevariq-worker -- SeDebugPrivilege
+  DRY-RUN plan-deny-privilege: elevariq-worker -- SeImpersonatePrivilege
+  DRY-RUN plan-deny-privilege: elevariq-worker -- SeAssignPrimaryTokenPrivilege
+  DRY-RUN plan-deny-privilege: elevariq-worker -- SeBackupPrivilege
+  DRY-RUN plan-deny-privilege: elevariq-worker -- SeRestorePrivilege
+  DRY-RUN plan-deny-privilege: elevariq-worker -- SeTakeOwnershipPrivilege
+  DRY-RUN plan-deny-privilege: elevariq-worker -- SeLoadDriverPrivilege
+  DRY-RUN plan-deny-privilege: elevariq-worker -- SeCreateGlobalPrivilege
+  DRY-RUN plan-deny-privilege: elevariq-worker -- SeCreateServicePrivilege
+  DRY-RUN plan-deny-privilege: elevariq-worker -- SeSystemtimePrivilege
+  DRY-RUN plan-deny-privilege: elevariq-worker -- SeShutdownPrivilege
+  DRY-RUN plan-deny-privilege: elevariq-worker -- SeRemoteShutdownPrivilege
+
+Report written: E:\Agent\v2-staging\trusted-execution-20261110-0249\admin-scripts\reports\01-create-worker-account-20261110-031318.json
+Changes: 15  Refusals: 0  Mode: DRY-RUN

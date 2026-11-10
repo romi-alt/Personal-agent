@@ -1,0 +1,26 @@
+﻿{
+    "script":  "04-worker-task-register",
+    "startedAt":  "2026-11-10T03:27:44.6748804+05:00",
+    "dryRun":  true,
+    "stagingOnly":  true,
+    "changes":  [
+                    {
+                        "action":  "register-scheduledtask",
+                        "target":  "ElevariqStagingWorker",
+                        "detail":  "principal=elv-stg-worker (standard); action=powershell -File C:\\ElevariqStaging\\work\\run-worker.ps1; env USERPROFILE/APPDATA/TEMP under C:\\ElevariqStaging\\work",
+                        "applied":  false,
+                        "at":  "2026-11-10T03:27:44.7049064+05:00"
+                    },
+                    {
+                        "action":  "note",
+                        "target":  "ElevariqStagingWorker",
+                        "detail":  "does NOT alter production task ElevariqPersonalAgent",
+                        "applied":  false,
+                        "at":  "2026-11-10T03:27:44.7090953+05:00"
+                    }
+                ],
+    "refusals":  [
+
+                 ],
+    "path":  "E:\\Agent\\v2-staging\\trusted-execution-20261110-0249\\admin-scripts\\reports\\04-worker-task-register-20261110-032744.json"
+}

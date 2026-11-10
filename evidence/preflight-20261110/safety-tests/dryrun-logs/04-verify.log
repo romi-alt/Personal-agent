@@ -1,0 +1,11 @@
+﻿== 04 Staging worker task [verify] (DRY-RUN) ==
+  DRY-RUN verify: G1 worker account exists -- result=False
+  DRY-RUN verify: G2 worker NOT an administrator -- result=True
+  DRY-RUN verify: G3 broker root denies worker -- result=False
+  DRY-RUN verify: G4 decoy credential denies worker -- result=n/a (not created)
+  DRY-RUN verify: G9 staging egress block rule -- result=False
+  DRY-RUN verify: P0 production task untouched -- result=True
+  DRY-RUN verify: P1 production supervisor alive -- result=True
+
+Report written: E:\Agent\v2-staging\trusted-execution-20261110-0249\admin-scripts\reports\04-worker-task-verify-20261110-032741.json
+Changes: 7  Refusals: 0  Mode: DRY-RUN / STAGING-ONLY
