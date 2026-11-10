@@ -1,0 +1,2 @@
+# Preserve exact bytes so the frozen SHA-256 hashes verify on clone/checkout
+* -text
