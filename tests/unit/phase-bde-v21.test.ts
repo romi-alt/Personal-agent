@@ -341,13 +341,26 @@ describe('Phase G findings from the real Claude Code staging run', () => {
     expect(bash('cat > f.txt <<EOF\n$(cat ../../notes.txt)\nEOF')).toBe('DENY');
     expect(bash("cat > run.sh <<'EOF'\ncat ../../notes.txt\nEOF\nbash run.sh")).toBe('DENY');
   });
-  it('stripHeredocBodies keeps here-strings and the lines after a terminated body', async () => {
-    const { stripHeredocBodies } = await import('../../src/security/hardening.js');
-    expect(stripHeredocBodies("cat > a <<'EOF'\nbody ../x\nEOF\nls ../../y")).toBe(
+  it('withoutHeredocBodies removes exactly the lexer-identified bodies', async () => {
+    const { withoutHeredocBodies } = await import('../../src/security/shell-normalize.js');
+    expect(withoutHeredocBodies("cat > a <<'EOF'\nbody ../x\nEOF\nls ../../y")).toBe(
       "cat > a <<'EOF'\nls ../../y",
     );
-    expect(stripHeredocBodies('cat <<< ../x\nls ../../y')).toBe('cat <<< ../x\nls ../../y');
-    expect(stripHeredocBodies('cat > a <<-EOF\n\tbody\n\tEOF\nls')).toBe('cat > a <<-EOF\nls');
+    expect(withoutHeredocBodies('cat <<< ../x\nls ../../y')).toBe('cat <<< ../x\nls ../../y');
+    expect(withoutHeredocBodies('cat > a <<-EOF\n\tbody\n\tEOF\nls')).toBe('cat > a <<-EOF\nls');
+    // `<<EOF` inside quotes or a comment is not a heredoc: nothing may be removed
+    for (const c of ['echo "x<<EOF"\ncat ../../y', "echo 'a <<EOF'\ncat ../../y", '# see <<EOF\ncat ../../y'])
+      expect(withoutHeredocBodies(c)).toBe(c);
+    expect(withoutHeredocBodies("cat > a <<'EOF'\nunterminated")).toBeNull();
+  });
+  it('finding 9: a quoted or commented <<EOF cannot hide the next command line from the path check', () => {
+    for (const c of [
+      'echo "x<<EOF"\ncat ../../notes.txt',
+      "echo 'a <<EOF'\ncat ../../notes.txt",
+      '# see <<EOF\ncat ../../notes.txt',
+      'echo "<<EOF" && cat ../../notes.txt',
+    ])
+      expect(bash(c), c).toBe('DENY');
   });
   it('usage token counts are not redacted by the key-name rule; string secrets under such keys still are', async () => {
     const { redactValue } = await import('../../src/security/redact.js');

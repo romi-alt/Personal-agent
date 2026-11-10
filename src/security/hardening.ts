@@ -249,29 +249,9 @@ function tokens(segment: string): string[] {
   return out.map((t) => t.replace(/^--?[\w-]+=/, '').replace(/^@/, '')).filter(Boolean);
 }
 
-/**
- * Removes heredoc BODIES (keeps the `cat > f <<'EOF'` line, so the redirect target is still checked). Phase G finding:
- * a real worker wrote a test file through a heredoc whose body contained `import ... from '../src/slugify.ts'`; the
- * body was tokenized as paths, `../src` resolved to `<agent home>/workspaces/src` and the call was denied. Callers
- * must only use this when the shell analyzer classified the heredoc as DATA (`useRaw` false): heredocs fed to an
- * interpreter, unquoted bodies with substitutions and files executed in the same command keep the raw text.
- */
-export function stripHeredocBodies(command: string): string {
-  const out: string[] = [];
-  const pending: { delim: string; tabs: boolean }[] = [];
-  for (const line of command.split('\n')) {
-    if (pending.length) {
-      const h = pending[0]!;
-      const cmp = (h.tabs ? line.replace(/^\t+/, '') : line).replace(/\r$/, '');
-      if (cmp === h.delim) pending.shift();
-      continue;
-    }
-    out.push(line);
-    for (const m of line.matchAll(/(?<!<)<<(-?)\s*(['"]?)([A-Za-z_][\w.-]*)\2/g))
-      pending.push({ delim: m[3]!, tabs: m[1] === '-' });
-  }
-  return out.join('\n');
-}
+// The line-based `stripHeredocBodies` (1e5b7d4) was REMOVED: it treated `<<EOF` inside quotes or comments as a
+// heredoc and dropped the following command lines from the path check (finding 9 bypass). Use
+// `withoutHeredocBodies` from shell-normalize.ts, which removes only the lexer's exact heredoc-body ranges.
 
 /**
  * Resolves path-like words of a command (tracking `cd`) and reports whether any of them names a protected
